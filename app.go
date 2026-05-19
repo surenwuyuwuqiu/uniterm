@@ -13,11 +13,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/ys-ll/uniterm/backend/log"
 	"github.com/ys-ll/uniterm/backend/session"
 	"github.com/ys-ll/uniterm/backend/store"
+
+	"golang.org/x/sys/windows"
 )
 
 type App struct {
@@ -26,6 +29,7 @@ type App struct {
 	connectionStore *store.ConnectionStore
 	aiConfigStore   *store.AIConfigStore
 	settingsStore   *store.SettingsStore
+	mainHwnd        uintptr
 }
 
 func NewApp() *App {
@@ -34,7 +38,16 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Init logger first so subsequent log.Writef calls actually write
+	if err := log.Init(); err != nil {
+		fmt.Printf("WARN: log.Init failed: %v\n", err)
+	}
+
 	a.sessionManager = session.NewSessionManager()
+
+	// Discover main window HWND for RDP child window embedding
+	a.mainHwnd = a.findMainWindow()
 
 	cs, err := store.NewConnectionStore()
 	if err != nil {
@@ -174,6 +187,11 @@ func (a *App) CreateSession(sessionType string, config session.ConnectionConfig)
 		return nil, err
 	}
 
+	// Set parent HWND for RDP sessions
+	if rdp, ok := s.(*session.RDPSession); ok {
+		rdp.SetParentHwnd(a.mainHwnd)
+	}
+
 	s.SetOnDataCallback(func(data []byte) {
 		runtime.EventsEmit(a.ctx, "session:data", map[string]interface{}{
 			"id":   s.ID(),
@@ -182,10 +200,22 @@ func (a *App) CreateSession(sessionType string, config session.ConnectionConfig)
 	})
 
 	s.SetOnStatusChangeCallback(func(status session.SessionStatus) {
-		runtime.EventsEmit(a.ctx, "session:status", map[string]interface{}{
+		payload := map[string]interface{}{
 			"id":     s.ID(),
 			"status": status,
-		})
+		}
+		// For RDP sessions, include client area screen coordinates so the
+		// frontend can position the overlay window without fragile browser APIs.
+		if status == session.StatusConnected {
+			if rdp, ok := s.(*session.RDPSession); ok {
+				cx, cy, cw, ch := rdp.ClientAreaScreenRect()
+				payload["clientX"] = cx
+				payload["clientY"] = cy
+				payload["clientW"] = cw
+				payload["clientH"] = ch
+			}
+		}
+		runtime.EventsEmit(a.ctx, "session:status", payload)
 	})
 
 	go func() {
@@ -252,6 +282,63 @@ func (a *App) SessionResize(sessionID string, cols, rows int) error {
 		return fmt.Errorf("session not found: %s", sessionID)
 	}
 	return s.Resize(cols, rows)
+}
+
+func (a *App) findMainWindow() uintptr {
+	title, _ := windows.UTF16PtrFromString("uniTerm")
+	hwnd, _, _ := windows.NewLazySystemDLL("user32.dll").NewProc("FindWindowW").Call(
+		0,
+		uintptr(unsafe.Pointer(title)),
+	)
+	return hwnd
+}
+
+func (a *App) RDPSetPosition(sessionID string, x, y, w, h int) error {
+	if a.sessionManager == nil {
+		return fmt.Errorf("session manager not initialized")
+	}
+	s, ok := a.sessionManager.Get(sessionID)
+	if !ok {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+	rdp, ok := s.(*session.RDPSession)
+	if !ok {
+		return fmt.Errorf("session is not RDP")
+	}
+	rdp.SetPosition(x, y, w, h)
+	return nil
+}
+
+func (a *App) RDPShow(sessionID string) error {
+	if a.sessionManager == nil {
+		return fmt.Errorf("session manager not initialized")
+	}
+	s, ok := a.sessionManager.Get(sessionID)
+	if !ok {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+	rdp, ok := s.(*session.RDPSession)
+	if !ok {
+		return fmt.Errorf("session is not RDP")
+	}
+	rdp.Show()
+	return nil
+}
+
+func (a *App) RDPHide(sessionID string) error {
+	if a.sessionManager == nil {
+		return fmt.Errorf("session manager not initialized")
+	}
+	s, ok := a.sessionManager.Get(sessionID)
+	if !ok {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+	rdp, ok := s.(*session.RDPSession)
+	if !ok {
+		return fmt.Errorf("session is not RDP")
+	}
+	rdp.Hide()
+	return nil
 }
 
 // ChatCompletion proxies Anthropic-native LLM API requests through the Go backend.

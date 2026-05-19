@@ -28,6 +28,10 @@ type ConnectionConfig struct {
 	Password string  `json:"password,omitempty"`
 	KeyPath  string  `json:"keyPath,omitempty"`
 	GroupId  *string `json:"groupId,omitempty"`
+	// RDP-specific fields
+	RdpSizeMode    string `json:"rdpSizeMode,omitempty"`    // "follow" | "fixed"
+	RdpFixedWidth  int    `json:"rdpFixedWidth,omitempty"`
+	RdpFixedHeight int    `json:"rdpFixedHeight,omitempty"`
 }
 
 // ConnectionStoreData is the top-level structure persisted to connections.json.

@@ -224,6 +224,20 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.modelProtocol': '协议',
     'settings.cancel': '取消',
     'settings.save': '保存',
+
+    // RDP
+    'conn.rdpSizeMode': '分辨率模式',
+    'conn.rdpFollowWindow': '跟随窗口',
+    'conn.rdpFixedSize': '固定分辨率',
+    'sidebar.connectRDP': '连接 RDP',
+    'rdp.connecting': '正在连接到 {host}...',
+    'rdp.connected': '已连接',
+    'rdp.disconnected': '已断开',
+    'rdp.error': '连接失败',
+    'rdp.reconnect': '重新连接',
+    'rdp.retry': '重试',
+    'rdp.resolution': '分辨率',
+    'rdp.windowOpen': '远程桌面已在新窗口打开',
   },
   'en': {
     // AppHeader
@@ -445,6 +459,20 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.modelProtocol': 'Protocol',
     'settings.cancel': 'Cancel',
     'settings.save': 'Save',
+
+    // RDP
+    'conn.rdpSizeMode': 'Resolution Mode',
+    'conn.rdpFollowWindow': 'Follow Window',
+    'conn.rdpFixedSize': 'Fixed Resolution',
+    'sidebar.connectRDP': 'Connect RDP',
+    'rdp.connecting': 'Connecting to {host}...',
+    'rdp.connected': 'Connected',
+    'rdp.disconnected': 'Disconnected',
+    'rdp.error': 'Connection failed',
+    'rdp.reconnect': 'Reconnect',
+    'rdp.retry': 'Retry',
+    'rdp.resolution': 'Resolution',
+    'rdp.windowOpen': 'Remote desktop opened in a new window',
   }
 }
 

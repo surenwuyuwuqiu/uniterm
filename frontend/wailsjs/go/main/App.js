@@ -50,6 +50,18 @@ export function OpenMultipleFilesDialog() {
   return window['go']['main']['App']['OpenMultipleFilesDialog']();
 }
 
+export function RDPHide(arg1) {
+  return window['go']['main']['App']['RDPHide'](arg1);
+}
+
+export function RDPSetPosition(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['RDPSetPosition'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function RDPShow(arg1) {
+  return window['go']['main']['App']['RDPShow'](arg1);
+}
+
 export function RemoveTempFile(arg1) {
   return window['go']['main']['App']['RemoveTempFile'](arg1);
 }

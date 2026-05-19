@@ -7,7 +7,7 @@
       @open-settings="openSettings"
     />
     <div class="main-content">
-      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" />
+      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" />
       <div class="tab-area">
         <TabBar />
         <template v-if="activeTab">
@@ -28,6 +28,13 @@
             v-else-if="activeTab.type === 'sftp'"
             :key="activeTab.id"
             :panel-id="activeTab.panelId"
+          />
+          <RDPTabContent
+            v-else-if="activeTab.type === 'rdp'"
+            :key="activeTab.id"
+            :panel-id="activeTab.panelId"
+            :config="getPanelConfig(activeTab.panelId)"
+            :session-id="getPanelSessionId(activeTab.panelId)"
           />
         </template>
       </div>
@@ -51,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import Sidebar from './components/Sidebar.vue'
 import TabBar from './components/TabBar.vue'
@@ -59,6 +66,7 @@ import TerminalTabContent from './components/TerminalTabContent.vue'
 import SettingsTabContent from './components/SettingsTabContent.vue'
 import WorkspaceContent from './components/WorkspaceContent.vue'
 import SFTPTabContent from './components/SFTPTabContent.vue'
+import RDPTabContent from './components/RDPTabContent.vue'
 import ConnectionForm from './components/ConnectionForm.vue'
 import AISidebar from './components/AISidebar.vue'
 import { useConnectionStore } from './stores/connectionStore'
@@ -68,7 +76,7 @@ import { useSessionStore } from './stores/sessionStore'
 import { useAIStore } from './stores/aiStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useI18n } from './i18n'
-import { CreateSession } from '../wailsjs/go/main/App'
+import { CreateSession, CloseSession, RDPHide, RDPShow } from '../wailsjs/go/main/App'
 import type { ConnectionConfig } from './types/session'
 
 const connectionStore = useConnectionStore()
@@ -197,11 +205,20 @@ function closeTab(tabId: string) {
   panelIds.forEach(pid => panelStore.removePanel(pid))
 }
 
+function getPanelConfig(panelId: string): ConnectionConfig | null {
+  return panelStore.getPanel(panelId)?.config || null
+}
+
+function getPanelSessionId(panelId: string): string | null {
+  return panelStore.getPanel(panelId)?.sessionId || null
+}
+
 function onSaveOnly(config: ConnectionConfig) {
   connectionStore.add(config)
 }
 
 async function onConnect(config: ConnectionConfig) {
+  if (config.type === 'rdp') return onConnectRDP(config)
   connectionStore.add(config)
   const panel = panelStore.createPanel(config, 'ssh')
   const displayTitle = config.name
@@ -240,6 +257,41 @@ async function onConnectSftp(config: ConnectionConfig) {
     panelStore.removePanel(panel.id)
   }
 }
+
+async function onConnectRDP(config: ConnectionConfig) {
+  connectionStore.add(config)
+
+  const displayTitle = config.name
+    ? `${config.name} (RDP)`
+    : `${config.user}@${config.host} (RDP)`
+
+  const panel = panelStore.createPanel(config, 'rdp')
+  panel.title = displayTitle
+  const tab = tabStore.createRDPTab(displayTitle, panel.id)
+  panelStore.movePanelToTab(panel.id, tab.id)
+
+  try {
+    const info = await CreateSession('rdp', config)
+    panelStore.bindSession(panel.id, info.id)
+    sessionStore.initSession(info.id)
+  } catch (e) {
+    console.error('Failed to create RDP session:', e)
+    tabStore.closeTab(tab.id)
+    panelStore.removePanel(panel.id)
+  }
+}
+
+// Show/hide native RDP window on tab switch
+watch(() => activeTab.value, (newTab, oldTab) => {
+  if (oldTab?.type === 'rdp') {
+    const p = panelStore.getPanel(oldTab.panelId)
+    if (p?.sessionId) RDPHide(p.sessionId)
+  }
+  if (newTab?.type === 'rdp') {
+    const p = panelStore.getPanel(newTab.panelId)
+    if (p?.sessionId) nextTick(() => RDPShow(p.sessionId!))
+  }
+})
 </script>
 
 <style scoped>

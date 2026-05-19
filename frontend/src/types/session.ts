@@ -8,7 +8,7 @@ export interface ConnectionGroup {
 export interface ConnectionConfig {
   id: string
   name: string
-  type: 'ssh'
+  type: 'ssh' | 'rdp'
   host: string
   port: number
   user: string
@@ -16,6 +16,10 @@ export interface ConnectionConfig {
   password?: string
   keyPath?: string
   groupId?: string
+  // RDP-specific
+  rdpSizeMode?: 'follow' | 'fixed'
+  rdpFixedWidth?: number
+  rdpFixedHeight?: number
 }
 
 export interface SessionInfo {

@@ -15,7 +15,7 @@
         ></div>
 
         <TabItem
-          v-if="tab.type === 'terminal' || tab.type === 'settings' || tab.type === 'sftp'"
+          v-if="tab.type === 'terminal' || tab.type === 'settings' || tab.type === 'sftp' || tab.type === 'rdp'"
           :tab="tab"
           :is-active="tab.id === activeTabId"
           @activate="setActiveTab"

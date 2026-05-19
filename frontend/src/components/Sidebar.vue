@@ -165,8 +165,9 @@
         :style="menuStyle"
         @click.stop
       >
-        <div class="menu-item" @click="doConnect">{{ t('sidebar.connect') }}</div>
-        <div class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
+        <div v-if="!selectedConn || selectedConn.type !== 'rdp'" class="menu-item" @click="doConnect">{{ t('sidebar.connect') }}</div>
+        <div v-if="!selectedConn || selectedConn.type !== 'rdp'" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
+        <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
         <div class="menu-divider" />
         <div class="menu-item" :class="{ disabled: multiSelectedIds.size > 0 }" @click="multiSelectedIds.size === 0 && doEdit()">{{ t('sidebar.edit') }}</div>
         <div class="menu-item" @click="doDuplicate">{{ t('sidebar.duplicate') }}</div>
@@ -309,7 +310,7 @@ import type { ConnectionConfig, ConnectionGroup } from '../types/session'
 defineProps<{
   visible: boolean
 }>()
-const emit = defineEmits(['connect', 'connectSftp', 'toggle'])
+const emit = defineEmits(['connect', 'connectSftp', 'connectRdp', 'toggle'])
 const connectionStore = useConnectionStore()
 const { t } = useI18n()
 const showForm = ref(false)
@@ -494,7 +495,13 @@ function onListKeydown(e: KeyboardEvent) {
     if (ids.length > 0) {
       for (const id of ids) {
         const c = connectionStore.connections.find(c => c.id === id)
-        if (c) emit('connect', c)
+        if (c) {
+          if (c.type === 'rdp') {
+            emit('connectRdp', c)
+          } else {
+            emit('connect', c)
+          }
+        }
       }
       multiSelectedIds.value = new Set()
     }
@@ -582,7 +589,11 @@ function onItemClick(e: MouseEvent, conn: ConnectionConfig) {
 
 function onItemDblClick(conn: ConnectionConfig) {
   multiSelectedIds.value = new Set()
-  emit('connect', conn)
+  if (conn.type === 'rdp') {
+    emit('connectRdp', conn)
+  } else {
+    emit('connect', conn)
+  }
 }
 
 // ── Context menu helper ──
@@ -640,6 +651,16 @@ function doConnectSFTP() {
   closeMenu()
   for (const c of conns) {
     emit('connectSftp', c)
+  }
+}
+
+function doConnectRDP() {
+  const ids = getSelectedConnectionIds()
+  const conns = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
+  multiSelectedIds.value = new Set()
+  closeMenu()
+  for (const c of conns) {
+    emit('connectRdp', c)
   }
 }
 
@@ -896,7 +917,11 @@ function onConnectFromForm(config: ConnectionConfig) {
   }
   showForm.value = false
   editConfig.value = undefined
-  emit('connect', config)
+  if (config.type === 'rdp') {
+    emit('connectRdp', config)
+  } else {
+    emit('connect', config)
+  }
 }
 
 // ── Lifecycle ──

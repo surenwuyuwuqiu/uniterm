@@ -1,4 +1,4 @@
-export type PanelType = 'ssh' | 'sftp' | 'settings' | 'other'
+export type PanelType = 'ssh' | 'sftp' | 'settings' | 'rdp' | 'other'
 export type PanelStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 export interface ConnectionConfig {
@@ -12,6 +12,10 @@ export interface ConnectionConfig {
   password?: string
   keyPath?: string
   groupId?: string
+  // RDP-specific
+  rdpSizeMode?: string
+  rdpFixedWidth?: number
+  rdpFixedHeight?: number
 }
 
 export interface Panel {
@@ -34,7 +38,7 @@ export type LayoutNode =
 
 // ── Tab types ──
 
-export type Tab = TerminalTab | SettingsTab | WorkspaceTab | SFTPTab
+export type Tab = TerminalTab | SettingsTab | WorkspaceTab | SFTPTab | RDPTab
 
 export interface TerminalTab {
   type: 'terminal'
@@ -61,6 +65,13 @@ export interface WorkspaceTab {
 
 export interface SFTPTab {
   type: 'sftp'
+  id: string
+  panelId: string
+  name: string
+}
+
+export interface RDPTab {
+  type: 'rdp'
   id: string
   panelId: string
   name: string

@@ -7,6 +7,7 @@
       <el-form-item :label="t('conn.type')">
         <el-radio-group v-model="form.type">
           <el-radio-button label="ssh">SSH</el-radio-button>
+          <el-radio-button label="rdp">RDP</el-radio-button>
         </el-radio-group>
       </el-form-item>
       <el-form-item :label="t('conn.host')" required>
@@ -15,19 +16,37 @@
       <el-form-item :label="t('conn.port')">
         <el-input-number v-model="form.port" :min="1" :max="65535" />
       </el-form-item>
+      <template v-if="form.type === 'rdp'">
+        <el-form-item :label="t('conn.rdpSizeMode')">
+          <el-radio-group v-model="form.rdpSizeMode">
+            <el-radio-button label="follow">{{ t('conn.rdpFollowWindow') }}</el-radio-button>
+            <el-radio-button label="fixed">{{ t('conn.rdpFixedSize') }}</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="form.rdpSizeMode === 'fixed'" :label="t('rdp.resolution')">
+          <el-select v-model="rdpResolution" placeholder="1280×720">
+            <el-option
+              v-for="r in rdpResolutions"
+              :key="r.label"
+              :label="r.label"
+              :value="r.label"
+            />
+          </el-select>
+        </el-form-item>
+      </template>
       <el-form-item :label="t('conn.user')">
         <el-input v-model="form.user" :placeholder="t('conn.userPlaceholder')" />
       </el-form-item>
-      <el-form-item :label="t('conn.authType')">
+      <el-form-item v-if="form.type !== 'rdp'" :label="t('conn.authType')">
         <el-radio-group v-model="form.authType">
           <el-radio-button label="password">{{ t('conn.password') }}</el-radio-button>
           <el-radio-button label="key">{{ t('conn.keyPath') }}</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      <el-form-item v-if="form.authType === 'password'" :label="t('conn.password')">
+      <el-form-item v-if="form.authType === 'password' || form.type === 'rdp'" :label="t('conn.password')">
         <el-input v-model="form.password" type="password" show-password />
       </el-form-item>
-      <el-form-item v-if="form.authType === 'key'" :label="t('conn.keyPath')">
+      <el-form-item v-if="form.authType === 'key' && form.type !== 'rdp'" :label="t('conn.keyPath')">
         <el-input v-model="form.keyPath" :placeholder="t('conn.keyPathPlaceholder')" />
       </el-form-item>
       <el-form-item :label="t('conn.group')">
@@ -111,8 +130,22 @@ const form = reactive<ConnectionConfig>({
   authType: 'password',
   password: '',
   keyPath: '',
-  groupId: undefined
+  groupId: undefined,
+  rdpSizeMode: 'follow',
+  rdpFixedWidth: undefined,
+  rdpFixedHeight: undefined
 })
+
+const rdpResolutions = [
+  { label: '1280 × 720 (HD)', w: 1280, h: 720 },
+  { label: '1920 × 1080 (Full HD)', w: 1920, h: 1080 },
+  { label: '2560 × 1440 (QHD)', w: 2560, h: 1440 },
+  { label: '1024 × 768 (XGA)', w: 1024, h: 768 },
+  { label: '1600 × 1200 (UXGA)', w: 1600, h: 1200 },
+  { label: '1680 × 1050 (WSXGA+)', w: 1680, h: 1050 },
+]
+
+const rdpResolution = ref('1280 × 720 (HD)')
 
 const selectedGroupId = ref<string | undefined>(undefined)
 
@@ -129,6 +162,25 @@ watch(() => props.editConfig, (config) => {
   }
 }, { immediate: true })
 
+// Auto-switch default port when changing type
+watch(() => form.type, (newType) => {
+  if (newType === 'rdp' && form.port === 22) form.port = 3389
+  else if (newType === 'ssh' && form.port === 3389) form.port = 22
+  if (newType === 'rdp') {
+    form.authType = 'password'
+    form.rdpSizeMode = form.rdpSizeMode || 'follow'
+  }
+})
+
+// Sync resolution picker to form fields
+watch(rdpResolution, (val) => {
+  const found = rdpResolutions.find(r => r.label === val)
+  if (found) {
+    form.rdpFixedWidth = found.w
+    form.rdpFixedHeight = found.h
+  }
+})
+
 function resetForm() {
   form.id = ''
   form.name = ''
@@ -140,6 +192,10 @@ function resetForm() {
   form.password = ''
   form.keyPath = ''
   form.groupId = undefined
+  form.rdpSizeMode = 'follow'
+  form.rdpFixedWidth = undefined
+  form.rdpFixedHeight = undefined
+  rdpResolution.value = '1280 × 720 (HD)'
   selectedGroupId.value = undefined
 }
 

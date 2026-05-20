@@ -4,25 +4,23 @@
   <p>A modern cross-platform terminal emulator with built-in AI assistant.</p>
 </div>
 
+[简体中文](README_zh-CN.md)
+
 ## Features
 
-- **SSH Client** — Connect to remote servers via SSH. Supports password and private key authentication.
-- **AI Assistant** — Built-in AI sidebar powered by Anthropic-compatible LLMs (DeepSeek, Claude, etc.). The AI executes shell commands in the active terminal — with configurable execution modes.
-- **Three Execution Modes** — Confirm All (approve every command), Confirm Dangerous (auto-run safe commands, prompt for destructive ones), and Bypass (fully autonomous).
-- **AI Session Management** — Persistent chat sessions with automatic compression, rename, switch, and delete.
-- **AI Debug Mode** — Toggle to inspect raw API request/response bodies in the chat.
-- **Tabs & Splits** — Flexible tab system with split-pane layouts for parallel sessions.
-- **Connection Manager** — Save, search, edit, duplicate, and organize server connections.
-- **Terminal Customization** — Configurable color scheme, font family, font size, selection behavior, right-click action, and scrollback history.
-- **Three Themes** — Dark, Deep Blue, and Light with CSS variable theming, plus system auto-detect.
-- **i18n** — Chinese (简体中文) and English language support.
-- **Cross-Platform** — Windows, macOS, and Linux via Wails.
+- **SSH Client** — Connect to remote servers via password or private key authentication, with multi-tab terminal session management. 5 color schemes, 6 monospace fonts, adjustable font size and scrollback history, configurable selection behavior and right-click action.
+- **SFTP File Manager** — Dual-pane browser for local and remote files. Upload, download, drag-and-drop, delete, rename, and more. Transfer tasks are tracked per tab with pause, resume, and cancel support.
+- **AI Assistant** — Sidebar chat with Anthropic-compatible LLMs that execute shell commands directly in the terminal. Three execution modes (confirm all, confirm dangerous, bypass) with persistent conversation history.
+- **Workspace & Split Panes** — Merge multiple terminal tabs into a workspace with horizontal or vertical split layouts. Drag panel edges or title bars to resize and rearrange freely.
+- **Connection Manager** — Save, search, edit, and duplicate server connections. Group and organize with drag-and-drop, multi-select or range-select for batch connect, batch delete, and more.
+- **Themes & i18n** — Dark, Deep Blue, and Light themes with system auto-detect. Simplified Chinese and English UI.
+- **Cross-Platform** — Built on Wails v2, runs on Windows, macOS, and Linux.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Desktop Framework | [Wails v2](https://wails.io) |
+| Desktop Framework | Wails v2 |
 | Backend | Go |
 | Frontend | Vue 3 + Pinia + Element Plus |
 | Terminal | xterm.js |
@@ -43,38 +41,32 @@
 ## Getting Started
 
 ```bash
-# Clone the repo
 git clone https://github.com/ys-ll/uniterm.git
 cd uniTerm
-
-# Install frontend dependencies
 cd frontend && npm install && cd ..
-
-# Run in development mode
-wails dev
-
-# Build for production
-wails build
+wails dev                   # Development
+wails build                 # Production build
 ```
 
 ## Project Structure
 
 ```
 uniTerm/
-├── app.go                        # Wails app bindings & LLM API proxy
 ├── main.go                       # Entry point
+├── app.go                        # Wails bindings, LLM API proxy, SFTP API
 ├── backend/
-│   ├── session/                  # SSH session management
-│   ├── store/                    # Persistent config (settings, AI config)
+│   ├── session/                  # SSH/SFTP session management
+│   ├── store/                    # Persistent config (connections, AI, settings)
 │   └── log/                      # File-based logging
 ├── frontend/
 │   └── src/
-│       ├── components/           # Vue components (13 components)
-│       ├── stores/               # Pinia stores (ai, connection, settings, tab)
-│       ├── services/             # AI agent loop, LLM client, terminal agent
-│       ├── i18n/                 # Chinese & English translations
+│       ├── components/           # Vue components
+│       ├── composables/          # Terminal composables
+│       ├── stores/               # Pinia stores
+│       ├── services/             # AI agent loop, LLM client
+│       ├── i18n/                 # Translations
 │       └── types/                # TypeScript type definitions
-└── wails.json                    # Wails project config
+└── wails.json
 ```
 
 ## License

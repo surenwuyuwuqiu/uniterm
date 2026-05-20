@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>uniTerm</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --text: #c9d1d9;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --border: #30363d;
+  --radius: 8px;
+  --max-width: 960px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* ── Lang toggle ── */
+.lang-bar {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px;
+}
+.lang-btn {
+  padding: 4px 14px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  transition: all .2s;
+}
+.lang-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.content-zh, .content-en { display: none; }
+html[lang="zh-CN"] .content-zh, html[lang="en"] .content-en { display: initial; }
+html[lang="zh-CN"] .content-inline-zh, html[lang="en"] .content-inline-en { display: inline; }
+.content-inline-zh, .content-inline-en { display: none; }
+
+/* ── Hero ── */
+.hero {
+  text-align: center;
+  padding: 100px 24px 80px;
+}
+.hero img {
+  width: 128px;
+  height: 128px;
+  margin-bottom: 24px;
+}
+.hero h1 {
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  letter-spacing: -1px;
+}
+.hero .subtitle {
+  font-size: 18px;
+  color: var(--text-muted);
+  margin-bottom: 36px;
+}
+.hero .btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all .2s;
+  border: none;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-outline {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover { border-color: var(--text-muted); }
+
+/* ── Sections ── */
+.section {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 60px 24px;
+}
+.section-title {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 40px;
+}
+
+/* ── Features grid ── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  text-align: center;
+}
+.feature-card .icon {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  color: var(--accent);
+}
+.feature-card .icon svg {
+  width: 100%;
+  height: 100%;
+}
+.feature-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.feature-card p {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ── Screenshots ── */
+.screenshots-wrapper {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.screenshots-wrapper img {
+  max-width: 100%;
+  border-radius: var(--radius);
+}
+
+/* ── Installation ── */
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.install-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  text-align: center;
+}
+.install-card .os-icon {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto 12px;
+  color: var(--text);
+}
+.install-card .os-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.install-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.install-card .format {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+.install-card .btn { padding: 10px 24px; font-size: 14px; }
+
+/* ── Footer ── */
+.footer {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 32px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+  margin-right: 16px;
+}
+.footer a:hover { color: var(--text); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .features-grid,
+  .install-grid {
+    grid-template-columns: 1fr;
+  }
+  .hero h1 { font-size: 36px; }
+  .hero { padding: 80px 24px 60px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Language toggle -->
+<div class="lang-bar">
+  <button class="lang-btn active" onclick="setLang('zh-CN')">中文</button>
+  <button class="lang-btn" onclick="setLang('en')">EN</button>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <img src="../build/appicon.png" alt="uniTerm" />
+  <h1>uniTerm</h1>
+  <p class="subtitle">
+    <span class="content-inline-zh">一款现代化跨平台终端模拟器，内置 AI 助理功能。</span>
+    <span class="content-inline-en">A modern cross-platform terminal emulator with built-in AI assistant.</span>
+  </p>
+  <div class="btns">
+    <a href="#install" class="btn btn-primary">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="content-inline-zh">下载安装</span>
+      <span class="content-inline-en">Download</span>
+    </a>
+    <a href="https://github.com/ys-ll/uniterm" target="_blank" class="btn btn-outline">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.604-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12 24 5.37 18.63 0 12 0z"/></svg>
+      GitHub
+    </a>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section class="section">
+  <h2 class="section-title"><span class="content-zh">功能特性</span><span class="content-en">Features</span></h2>
+  <div class="features-grid">
+
+    <div class="feature-card">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><polyline points="6 9 10 13 14 9"/><line x1="10" y1="13" x2="10" y2="21"/></svg></div>
+      <h3>SSH <span class="content-inline-zh">客户端</span><span class="content-inline-en">Client</span></h3>
+      <p><span class="content-zh">密码/私钥认证、多标签页管理、5 种配色、可定制字体与操作</span><span class="content-en">Password &amp; key auth, multi-tab sessions, 5 color schemes, customizable fonts &amp; behavior</span></p>
+    </div>
+
+    <div class="feature-card">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></div>
+      <h3>SFTP <span class="content-inline-zh">文件管理</span><span class="content-inline-en">File Manager</span></h3>
+      <p><span class="content-zh">双栏浏览本地与远程文件，上传下载拖拽，传输任务按标签跟踪</span><span class="content-en">Dual-pane browse, upload, download, drag-and-drop, per-tab transfer tracking</span></p>
+    </div>
+
+    <div class="feature-card">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+      <h3>AI <span class="content-inline-zh">助理</span><span class="content-inline-en">Assistant</span></h3>
+      <p><span class="content-zh">侧边对话、终端执行命令，三种确认模式，多轮对话持久化</span><span class="content-en">Sidebar chat, terminal command execution, 3 confirm modes, persistent sessions</span></p>
+    </div>
+
+    <div class="feature-card">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/></svg></div>
+      <h3><span class="content-inline-zh">工作区分屏</span><span class="content-inline-en">Workspace &amp; Split</span></h3>
+      <p><span class="content-zh">标签合并为工作区，水平/垂直分屏，拖拽自由调整布局</span><span class="content-en">Merge tabs into workspaces, horizontal/vertical splits, drag to rearrange</span></p>
+    </div>
+
+    <div class="feature-card">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>
+      <h3><span class="content-inline-zh">连接管理</span><span class="content-inline-en">Connection Manager</span></h3>
+      <p><span class="content-zh">分组、搜索、批量操作，多选/范围选择连接</span><span class="content-en">Grouping, search, batch ops, multi-select &amp; range-select connections</span></p>
+    </div>
+
+    <div class="feature-card">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+      <h3><span class="content-inline-zh">主题国际化</span><span class="content-inline-en">Themes &amp; i18n</span></h3>
+      <p><span class="content-zh">暗色/深蓝/浅色主题，跟随系统切换，中英双语</span><span class="content-en">Dark, deep blue, light themes with system auto-detect, bilingual UI</span></p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ SCREENSHOTS ═══ -->
+<section class="section">
+  <h2 class="section-title"><span class="content-zh">界面截图</span><span class="content-en">Screenshots</span></h2>
+  <div class="screenshots-wrapper">
+    <span class="content-zh">截图即将到来</span><span class="content-en">Screenshots coming soon</span>
+  </div>
+</section>
+
+<!-- ═══ INSTALLATION ═══ -->
+<section class="section" id="install">
+  <h2 class="section-title"><span class="content-zh">下载安装</span><span class="content-en">Download</span></h2>
+  <div class="install-grid">
+
+    <div class="install-card">
+      <div class="os-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 12V6.5l8-1.12V12H3zm0 .18V19l8-1.12v-5.7H3zM12 5.19L21 3v9h-9V5.19zM21 12.18V21l-9-1.19v-5.63h9z"/></svg></div>
+      <h3>Windows</h3>
+      <div class="format">.exe</div>
+      <a href="https://github.com/ys-ll/uniterm/releases" target="_blank" class="btn btn-primary">
+        <span class="content-inline-zh">下载</span><span class="content-inline-en">Download</span>
+      </a>
+    </div>
+
+    <div class="install-card">
+      <div class="os-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg></div>
+      <h3>macOS</h3>
+      <div class="format">.dmg</div>
+      <a href="https://github.com/ys-ll/uniterm/releases" target="_blank" class="btn btn-primary">
+        <span class="content-inline-zh">下载</span><span class="content-inline-en">Download</span>
+      </a>
+    </div>
+
+    <div class="install-card">
+      <div class="os-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 1.375-.495 2.636-1.209 3.88-.724 1.283-1.56 2.396-2.628 3.262l-.051.04-.019.015c1.025-.283 2.027-.457 3.03-.48 1.69-.04 3.225.238 4.557.831-.666-.987-1.345-2.008-1.848-3.153C13.576 2.672 13.059 1.406 12.504 0zM7.856 7.374c-.89.201-1.791.512-2.7.924-.18.082-.358.162-.536.24l-.016.008-.002.002c.472.087.932.155 1.38.2.86.086 1.686.11 2.49.098.385 0 .763-.015 1.138-.036.175-.01.35-.023.521-.036-.495-.246-.977-.549-1.41-.916-.269-.233-.532-.48-.785-.75a9.455 9.455 0 01-.08.266zM5.25 9.05c-.4.294-.78.628-1.12 1.01-.58.639-1.02 1.36-1.39 2.14l-.01.02s.014-.002.02-.003c.994-.213 1.992-.277 3.027-.263.462.008.927.033 1.395.078l.01.003c.024-.21.046-.419.072-.63.045-.38.108-.77.19-1.17.14-.67.32-1.34.54-1.98-1-.16-1.948-.07-2.734.798zM7.05 10.554a3.63 3.63 0 00-.21 1.616c.03.268.068.526.124.776l.048.211.18-.293c.73-1.188 1.959-2.059 3.379-2.35-.085-.66-.483-1.398-.654-1.753-.679.279-1.364.642-2.047 1.1-.282.188-.558.385-.82.693zM12.712 8.273c-.163.155-.27.272-.415.395-.41.346-.88.737-1.455.927.117.176.203.363.294.545.228.455.42.91.506 1.413.266-.166.556-.328.783-.55.24-.234.467-.493.686-.728.426-.461.788-.872 1.066-1.158a3.948 3.948 0 00-.343-.002c-.38 0-.75-.02-1.122-.06-.232-.02-.465-.04-.698-.058.07-.224.155-.445.225-.668.114-.36.277-.712.473-1.056zM22.5 12.007c0-.314-.02-.627-.048-.938-.596.179-1.22.3-1.853.306-.896.008-1.825-.13-2.77-.365 1.385 1.054 2.232 2.598 2.232 4.324 0 3.2-2.652 5.812-5.904 5.812h-.058l.437.822c.015.028.044.054.075.064l.015.004c.034.003.07-.002.1-.016.82-.33 1.95-1.218 2.58-2.455.587-1.17.872-2.607.9-4.332.006-.415-.003-.83-.03-1.244.582.3 1.23.427 1.896.427.6 0 1.217-.12 1.868-.384.034-.01.07-.009.104.004.075.028.127.106.132.191.01.158.014.317.014.476 0 5.518-4.114 10.07-9.396 10.567 1.158.326 2.382.494 3.646.494 5.766 0 10.44-4.468 10.44-9.98z"/></svg></div>
+      <h3>Linux</h3>
+      <div class="format">.tar.gz</div>
+      <a href="https://github.com/ys-ll/uniterm/releases" target="_blank" class="btn btn-primary">
+        <span class="content-inline-zh">下载</span><span class="content-inline-en">Download</span>
+      </a>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+  <div>
+    <a href="https://github.com/ys-ll/uniterm" target="_blank">GitHub</a>
+    <span>Apache 2.0</span>
+  </div>
+  <div>&copy; 2026 uniTerm</div>
+</footer>
+
+<script>
+function setLang(lang) {
+  document.documentElement.lang = lang;
+  document.querySelectorAll('.lang-btn').forEach(function(b) {
+    b.classList.toggle('active', b.textContent.trim() === (lang === 'zh-CN' ? '中文' : 'EN'));
+  });
+  try { localStorage.setItem('uniterm-lang', lang); } catch(e) {}
+}
+(function() {
+  var saved = 'zh-CN';
+  try { saved = localStorage.getItem('uniterm-lang') || saved; } catch(e) {}
+  setLang(saved);
+})();
+</script>
+
+</body>
+</html>

@@ -1,12 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
 import type { AIMessage, AIConfig, ExecutionMode, AISession } from '../types/ai'
-import { SaveAIConfig, LoadAIConfig } from '../../wailsjs/go/main/App'
-import { compressToUTF16, decompressFromUTF16 } from 'lz-string'
+import { SaveAIConfig, LoadAIConfig, SaveAISessions, LoadAISessions } from '../../wailsjs/go/main/App'
 import { t } from '../i18n'
-
-const SESSIONS_KEY = 'uniterm:ai-sessions'
-const CURRENT_SESSION_KEY = 'uniterm:ai-current-session'
 
 const SYSTEM_PROMPT = `You are an AI assistant inside uniTerm, a terminal emulator. You can execute shell commands in the user's active terminal to help them complete tasks.
 
@@ -21,7 +17,15 @@ CRITICAL RULES:
 - Chain multiple commands with && or ; when appropriate.
 - If the output is too long, summarize the key findings.
 - Commands have a 60-second timeout. If a command times out, you will see "[Command timed out after 60s...]". In that case, you can either wait (the command may still be running) or suggest canceling it with Ctrl+C.
-- Do NOT send a new command if the previous one might still be running, unless you intend to cancel it first.`
+- Do NOT send a new command if the previous one might still be running, unless you intend to cancel it first.
+
+RISK CLASSIFICATION:
+Every execute_command call MUST include a "risk" field. Classify each command honestly:
+- "read": only inspects/views data, no modifications at all (ls, cat, grep, head, tail, df, du, ps, top, find, pwd, whoami, git status/log/diff, docker ps/images/logs, npm list, pip list, go version/env, etc.)
+- "write": modifies or creates data, but not system-destructive (echo > file, touch, mkdir, cp, mv, git add/commit/push, curl POST, npm install, pip install, apt install, brew install, etc.)
+- "dangerous": potentially destructive or system-altering (rm, > overwrite important files, chmod, chown, shutdown, reboot, mkfs, dd, force push, kill -9, etc.)
+
+For chained commands with && or ;, classify based on the MOST risky operation in the chain.`
 
 const DEFAULT_CONFIG: AIConfig = {
   apiKey: '',
@@ -29,24 +33,25 @@ const DEFAULT_CONFIG: AIConfig = {
   model: 'gpt-4o'
 }
 
-function loadSessions(): AISession[] {
+async function loadSessionsFromBackend(): Promise<{ sessions: AISession[], currentSessionId: string | null }> {
   try {
-    const raw = localStorage.getItem(SESSIONS_KEY)
-    if (!raw) return []
-    const decompressed = decompressFromUTF16(raw)
-    if (decompressed) return JSON.parse(decompressed)
-    return JSON.parse(raw)
+    const data = await LoadAISessions() as any
+    const sessions: AISession[] = (data.sessions || []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+      messages: (s.messages || []).map((m: any) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        tool_call_id: m.tool_call_id,
+        _rawApiMsg: m._rawApiMsg ? JSON.parse(m._rawApiMsg) : undefined,
+      }))
+    }))
+    return { sessions, currentSessionId: data.currentSessionId || null }
   } catch {
-    // ignore
-  }
-  return []
-}
-
-function loadCurrentSessionId(): string | null {
-  try {
-    return localStorage.getItem(CURRENT_SESSION_KEY)
-  } catch {
-    return null
+    return { sessions: [], currentSessionId: null }
   }
 }
 
@@ -57,9 +62,17 @@ export const useAIStore = defineStore('ai', () => {
   const config = ref<AIConfig>({ ...DEFAULT_CONFIG })
   const isRunning = ref(false)
   const stopRequested = ref(false)
-  const sessions = ref<AISession[]>(loadSessions())
-  const currentSessionId = ref<string | null>(loadCurrentSessionId())
+  const sessions = ref<AISession[]>([])
+  const currentSessionId = ref<string | null>(null)
   const lastDebugInfo = ref<{ request: string; error: string } | null>(null)
+  const initialized = ref(false)
+  const pendingCommand = ref<{
+    messageId: string
+    toolId: string
+    command: string
+    risk: string
+    dangerous: boolean
+  } | null>(null)
 
   function setDebugInfo(request: unknown, error: string) {
     try {
@@ -77,6 +90,14 @@ export const useAIStore = defineStore('ai', () => {
 
   function clearDebugInfo() {
     lastDebugInfo.value = null
+  }
+
+  function setPendingCommand(cmd: { messageId: string; toolId: string; command: string; risk: string; dangerous: boolean }) {
+    pendingCommand.value = cmd
+  }
+
+  function clearPendingCommand() {
+    pendingCommand.value = null
   }
 
   function toggle() {
@@ -97,7 +118,7 @@ export const useAIStore = defineStore('ai', () => {
             s.name = trimmed.length > 20 ? trimmed.slice(0, 20) + '...' : trimmed
           }
         }
-        saveSessions()
+        scheduleSave()
       }
     }
     return r
@@ -110,8 +131,28 @@ export const useAIStore = defineStore('ai', () => {
       if (s) {
         s.messages = []
         s.updatedAt = Date.now()
-        saveSessions()
+        scheduleSave()
       }
+    }
+  }
+
+  async function init() {
+    await initConfig()
+    const data = await loadSessionsFromBackend()
+    sessions.value = data.sessions
+    currentSessionId.value = data.currentSessionId
+    initialized.value = true
+
+    // Restore current session or create a new one
+    if (currentSessionId.value) {
+      const s = sessions.value.find(s => s.id === currentSessionId.value)
+      if (s) {
+        messages.value = s.messages.map(m => reactive({ ...m }) as AIMessage)
+      } else {
+        createSession()
+      }
+    } else {
+      createSession()
     }
   }
 
@@ -146,52 +187,34 @@ export const useAIStore = defineStore('ai', () => {
     config.value = { ...config.value, ...updates }
   }
 
-  function saveSessions() {
-    const MAX_MSG_PER_SESSION = 100
-    const MAX_MSG_CONTENT_LEN = 10000
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
 
-    // Only persist sessions that have actual conversation content
-    const nonEmpty = sessions.value.filter(s => s.messages.length > 0)
-
-    // Keep at most 15 sessions
-    const kept = nonEmpty.slice(0, 15)
-
-    const trimmed = kept.map(s => {
-      let msgs = s.messages.slice(-MAX_MSG_PER_SESSION)
-      msgs = msgs.map(m => {
-        if (m.content && m.content.length > MAX_MSG_CONTENT_LEN) {
-          return { ...m, content: m.content.slice(0, MAX_MSG_CONTENT_LEN) + '\n...[truncated]' }
-        }
-        return m
-      })
-      return { ...s, messages: msgs }
-    })
-
-    try {
-      const compressed = compressToUTF16(JSON.stringify(trimmed))
-      localStorage.setItem(SESSIONS_KEY, compressed)
-    } catch (e) {
-      const aggressive = kept.map(s => {
-        const msgs = s.messages.slice(-50).map(m => ({
-          ...m,
-          content: m.content?.slice(0, 2000) || ''
-        }))
-        return { ...s, messages: msgs }
-      })
-      try {
-        const compressed = compressToUTF16(JSON.stringify(aggressive))
-        localStorage.setItem(SESSIONS_KEY, compressed)
-      } catch {
-        localStorage.removeItem(SESSIONS_KEY)
-      }
-    }
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => doSave(), 300)
   }
 
-  function saveCurrentSessionId() {
-    if (currentSessionId.value) {
-      localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId.value)
-    } else {
-      localStorage.removeItem(CURRENT_SESSION_KEY)
+  async function doSave() {
+    try {
+      const data = {
+        sessions: sessions.value.map(s => ({
+          id: s.id,
+          name: s.name,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+          messages: s.messages.map(m => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            tool_call_id: m.tool_call_id || '',
+            _rawApiMsg: m._rawApiMsg ? JSON.stringify(m._rawApiMsg) : '',
+          }))
+        })),
+        currentSessionId: currentSessionId.value || '',
+      }
+      await SaveAISessions(data as any)
+    } catch {
+      // ignore save errors
     }
   }
 
@@ -207,8 +230,7 @@ export const useAIStore = defineStore('ai', () => {
     sessions.value.unshift(session)
     currentSessionId.value = session.id
     messages.value = []
-    saveSessions()
-    saveCurrentSessionId()
+    scheduleSave()
   }
 
   function switchSession(sessionId: string) {
@@ -216,14 +238,13 @@ export const useAIStore = defineStore('ai', () => {
     if (!s) return
     currentSessionId.value = sessionId
     messages.value = s.messages.map(m => reactive({ ...m }) as AIMessage)
-    saveCurrentSessionId()
   }
 
   function deleteSession(sessionId: string) {
     const idx = sessions.value.findIndex(s => s.id === sessionId)
     if (idx === -1) return
     sessions.value.splice(idx, 1)
-    saveSessions()
+    scheduleSave()
     if (currentSessionId.value === sessionId) {
       if (sessions.value.length > 0) {
         switchSession(sessions.value[0].id)
@@ -237,7 +258,7 @@ export const useAIStore = defineStore('ai', () => {
     const s = sessions.value.find(s => s.id === sessionId)
     if (s) {
       s.name = name
-      saveSessions()
+      scheduleSave()
     }
   }
 
@@ -306,7 +327,7 @@ export const useAIStore = defineStore('ai', () => {
             }
             return true
           })
-          if (filtered.length === 0 && !m.content && !m.pendingTools?.length) continue
+          if (filtered.length === 0 && !m.content && !(m.pendingTools?.length || pendingCommand.value?.messageId === m.id)) continue
           result.push({ ...raw, content: filtered })
         } else {
           result.push({ ...raw })
@@ -317,7 +338,7 @@ export const useAIStore = defineStore('ai', () => {
       // Assistant with legacy tool_calls: filter dangling ones, build content blocks
       if (m.role === 'assistant' && m.tool_calls?.length) {
         const resolved = m.tool_calls.filter(tc => resolvedIds.has(tc.id))
-        if (!m.content && resolved.length === 0 && !m.pendingTools?.length) continue
+        if (!m.content && resolved.length === 0 && !(m.pendingTools?.length || pendingCommand.value?.messageId === m.id)) continue
 
         const blocks: Array<Record<string, unknown>> = []
         if (m.content) {
@@ -333,7 +354,7 @@ export const useAIStore = defineStore('ai', () => {
       }
 
       // Skip empty assistant messages (no content, no tool calls, no raw api msg, no pending tools)
-      if (m.role === 'assistant' && !m.content && !m.pendingTools?.length) continue
+      if (m.role === 'assistant' && !m.content && !(m.pendingTools?.length || pendingCommand.value?.messageId === m.id)) continue
 
       result.push({ role: m.role, content: m.content })
     }
@@ -410,9 +431,6 @@ export const useAIStore = defineStore('ai', () => {
 
   const systemPrompt = computed(() => SYSTEM_PROMPT)
 
-  // Init: always start fresh to avoid loading stale conversation state
-  createSession()
-
   return {
     visible,
     toggle,
@@ -438,6 +456,11 @@ export const useAIStore = defineStore('ai', () => {
     renameSession,
     lastDebugInfo,
     setDebugInfo,
-    clearDebugInfo
+    clearDebugInfo,
+    pendingCommand,
+    setPendingCommand,
+    clearPendingCommand,
+    initialized,
+    init
   }
 })

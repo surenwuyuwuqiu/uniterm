@@ -33,6 +33,8 @@ import { SessionWrite, SessionResize } from '../../wailsjs/go/main/App'
 import { EventsOn, BrowserOpenURL } from '../../wailsjs/runtime'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSessionStore } from '../stores/sessionStore'
+import { useTabStore } from '../stores/tabStore'
+import { usePanelStore } from '../stores/panelStore'
 import { useTerminalMenu } from '../composables/useTerminalMenu'
 import { useI18n } from '../i18n'
 import { getXtermTheme } from '../composables/useTerminal'
@@ -41,10 +43,15 @@ const props = defineProps<{
   mode: 'ssh' | 'sftp'
   sessionId: string | null | undefined
   onSessionStatus?: (status: string) => void
+  broadcastActive?: boolean
+  workspaceId?: string
+  panelId?: string
 }>()
 
 const settingsStore = useSettingsStore()
 const sessionStore = useSessionStore()
+const tabStore = useTabStore()
+const panelStore = usePanelStore()
 const { t } = useI18n()
 
 const terminalRef = ref<HTMLDivElement>()
@@ -238,6 +245,18 @@ onMounted(() => {
       }
       const sid = props.sessionId
       if (sid) {
+        if (props.broadcastActive && props.workspaceId) {
+          const tab = tabStore.tabs.find(t => t.id === props.workspaceId)
+          if (tab && tab.type === 'workspace') {
+            for (const pid of tab.panelIds) {
+              const p = panelStore.getPanel(pid)
+              if (p?.sessionId) {
+                SessionWrite(p.sessionId, data)
+              }
+            }
+            return
+          }
+        }
         SessionWrite(sid, data)
       }
     } else {

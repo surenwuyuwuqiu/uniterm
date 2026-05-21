@@ -106,6 +106,9 @@
                 <el-dropdown-item command="confirm_all">
                   <span class="mode-option mode-confirm">{{ t('ai.confirmAll') }}</span>
                 </el-dropdown-item>
+                <el-dropdown-item command="confirm_write">
+                  <span class="mode-option mode-write">{{ t('ai.confirmWrite') }}</span>
+                </el-dropdown-item>
                 <el-dropdown-item command="confirm_dangerous">
                   <span class="mode-option mode-warning">{{ t('ai.confirmDangerous') }}</span>
                 </el-dropdown-item>
@@ -135,7 +138,7 @@ import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useI18n } from '../i18n'
 import { runAgent, approveTool, rejectTool, continueAgent } from '../services/agent'
-import type { ExecutionMode, AIConfig } from '../types/ai'
+import type { ExecutionMode } from '../types/ai'
 import AIMessage from './AIMessage.vue'
 
 const aiStore = useAIStore()
@@ -152,8 +155,9 @@ const visibleMessages = computed(() => {
     // Display-only tool messages (system errors, no tool_call_id) should be visible
     if (m.role === 'tool' && !m.tool_call_id) return true
     if (m.role !== 'assistant') return true
-    // 过滤掉内容为空且没有可展示内容的 assistant 消息
-    return m.content || m.tool_calls?.length || m.pendingTools?.length || m.needsContinue
+    // Also show if this message has a pending command waiting for confirmation
+    const hasPending = aiStore.pendingCommand?.messageId === m.id
+    return m.content || m.tool_calls?.length || hasPending || m.needsContinue
   })
 })
 const messagesRef = ref<HTMLDivElement>()
@@ -175,7 +179,9 @@ const modeLabel = computed(() => {
   switch (aiStore.mode) {
     case 'bypass': return t('ai.bypass')
     case 'confirm_dangerous': return t('ai.confirmDangerous')
-    default: return t('ai.confirmAll')
+    case 'confirm_write': return t('ai.confirmWrite')
+    case 'confirm_all': return t('ai.confirmAll')
+    default: return t('ai.confirmDangerous')
   }
 })
 
@@ -183,7 +189,9 @@ const modeButtonType = computed(() => {
   switch (aiStore.mode) {
     case 'bypass': return 'danger'
     case 'confirm_dangerous': return 'warning'
-    default: return 'success'
+    case 'confirm_write': return ''  // default style (info-like)
+    case 'confirm_all': return 'success'
+    default: return 'warning'
   }
 })
 
@@ -321,13 +329,11 @@ function onStop() {
 }
 
 async function onApprove(messageId: string) {
-  console.log('[DEBUG] onApprove clicked, messageId=', messageId)
   await approveTool(messageId)
   scrollToBottom()
 }
 
 function onReject(messageId: string) {
-  console.log('[DEBUG] onReject clicked, messageId=', messageId)
   rejectTool(messageId)
   scrollToBottom()
 }
@@ -628,6 +634,9 @@ onUnmounted(() => {
 }
 .mode-confirm {
   color: var(--success);
+}
+.mode-write {
+  color: var(--accent);
 }
 .mode-warning {
   color: var(--warning);

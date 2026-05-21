@@ -163,7 +163,7 @@ function onWheel(e: WheelEvent) {
 
 onMounted(() => {
   connectionStore.load()
-  aiStore.initConfig()
+  aiStore.init()
   settingsStore.init()
   window.addEventListener('input:contextmenu', onInputContextMenu)
   window.addEventListener('global:close-context-menus', closeInputMenu)
@@ -204,9 +204,7 @@ function onSaveOnly(config: ConnectionConfig) {
 async function onConnect(config: ConnectionConfig) {
   connectionStore.add(config)
   const panel = panelStore.createPanel(config, 'ssh')
-  const displayTitle = config.name
-    ? `${config.name} (${config.host})`
-    : `${config.user}@${config.host}`
+  const displayTitle = config.name || `${config.user}@${config.host}`
   panel.title = displayTitle
   const tab = tabStore.createTerminalTab(displayTitle, panel.id)
   panelStore.movePanelToTab(panel.id, tab.id)

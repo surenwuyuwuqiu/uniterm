@@ -85,6 +85,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'terminal.lockAI': '锁定 AI',
     'terminal.aiLockedToPanel': 'AI 已锁定到此面板',
     'terminal.lockAIToPanel': '锁定 AI 到此面板',
+    'terminal.broadcastInput': '广播输入到所有面板',
 
     // Input context menu
     'input.cut': '剪切',
@@ -111,6 +112,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'ai.confirm': '确认',
     'ai.confirmAll': '全部确认',
     'ai.confirmDangerous': '仅高危确认',
+    'ai.confirmWrite': '写操作确认',
     'ai.dangerous': '高危',
     'ai.justNow': '刚刚',
     'ai.minutesAgo': '{n}分钟前',
@@ -125,6 +127,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'ai.avatarAI': 'AI',
     'ai.copyDebug': '复制调试信息',
     'ai.copied': '已复制',
+    'ai.copyMarkdown': '复制为 Markdown',
     'ai.copyFailed': '复制失败',
 
     // SFTP
@@ -185,6 +188,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.basic': '基础设置',
     'settings.terminal': '终端配置',
     'settings.ai': 'AI 助理设置',
+    'settings.about': '关于',
+    'settings.aboutDesc': '一款现代化跨平台终端模拟器，内置可自主执行的 AI Agent —— 能够独立规划并执行多轮 Shell 命令。',
+    'settings.version': '版本号',
     'settings.theme': '主题',
     'settings.themeDark': '暗色',
     'settings.themeDeepBlue': '深蓝',
@@ -306,6 +312,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'terminal.lockAI': 'Lock AI',
     'terminal.aiLockedToPanel': 'AI locked to this panel',
     'terminal.lockAIToPanel': 'Lock AI to this panel',
+    'terminal.broadcastInput': 'Broadcast input to all panels',
 
     // Input context menu
     'input.cut': 'Cut',
@@ -332,6 +339,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'ai.confirm': 'Confirm',
     'ai.confirmAll': 'Confirm All',
     'ai.confirmDangerous': 'Dangerous Only',
+    'ai.confirmWrite': 'Confirm Write',
     'ai.dangerous': 'DANGER',
     'ai.justNow': 'just now',
     'ai.minutesAgo': '{n} min ago',
@@ -345,6 +353,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'ai.avatarTool': 'Tool',
     'ai.avatarAI': 'AI',
     'ai.copyDebug': 'Copy Debug Info',
+    'ai.copyMarkdown': 'Copy as Markdown',
     'ai.copied': 'Copied',
     'ai.copyFailed': 'Copy Failed',
 
@@ -406,6 +415,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.basic': 'Basic',
     'settings.terminal': 'Terminal',
     'settings.ai': 'AI Assistant',
+    'settings.about': 'About',
+    'settings.aboutDesc': 'A modern cross-platform terminal emulator with a built-in AI agent that can independently plan and execute multi-turn shell commands.',
+    'settings.version': 'Version',
     'settings.theme': 'Theme',
     'settings.themeDark': 'Dark',
     'settings.themeDeepBlue': 'Deep Blue',

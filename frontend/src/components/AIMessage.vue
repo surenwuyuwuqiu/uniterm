@@ -4,6 +4,13 @@
     <div class="content">
       <div class="text" v-html="renderedContent" />
 
+      <div v-if="message.role === 'assistant' && message.content" class="copy-action">
+        <button class="copy-md-btn" @click="copyAsMarkdown" :title="t('ai.copyMarkdown')">
+          <el-icon><DocumentCopy /></el-icon>
+          {{ copyMdLabel }}
+        </button>
+      </div>
+
       <div v-if="isError && aiStore.lastDebugInfo" class="debug-actions">
         <button class="debug-copy-btn" @click="copyDebugInfo">
           <el-icon><DocumentCopy /></el-icon>
@@ -46,17 +53,16 @@
         </div>
       </div>
 
-      <div v-if="message.pendingTools?.length" class="pending-tools">
-        <div v-for="(pt, idx) in message.pendingTools" :key="pt.id" class="pending-tool" :class="{ dangerous: pt.dangerous }">
+      <div v-if="pendingCmd" class="pending-tools">
+        <div class="pending-tool" :class="{ dangerous: pendingCmd.dangerous }">
           <div class="tool-name">
-            {{ pt.name }}
-            <span class="pending-count">({{ idx + 1 }}/{{ message.pendingTools.length }})</span>
-            <span v-if="pt.dangerous" class="danger-badge">{{ t('ai.dangerous') }}</span>
+            execute_command
+            <span v-if="pendingCmd.dangerous" class="danger-badge">{{ t('ai.dangerous') }}</span>
           </div>
-          <code class="tool-args">{{ formatPendingArgs(pt.arguments) }}</code>
+          <code class="tool-args">{{ pendingCmd.command }}</code>
           <div class="tool-actions">
-            <el-button size="small" type="primary" @click="$emit('approve', message.id)">{{ t('ai.run') }}</el-button>
-            <el-button size="small" @click="$emit('reject', message.id)">{{ t('ai.skip') }}</el-button>
+            <el-button size="small" type="primary" @click="handleApprove">{{ t('ai.run') }}</el-button>
+            <el-button size="small" @click="handleReject">{{ t('ai.skip') }}</el-button>
           </div>
         </div>
       </div>
@@ -72,13 +78,31 @@ import { useI18n } from '../i18n'
 import type { AIMessage } from '../types/ai'
 
 const props = defineProps<{ message: AIMessage }>()
-defineEmits(['approve', 'reject', 'continue'])
+const emit = defineEmits<{
+  (e: 'approve', messageId: string): void
+  (e: 'reject', messageId: string): void
+  (e: 'continue'): void
+}>()
+
+const isPending = computed(() =>
+  aiStore.pendingCommand?.messageId === props.message.id
+)
+const pendingCmd = computed(() => isPending.value ? aiStore.pendingCommand! : null)
+
+function handleApprove() {
+  emit('approve', props.message.id)
+}
+
+function handleReject() {
+  emit('reject', props.message.id)
+}
 
 const aiStore = useAIStore()
 const { t } = useI18n()
 const inExpanded = ref(false)
 const outExpanded = ref(false)
 const copyLabel = ref(t('ai.copyDebug'))
+const copyMdLabel = ref(t('ai.copyMarkdown'))
 
 const avatar = computed(() => {
   if (props.message.role === 'user') return t('ai.avatarUser')
@@ -93,6 +117,17 @@ const isError = computed(() => {
   // Assistant errors (legacy) or display-only tool errors
   return (props.message.role === 'assistant' || (props.message.role === 'tool' && !props.message.tool_call_id)) && hasErrorText
 })
+
+async function copyAsMarkdown() {
+  try {
+    await navigator.clipboard.writeText(props.message.content)
+    copyMdLabel.value = t('ai.copied')
+    setTimeout(() => { copyMdLabel.value = t('ai.copyMarkdown') }, 2000)
+  } catch {
+    copyMdLabel.value = t('ai.copyFailed')
+    setTimeout(() => { copyMdLabel.value = t('ai.copyMarkdown') }, 2000)
+  }
+}
 
 async function copyDebugInfo() {
   const info = aiStore.lastDebugInfo
@@ -116,11 +151,6 @@ function formatArgs(args: string): string {
   } catch {
     return args
   }
-}
-
-function formatPendingArgs(args: Record<string, unknown>): string {
-  if (args.command) return String(args.command)
-  return JSON.stringify(args, null, 2)
 }
 
 function getToolResult(toolCallId: string): AIMessage | undefined {
@@ -487,6 +517,27 @@ function escapeHtml(text: string): string {
   margin-top: 8px;
 }
 
+.copy-action {
+  margin-top: 4px;
+}
+.copy-md-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.copy-md-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent-glow);
+  background: var(--accent-subtle);
+}
 .continue-box {
   margin-top: 8px;
 }

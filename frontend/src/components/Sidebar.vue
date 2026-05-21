@@ -378,7 +378,7 @@ watch(filteredGrouped, () => {
   for (const c of filteredGrouped.value.ungrouped) allIds.push(c.id)
 
   if (allIds.length === 0) {
-    selectedId.value = null
+    selectedId.value = searchQuery.value.trim() ? '__new_connection__' : null
   } else if (!selectedId.value || !allIds.includes(selectedId.value)) {
     selectedId.value = allIds[0]
   }
@@ -575,7 +575,7 @@ function onItemClick(e: MouseEvent, conn: ConnectionConfig) {
     lastClickId.value = conn.id
   } else {
     selectedId.value = conn.id
-    multiSelectedIds.value = new Set([conn.id])
+    multiSelectedIds.value = new Set()
     lastClickId.value = conn.id
   }
 }

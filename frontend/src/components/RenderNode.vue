@@ -13,6 +13,8 @@
         :panel="panel"
         :show-header="isMultiPanel"
         :is-active="activePanelId === panel.id"
+        :broadcast-active="broadcastActive"
+        :workspace-id="tabId"
         :key="panel.id"
         @close="handleClosePanel(panel.id)"
         @dragstart="onPanelDragStart($event, panel.id)"
@@ -34,6 +36,7 @@
         :panel-ids="panelIds"
         :active-panel-id="activePanelId"
         :tab-id="tabId"
+        :broadcast-active="broadcastActive"
         @close-panel="(id) => $emit('closePanel', id)"
         @toggle-ai-lock="(id) => $emit('toggleAiLock', id)"
         @panel-drag-start="(e, id) => $emit('panelDragStart', e, id)"
@@ -63,6 +66,7 @@ const props = defineProps<{
   panelIds: string[]
   activePanelId: string | null
   tabId: string
+  broadcastActive: boolean
 }>()
 
 const emit = defineEmits<{

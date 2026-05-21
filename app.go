@@ -21,11 +21,12 @@ import (
 )
 
 type App struct {
-	ctx             context.Context
-	sessionManager  *session.SessionManager
-	connectionStore *store.ConnectionStore
-	aiConfigStore   *store.AIConfigStore
-	settingsStore   *store.SettingsStore
+	ctx              context.Context
+	sessionManager   *session.SessionManager
+	connectionStore  *store.ConnectionStore
+	aiConfigStore    *store.AIConfigStore
+	aiSessionStore   *store.AISessionStore
+	settingsStore    *store.SettingsStore
 }
 
 func NewApp() *App {
@@ -49,6 +50,13 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	a.aiConfigStore = acs
+
+	ass, err := store.NewAISessionStore()
+	if err != nil {
+		log.Writef("Failed to init AI session store: %v", err)
+		return
+	}
+	a.aiSessionStore = ass
 
 	ss, err := store.NewSettingsStore()
 	if err != nil {
@@ -98,6 +106,22 @@ func (a *App) LoadAIConfig() (store.AIConfig, error) {
 		return store.AIConfig{}, fmt.Errorf("AI config store not initialized")
 	}
 	return a.aiConfigStore.Load()
+}
+
+// AI Session Store methods
+
+func (a *App) SaveAISessions(data store.AISessionData) error {
+	if a.aiSessionStore == nil {
+		return fmt.Errorf("AI session store not initialized")
+	}
+	return a.aiSessionStore.Save(data)
+}
+
+func (a *App) LoadAISessions() (store.AISessionData, error) {
+	if a.aiSessionStore == nil {
+		return store.AISessionData{}, fmt.Errorf("AI session store not initialized")
+	}
+	return a.aiSessionStore.Load()
 }
 
 // SettingsStore methods
@@ -252,6 +276,18 @@ func (a *App) SessionResize(sessionID string, cols, rows int) error {
 		return fmt.Errorf("session not found: %s", sessionID)
 	}
 	return s.Resize(cols, rows)
+}
+
+type AppInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+func (a *App) GetAppInfo() AppInfo {
+	return AppInfo{
+		Name:    "uniTerm",
+		Version: Version,
+	}
 }
 
 // ChatCompletion proxies Anthropic-native LLM API requests through the Go backend.

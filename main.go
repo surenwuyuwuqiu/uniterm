@@ -12,6 +12,8 @@ import (
 	"github.com/ys-ll/uniterm/backend/log"
 )
 
+var Version = "dev"
+
 //go:embed all:frontend/dist
 var assets embed.FS
 

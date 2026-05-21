@@ -9,6 +9,21 @@
       <span class="panel-title">{{ panel.title }}</span>
       <div class="panel-header-actions">
         <button
+          v-if="panel.type === 'ssh' && workspaceId"
+          class="panel-broadcast"
+          :class="{ active: broadcastActive }"
+          @click.stop="tabStore.toggleBroadcast(workspaceId)"
+          :title="t('terminal.broadcastInput')"
+        >
+          <svg class="broadcast-icon" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="0.5" y="1.5" width="6" height="13" rx="1" />
+            <rect x="9.5" y="1.5" width="6" height="13" rx="1" />
+            <line x1="2.5" y1="5" x2="5" y2="5" />
+            <line x1="11.5" y1="5" x2="14" y2="5" />
+            <line x1="7" y1="8" x2="9" y2="8" />
+          </svg>
+        </button>
+        <button
           v-if="panel.type === 'ssh'"
           class="panel-ai-lock"
           :class="{ locked: isAILocked }"
@@ -23,12 +38,15 @@
       mode="ssh"
       :session-id="panel.sessionId"
       :on-session-status="onSessionStatus"
+      :broadcast-active="broadcastActive"
+      :workspace-id="workspaceId"
+      :panel-id="panel.id"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import BaseTerminal from './BaseTerminal.vue'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
@@ -43,6 +61,8 @@ const props = defineProps<{
   panel: Panel
   showHeader: boolean
   isActive: boolean
+  broadcastActive?: boolean
+  workspaceId?: string
 }>()
 
 const emit = defineEmits<{
@@ -87,6 +107,12 @@ watch(() => props.panel.sessionId, (newId) => {
     delays.forEach((delay) => {
       setTimeout(() => baseTerminalRef.value?.resize(), delay)
     })
+  }
+})
+
+watch(() => props.isActive, (active) => {
+  if (active) {
+    nextTick(() => baseTerminalRef.value?.focus())
   }
 })
 </script>
@@ -135,6 +161,27 @@ watch(() => props.panel.sessionId, (newId) => {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+}
+.panel-broadcast {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.panel-broadcast:hover {
+  background: var(--bg-hover);
+}
+.panel-broadcast.active {
+  color: var(--accent, #22d3ee);
+  background: var(--accent-subtle);
+}
+.broadcast-icon {
+  display: inline-block;
+  line-height: 1;
 }
 .panel-ai-lock {
   background: none;

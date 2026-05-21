@@ -34,44 +34,23 @@ function hasActiveSession(): boolean {
   return !!panel?.sessionId
 }
 
-function isDangerousCommand(command: string): boolean {
-  const dangerousPatterns = [
-    /\brm\s+-[rf]*\s+\//i,
-    /\brm\s+-[rf]*\s+~/i,
-    /\brm\s+/i,
-    /\bshutdown\b/i,
-    /\breboot\b/i,
-    /\bpoweroff\b/i,
-    /\bhalt\b/i,
-    /\binit\s+0\b/i,
-    /\bmkfs\b/i,
-    /\bfdisk\b/i,
-    /\bdd\s+if=[^|]*of=\/dev\//i,
-    /:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:\s*\(/,
-    /\bchmod\s+.*\s+\//i,
-    />\s*\/dev\/[sh]d[a-z]/i,
-    /\bmkfs\./i,
-    /\bparted\b/i,
-    /\bwipefs\b/i,
-    /\bsysctl\b/i,
-    /\becho\s+.*>\s*\/sys\//i,
-    /\becho\s+.*>\s*\/proc\/sys\//i,
-    /\buserdel\b/i,
-    /\bgroupdel\b/i,
-    /\bkillall\b/i,
-    /\bpkill\b/i,
-    /\bsystemctl\s+(poweroff|reboot|halt|suspend|hibernate)/i,
-  ]
-  return dangerousPatterns.some(p => p.test(command))
+type RiskLevel = 'read' | 'write' | 'dangerous'
+
+function getRisk(tu: { name: string; input: Record<string, unknown> }): RiskLevel {
+  if (tu.name !== 'execute_command') return 'write'
+  const risk = tu.input.risk as string | undefined
+  if (risk === 'read' || risk === 'write' || risk === 'dangerous') return risk
+  return 'write' // conservative fallback
 }
 
-function shouldConfirm(dangerous: boolean): boolean {
+function shouldConfirm(risk: RiskLevel): boolean {
   const store = useAIStore()
   switch (store.mode) {
     case 'confirm_all': return true
-    case 'confirm_dangerous': return dangerous
+    case 'confirm_write': return risk !== 'read'
+    case 'confirm_dangerous': return risk === 'dangerous'
     case 'bypass': return false
-    default: return true
+    default: return risk !== 'read'
   }
 }
 
@@ -109,20 +88,15 @@ export async function runAgent(userInput: string) {
     return
   }
 
-  // Auto-reject any pending tools from previous turn
-  if (userInput) {
-    const pendingMsg = store.messages.find(m => m.pendingTools?.length)
-    if (pendingMsg) {
-      for (const pt of [...pendingMsg.pendingTools!]) {
-        store.addMessage({
-          id: `msg-${Date.now()}`,
-          role: 'tool',
-          content: 'User started a new conversation. Previous command was cancelled.',
-          tool_call_id: pt.id
-        })
-      }
-      delete pendingMsg.pendingTools
-    }
+  // Auto-reject any pending command from previous turn
+  if (userInput && store.pendingCommand) {
+    store.addMessage({
+      id: `msg-${Date.now()}`,
+      role: 'tool',
+      content: 'User started a new conversation. Previous command was cancelled.',
+      tool_call_id: store.pendingCommand.toolId
+    })
+    store.clearPendingCommand()
   }
 
   store.resetStop()
@@ -240,14 +214,25 @@ export async function runAgent(userInput: string) {
     const tu = toolUses[0]
     if (tu.name === 'execute_command') {
       const command = tu.input.command as string
-      const dangerous = isDangerousCommand(command)
 
-      if (shouldConfirm(dangerous)) {
-        assistantMsg.pendingTools = [{
+      const risk = getRisk(tu)
+
+      if (shouldConfirm(risk)) {
+        store.setPendingCommand({
+          messageId: assistantMsg.id,
+          toolId: tu.id,
+          command,
+          risk,
+          dangerous: risk === 'dangerous'
+        })
+        // Keep tool_calls for UI display of IN/OUT boxes
+        assistantMsg.tool_calls = [{
           id: tu.id,
-          name: 'execute_command',
-          arguments: tu.input,
-          dangerous
+          type: 'function' as const,
+          function: {
+            name: tu.name,
+            arguments: JSON.stringify(tu.input)
+          }
         }]
         store.isRunning = false
         return
@@ -295,14 +280,13 @@ export async function continueAgent() {
   await runAgent('')
 }
 
-export async function approveTool(messageId: string) {
+export async function approveTool(_messageId: string) {
   const store = useAIStore()
-  const msg = store.messages.find(m => m.id === messageId)
-  if (!msg?.pendingTools?.length) return
-
-  const pendingTool = msg.pendingTools[0]
+  const cmd = store.pendingCommand
+  if (!cmd) return
 
   if (!hasActiveSession()) {
+    store.clearPendingCommand()
     store.addMessage({
       id: `msg-${Date.now()}`,
       role: 'assistant',
@@ -311,57 +295,42 @@ export async function approveTool(messageId: string) {
     return
   }
 
+  store.clearPendingCommand()
   store.isRunning = true
 
-  const { id, arguments: args } = pendingTool
-  const command = args.command as string
 
   try {
-    const result = await executeCommand(command)
+    const result = await executeCommand(cmd.command)
     store.addMessage({
       id: `msg-${Date.now()}`,
       role: 'tool',
       content: result.output,
-      tool_call_id: id
+      tool_call_id: cmd.toolId
     })
   } catch (e: any) {
     store.addMessage({
       id: `msg-${Date.now()}`,
       role: 'tool',
       content: `[Error executing command: ${e.message ?? e}]`,
-      tool_call_id: id
+      tool_call_id: cmd.toolId
     })
   }
-
-  msg.pendingTools.shift()
-
-  if (msg.pendingTools.length > 0) {
-    store.isRunning = false
-    return
-  }
-
   await runAgent('')
 }
 
-export function rejectTool(messageId: string) {
+export function rejectTool(_messageId: string) {
   const store = useAIStore()
-  const msg = store.messages.find(m => m.id === messageId)
-  if (!msg?.pendingTools?.length) return
+  const cmd = store.pendingCommand
+  if (!cmd) return
 
-  const pendingTool = msg.pendingTools[0]
+  store.clearPendingCommand()
 
   store.addMessage({
     id: `msg-${Date.now()}`,
     role: 'tool',
     content: 'User rejected this command.',
-    tool_call_id: pendingTool.id
+    tool_call_id: cmd.toolId
   })
-
-  msg.pendingTools.shift()
-
-  if (msg.pendingTools.length > 0) {
-    return
-  }
 
   setTimeout(() => runAgent(''), 0)
 }

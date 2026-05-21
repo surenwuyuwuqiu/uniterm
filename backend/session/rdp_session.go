@@ -32,6 +32,8 @@ var (
 	procClientToScreen     = user32Dll.NewProc("ClientToScreen")
 	procSetWindowLongPtr   = user32Dll.NewProc("SetWindowLongPtrW")
 	procPostMessageW       = user32Dll.NewProc("PostMessageW")
+	procFindWindowExW      = user32Dll.NewProc("FindWindowExW")
+	procSendMessageW       = user32Dll.NewProc("SendMessageW")
 )
 
 const (
@@ -51,6 +53,10 @@ const (
 	GWLP_HWNDPARENT   = ^uintptr(7) // -8 represented as uintptr for syscall compatibility
 	SW_HIDE           = 0
 	SW_SHOWNOACTIVATE = 4
+	WM_COMMAND        = 0x0111
+	BM_CLICK          = 0x00F5
+	IDYES             = 6
+	IDOK              = 1
 )
 
 type RDPSession struct {
@@ -105,6 +111,52 @@ func (s *RDPSession) storeCredentials(host, user, password string) {
 		log.Writef("[RDP] cmdkey failed: %v", err)
 	} else {
 		log.Writef("[RDP] credentials stored for TERMSRV/%s", host)
+	}
+}
+
+// autoDismissSecurityDialogs polls for RDP security warning dialogs (e.g.
+// "网站正在尝试启动远程连接") and dismisses them by clicking "Yes" / "是".
+func (s *RDPSession) autoDismissSecurityDialogs(stop <-chan struct{}) {
+	dialogTitles := []string{
+		"远程桌面连接",
+		"Remote Desktop Connection",
+		"Windows 安全",
+		"Windows Security",
+	}
+	clsName, _ := windows.UTF16PtrFromString("#32770")
+
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			for _, title := range dialogTitles {
+				tPtr, _ := windows.UTF16PtrFromString(title)
+				hwnd, _, _ := procFindWindowW.Call(
+					uintptr(unsafe.Pointer(clsName)),
+					uintptr(unsafe.Pointer(tPtr)),
+				)
+				if hwnd == 0 {
+					continue
+				}
+				// Dismiss via standard dialog button IDs
+				procPostMessageW.Call(hwnd, WM_COMMAND, IDYES, 0)
+				procPostMessageW.Call(hwnd, WM_COMMAND, IDOK, 0)
+
+				// Also try clicking the "是" / "Yes" button directly
+				for _, btnText := range []string{"是(&Y)", "是", "Yes", "&Yes", "连接(&C)", "连接", "Connect", "&Connect"} {
+					btnPtr, _ := windows.UTF16PtrFromString(btnText)
+					btnHwnd, _, _ := procFindWindowExW.Call(hwnd, 0, 0, uintptr(unsafe.Pointer(btnPtr)))
+					if btnHwnd != 0 {
+						procSendMessageW.Call(btnHwnd, BM_CLICK, 0, 0)
+						break
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -312,8 +364,16 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 	// Suppress credential dialogs via NonScriptable interface
 	s.configureNonScriptable(config.Password)
 
+	// Auto-dismiss any security dialogs that appear during Connect (e.g.
+	// "网站正在尝试启动远程连接"). The goroutine polls for dialog windows
+	// and clicks "Yes" to dismiss them.
+	stopDismiss := make(chan struct{})
+	go s.autoDismissSecurityDialogs(stopDismiss)
+
 	log.Writef("[RDP] calling Connect...")
 	_, err = dispatch.CallMethod("Connect")
+
+	close(stopDismiss)
 	if err != nil {
 		log.Writef("[RDP] Connect failed: %v", err)
 		s.mu.Lock()
@@ -445,11 +505,11 @@ func (s *RDPSession) findRdpProgID() string {
 // setAuthLevelOverride sets the system-wide RDP authentication level to 0,
 // which suppresses the server certificate warning dialog.
 func setAuthLevelOverride() {
+	// AuthenticationLevelOverride = 0 disables server cert verification.
 	k, err := registry.OpenKey(registry.CURRENT_USER,
 		`Software\Microsoft\Terminal Server Client`,
 		registry.SET_VALUE)
 	if err != nil {
-		// Key may not exist; create it
 		k, _, err = registry.CreateKey(registry.CURRENT_USER,
 			`Software\Microsoft\Terminal Server Client`,
 			registry.SET_VALUE)
@@ -459,6 +519,89 @@ func setAuthLevelOverride() {
 	}
 	defer k.Close()
 	k.SetDWordValue("AuthenticationLevelOverride", 0)
+
+	// RedirectionWarningDialogVersion = 1 suppresses the "unknown remote
+	// connection" security warning dialog. Check if already set first.
+	if isRDWAlreadySet() {
+		return
+	}
+	// Try direct HKLM write first. If it fails, elevate via UAC.
+	rdwPath := `SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client`
+	if writeRegDWORD(registry.LOCAL_MACHINE, rdwPath, "RedirectionWarningDialogVersion", 1) {
+		return
+	}
+	elevateRegWrite()
+}
+
+// isRDWAlreadySet returns true if RedirectionWarningDialogVersion is already 1.
+func isRDWAlreadySet() bool {
+	paths := []struct {
+		root registry.Key
+		path string
+	}{
+		{registry.LOCAL_MACHINE, `SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client`},
+		{registry.CURRENT_USER, `Software\Policies\Microsoft\Windows NT\Terminal Services\Client`},
+	}
+	for _, p := range paths {
+		if readRegDWORD(p.root, p.path, "RedirectionWarningDialogVersion") == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+// writeRegDWORD writes a DWORD value to the registry. Returns true on success.
+func writeRegDWORD(root registry.Key, path, name string, value uint32) bool {
+	k, err := registry.OpenKey(root, path, registry.SET_VALUE)
+	if err != nil {
+		k, _, err = registry.CreateKey(root, path, registry.SET_VALUE)
+		if err != nil {
+			return false
+		}
+	}
+	defer k.Close()
+	return k.SetDWordValue(name, value) == nil
+}
+
+// readRegDWORD reads a DWORD value from the registry. Returns 0 if not found.
+func readRegDWORD(root registry.Key, path, name string) uint32 {
+	k, err := registry.OpenKey(root, path, registry.QUERY_VALUE)
+	if err != nil {
+		return 0
+	}
+	defer k.Close()
+	val, _, err := k.GetIntegerValue(name)
+	if err != nil {
+		return 0
+	}
+	return uint32(val)
+}
+
+// elevateRegWrite launches reg.exe with the "runas" verb to write the
+// RedirectionWarningDialogVersion machine-policy key with admin rights.
+func elevateRegWrite() {
+	shell32 := windows.NewLazySystemDLL("shell32.dll")
+	procShellExecute := shell32.NewProc("ShellExecuteW")
+
+	op, _ := windows.UTF16PtrFromString("runas")
+	file, _ := windows.UTF16PtrFromString("reg.exe")
+	params, _ := windows.UTF16PtrFromString(
+		`add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client" /v RedirectionWarningDialogVersion /t REG_DWORD /d 1 /f`,
+	)
+
+	ret, _, _ := procShellExecute.Call(
+		0,
+		uintptr(unsafe.Pointer(op)),
+		uintptr(unsafe.Pointer(file)),
+		uintptr(unsafe.Pointer(params)),
+		0,
+		0, // SW_HIDE
+	)
+	if ret <= 32 {
+		log.Writef("[RDP] ShellExecute runas failed: %d", ret)
+	} else {
+		log.Writef("[RDP] UAC elevation requested for RedirectionWarningDialogVersion")
+	}
 }
 
 func (s *RDPSession) configureNonScriptable(password string) {

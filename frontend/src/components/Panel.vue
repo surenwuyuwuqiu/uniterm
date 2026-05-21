@@ -16,11 +16,23 @@
           :title="t('terminal.broadcastInput')"
         >
           <svg class="broadcast-icon" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="0.5" y="1.5" width="6" height="13" rx="1" />
-            <rect x="9.5" y="1.5" width="6" height="13" rx="1" />
-            <line x1="2.5" y1="5" x2="5" y2="5" />
-            <line x1="11.5" y1="5" x2="14" y2="5" />
-            <line x1="7" y1="8" x2="9" y2="8" />
+            <!-- top terminal (input source) -->
+            <rect x="3" y="0.5" width="10" height="3.5" rx="0.8" />
+            <line x1="5.5" y1="2.25" x2="7.5" y2="2.25" />
+            <!-- connector lines branching down -->
+            <line x1="8" y1="4" x2="8" y2="5.5" />
+            <line x1="4" y1="5.5" x2="12" y2="5.5" />
+            <line x1="4" y1="5.5" x2="4" y2="7" />
+            <line x1="8" y1="5.5" x2="8" y2="7" />
+            <line x1="12" y1="5.5" x2="12" y2="7" />
+            <!-- bottom terminals (output targets) -->
+            <rect x="1" y="7" width="6" height="3.5" rx="0.8" />
+            <rect x="5" y="10.5" width="6" height="3.5" rx="0.8" />
+            <rect x="9" y="7" width="6" height="3.5" rx="0.8" />
+            <!-- cursors -->
+            <line x1="2.5" y1="8.75" x2="5" y2="8.75" />
+            <line x1="6.5" y1="12.25" x2="9" y2="12.25" />
+            <line x1="10.5" y1="8.75" x2="13" y2="8.75" />
           </svg>
         </button>
         <button

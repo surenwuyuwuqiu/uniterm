@@ -72,7 +72,6 @@ const rdpAreaStyle = computed(() => {
 })
 
 // --- Positioning ---
-// Convert viewport-relative div position to screen coordinates and send to backend.
 let lastX = -1, lastY = -1, lastW = -1, lastH = -1
 
 function syncRDPPosition() {
@@ -86,8 +85,62 @@ function syncRDPPosition() {
   const h = Math.round(rect.height * dpr)
   if (x === lastX && y === lastY && w === lastW && h === lastH) return
   lastX = x; lastY = y; lastW = w; lastH = h
+  // RDPSetPosition shows the RDP at the given position (SWP_SHOWWINDOW)
   RDPSetPosition(currentSessionId.value, x, y, w, h)
 }
+
+// --- Layout change: sync position directly ---
+// syncRDPPosition skips if position hasn't changed (lastX/lastY check),
+// so calling it directly on every event is cheap.
+
+// --- Window resize ---
+function onWindowResize() {
+  syncRDPPosition()
+}
+
+// --- Window move detection ---
+// Window resize events don't fire for title-bar drag moves, so poll screen pos.
+
+let movePollTimer: ReturnType<typeof setInterval> | null = null
+let lastScreenX = 0
+let lastScreenY = 0
+
+function startMovePolling() {
+  lastScreenX = window.screenLeft ?? window.screenX ?? 0
+  lastScreenY = window.screenTop ?? window.screenY ?? 0
+  movePollTimer = setInterval(() => {
+    const sx = window.screenLeft ?? window.screenX ?? 0
+    const sy = window.screenTop ?? window.screenY ?? 0
+    if (sx !== lastScreenX || sy !== lastScreenY) {
+      lastScreenX = sx
+      lastScreenY = sy
+      syncRDPPosition()
+    }
+  }, 16)
+}
+
+function stopMovePolling() {
+  if (movePollTimer) { clearInterval(movePollTimer); movePollTimer = null }
+}
+
+// --- Sidebar/panel resize detection ---
+// ResizeObserver tracks the rdpArea div; fires when sidebars change width.
+
+let resizeObserver: ResizeObserver | null = null
+
+function startResizeObserver() {
+  if (!rdpAreaRef.value) return
+  resizeObserver = new ResizeObserver(() => {
+    syncRDPPosition()
+  })
+  resizeObserver.observe(rdpAreaRef.value)
+}
+
+function stopResizeObserver() {
+  if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null }
+}
+
+// --- Connection ---
 
 async function connect() {
   if (!props.config) return
@@ -107,17 +160,6 @@ async function reconnect() {
     currentSessionId.value = null
   }
   await connect()
-}
-
-// --- Resize tracking ---
-
-let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null
-
-function onWindowResize() {
-  syncRDPPosition()
-  // Delayed re-sync to catch final layout after maximize/restore transitions
-  if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer)
-  resizeDebounceTimer = setTimeout(() => syncRDPPosition(), 300)
 }
 
 // --- Events ---
@@ -150,10 +192,11 @@ onMounted(() => {
   if (props.sessionId) {
     currentSessionId.value = props.sessionId
   }
-  // Only use debounced window resize for maximize/restore.
-  // ResizeObserver removed: fired too frequently during resize, flooding RDP.
   window.addEventListener('resize', onWindowResize)
-  // If session already exists (tab switch back), show connected state immediately
+  startMovePolling()
+  nextTick(() => {
+    startResizeObserver()
+  })
   if (currentSessionId.value) {
     status.value = 'connected'
     nextTick(() => requestAnimationFrame(() => syncRDPPosition()))
@@ -170,9 +213,8 @@ watch(() => props.sessionId, (newId) => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', onWindowResize)
-  if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer)
-  // Only hide, don't close — session persists across tab switches.
-  // Session cleanup is handled by the backend when the tab is closed or app exits.
+  stopMovePolling()
+  stopResizeObserver()
   if (currentSessionId.value) {
     RDPHide(currentSessionId.value)
   }

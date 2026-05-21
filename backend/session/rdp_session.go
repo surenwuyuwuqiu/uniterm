@@ -71,8 +71,6 @@ type RDPSession struct {
 	trackStop            chan struct{}
 	trackGen             int       // incremented on each startTracking; stale goroutines exit
 	wasMinimized         bool      // tracks parent minimize→restore transitions
-	lastSetPos           time.Time // rate-limit cross-thread SetWindowPos calls
-	tickCount            int       // heartbeat counter for diagnostics
 }
 
 func NewRDPSession(id string) *RDPSession {
@@ -637,6 +635,9 @@ func (s *RDPSession) Hide() {
 // trackParentMove checks if the parent window has moved and repositions the RDP window
 // to follow. Also detects minimize/restore to hide/re-show RDP. Called from the tracking
 // goroutine every ~16ms.
+// trackParentMove checks the parent window state and hides/shows RDP accordingly.
+// Position tracking during drag/resize is handled by the frontend via RDPHide/RDPSetPosition.
+// This goroutine only handles minimize/restore detection which the frontend cannot see.
 func (s *RDPSession) trackParentMove() {
 	s.mu.Lock()
 	hwnd := s.hwnd
@@ -645,86 +646,29 @@ func (s *RDPSession) trackParentMove() {
 		return
 	}
 	parent := s.parentHwnd
-	tick := s.tickCount
-	s.tickCount++
 	tX := s.trackX
 	tY := s.trackY
 	s.mu.Unlock()
 
-	// Heartbeat every ~60 ticks (~1 second)
-	if tick%60 == 0 {
-		log.Writef("[RDP-heartbeat] tracking alive, tick=%d, shown=true, hwnd=0x%x", tick, hwnd)
-	}
-
-	// --- Minimize / Restore ---
-	s.mu.Lock()
 	isMin, _, _ := procIsIconic.Call(parent)
 	if isMin != 0 {
 		if !s.wasMinimized {
 			s.wasMinimized = true
 			log.Writef("[RDP-track] parent minimized, hiding RDP")
-			s.mu.Unlock()
 			procSetWindowPos.Call(hwnd, 0, 32000, 32000, 0, 0,
 				SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_ASYNCWINDOWPOS)
-			return
 		}
-		s.mu.Unlock()
 		return
 	}
 	if s.wasMinimized {
 		s.wasMinimized = false
 		log.Writef("[RDP-track] parent restored, showing RDP at (%d,%d)", tX, tY)
-		s.mu.Unlock()
 		procSetWindowPos.Call(hwnd, HWND_TOPMOST, uintptr(tX), uintptr(tY), 0, 0,
 			SWP_SHOWWINDOW|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
 		return
 	}
 
-	// --- Position tracking ---
-	var wr rect
-	ret, _, _ := procGetWindowRect.Call(parent, uintptr(unsafe.Pointer(&wr)))
-	if ret == 0 {
-		s.mu.Unlock()
-		return
-	}
-	curX := int(wr.Left)
-	curY := int(wr.Top)
-
-	if curX != s.refParentX || curY != s.refParentY {
-		dx := curX - s.refParentX
-		dy := curY - s.refParentY
-		newX := s.refRdpX + dx
-		newY := s.refRdpY + dy
-		if newX != s.trackX || newY != s.trackY {
-			s.trackX = newX
-			s.trackY = newY
-			tX = newX
-			tY = newY
-			now := time.Now()
-			doCall := now.Sub(s.lastSetPos) > 200*time.Millisecond
-			if doCall {
-				s.lastSetPos = now
-			}
-			s.mu.Unlock()
-			if doCall {
-				log.Writef("[RDP-track] pos delta dx=%d dy=%d", dx, dy)
-				procSetWindowPos.Call(hwnd, 0,
-					uintptr(newX), uintptr(newY),
-					0, 0,
-					SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_ASYNCWINDOWPOS)
-			}
-			// Z-order refresh after position update
-			procSetWindowPos.Call(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-				SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
-			return
-		}
-	}
-	s.mu.Unlock()
-
-	// --- Z-order: dynamic TOPMOST based on foreground ---
-	// When uniTerm is the active app, make RDP topmost so it always stays above
-	// the main window. When user switches away, remove topmost so RDP doesn't
-	// cover other applications.
+	// Z-order maintenance: dynamic TOPMOST based on foreground
 	fg, _, _ := procGetForegroundWindow.Call()
 	fgRoot, _, _ := procGetAncestor.Call(fg, GA_ROOT)
 	if fgRoot == parent {
@@ -735,6 +679,7 @@ func (s *RDPSession) trackParentMove() {
 			SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
 	}
 }
+
 func (s *RDPSession) startTracking() {
 	s.mu.Lock()
 	if s.trackStop != nil {
@@ -752,7 +697,7 @@ func (s *RDPSession) startTracking() {
 				log.Writef("[RDP-track] PANIC in tracking goroutine: %v", r)
 			}
 		}()
-		ticker := time.NewTicker(16 * time.Millisecond)
+		ticker := time.NewTicker(150 * time.Millisecond)
 		defer ticker.Stop()
 		for {
 			select {

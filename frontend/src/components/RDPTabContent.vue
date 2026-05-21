@@ -111,7 +111,14 @@ async function reconnect() {
 
 // --- Resize tracking ---
 
-let resizeObserver: ResizeObserver | null = null
+let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function onWindowResize() {
+  syncRDPPosition()
+  // Delayed re-sync to catch final layout after maximize/restore transitions
+  if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer)
+  resizeDebounceTimer = setTimeout(() => syncRDPPosition(), 300)
+}
 
 // --- Events ---
 
@@ -143,17 +150,15 @@ onMounted(() => {
   if (props.sessionId) {
     currentSessionId.value = props.sessionId
   }
-  if (sizeMode.value === 'follow' && rdpAreaRef.value) {
-    resizeObserver = new ResizeObserver(() => syncRDPPosition())
-    resizeObserver.observe(rdpAreaRef.value)
-  }
-  window.addEventListener('resize', syncRDPPosition)
-  if (!props.sessionId) {
+  // Only use debounced window resize for maximize/restore.
+  // ResizeObserver removed: fired too frequently during resize, flooding RDP.
+  window.addEventListener('resize', onWindowResize)
+  // If session already exists (tab switch back), show connected state immediately
+  if (currentSessionId.value) {
+    status.value = 'connected'
+    nextTick(() => requestAnimationFrame(() => syncRDPPosition()))
+  } else {
     status.value = 'connecting'
-  }
-  // If session already connected when component mounts, sync position immediately
-  if (currentSessionId.value && status.value !== 'connecting' && status.value !== 'error') {
-    requestAnimationFrame(() => syncRDPPosition())
   }
 })
 
@@ -164,11 +169,12 @@ watch(() => props.sessionId, (newId) => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', syncRDPPosition)
-  resizeObserver?.disconnect()
+  window.removeEventListener('resize', onWindowResize)
+  if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer)
+  // Only hide, don't close — session persists across tab switches.
+  // Session cleanup is handled by the backend when the tab is closed or app exits.
   if (currentSessionId.value) {
     RDPHide(currentSessionId.value)
-    CloseSession(currentSessionId.value).catch(() => {})
   }
 })
 

@@ -1,6 +1,7 @@
 package session
 
 import (
+	"runtime"
 	"fmt"
 	"os/exec"
 	"sync"
@@ -18,35 +19,40 @@ var (
 	procAtlAxWinInit    = atlDll.NewProc("AtlAxWinInit")
 	procAtlAxGetControl = atlDll.NewProc("AtlAxGetControl")
 
-	user32Dll            = windows.NewLazySystemDLL("user32.dll")
-	procSetWindowPos     = user32Dll.NewProc("SetWindowPos")
-	procShowWindow       = user32Dll.NewProc("ShowWindow")
-	procDestroyWindow    = user32Dll.NewProc("DestroyWindow")
-	procFindWindowW      = user32Dll.NewProc("FindWindowW")
-	procGetMessage       = user32Dll.NewProc("GetMessageW")
-	procTranslateMessage = user32Dll.NewProc("TranslateMessage")
-	procDispatchMessage  = user32Dll.NewProc("DispatchMessageW")
-	procGetWindowRect    = user32Dll.NewProc("GetWindowRect")
-	procGetClientRect    = user32Dll.NewProc("GetClientRect")
-	procClientToScreen   = user32Dll.NewProc("ClientToScreen")
-	procPostMessageW     = user32Dll.NewProc("PostMessageW")
-	procIsIconic         = user32Dll.NewProc("IsIconic")
+	user32Dll              = windows.NewLazySystemDLL("user32.dll")
+	procSetWindowPos       = user32Dll.NewProc("SetWindowPos")
+	procDestroyWindow      = user32Dll.NewProc("DestroyWindow")
+	procFindWindowW        = user32Dll.NewProc("FindWindowW")
+	procPeekMessage        = user32Dll.NewProc("PeekMessageW")
+	procTranslateMessage   = user32Dll.NewProc("TranslateMessage")
+	procDispatchMessage    = user32Dll.NewProc("DispatchMessageW")
+	procGetWindowRect      = user32Dll.NewProc("GetWindowRect")
+	procGetClientRect      = user32Dll.NewProc("GetClientRect")
+	procClientToScreen     = user32Dll.NewProc("ClientToScreen")
+	procPostMessageW       = user32Dll.NewProc("PostMessageW")
+	procIsIconic           = user32Dll.NewProc("IsIconic")
+	procGetForegroundWindow = user32Dll.NewProc("GetForegroundWindow")
+	procGetAncestor         = user32Dll.NewProc("GetAncestor")
 )
 
 const (
 	WM_CLOSE       = 0x0010
-	SW_SHOW        = 5
-	HWND_TOP       = 0
+	HWND_TOPMOST   = ^uintptr(0) // -1 as uintptr for syscall compatibility
+	HWND_NOTOPMOST = ^uintptr(1) // -2 as uintptr for syscall compatibility
 	SWP_SHOWWINDOW = 0x0040
 	SWP_HIDEWINDOW = 0x0080
 	SWP_NOMOVE     = 0x0002
 	SWP_NOSIZE     = 0x0001
 	SWP_NOACTIVATE = 0x0010
 	SWP_NOZORDER   = 0x0004
+	SWP_ASYNCWINDOWPOS = 0x4000 // non-blocking: avoids freezing RDP COM thread
 	WS_EX_TOOLWINDOW  = 0x00000080
 	WS_EX_NOACTIVATE  = 0x08000000
 	WS_POPUP          = 0x80000000
 	WS_CLIPSIBLINGS   = 0x04000000
+	GA_ROOT           = 2
+	PM_REMOVE         = 0x0001
+	GWLP_HWNDPARENT   = ^uintptr(7) // -8 represented as uintptr for syscall compatibility
 )
 
 type RDPSession struct {
@@ -56,13 +62,17 @@ type RDPSession struct {
 	rdp        *ole.IDispatch
 	config     ConnectionConfig
 	mu         sync.Mutex
-	shown      bool
+	shown     bool
 
 	// Position tracking
-	trackStop            chan struct{}
 	trackX, trackY       int
 	refParentX, refParentY int
 	refRdpX, refRdpY     int
+	trackStop            chan struct{}
+	trackGen             int       // incremented on each startTracking; stale goroutines exit
+	wasMinimized         bool      // tracks parent minimize→restore transitions
+	lastSetPos           time.Time // rate-limit cross-thread SetWindowPos calls
+	tickCount            int       // heartbeat counter for diagnostics
 }
 
 func NewRDPSession(id string) *RDPSession {
@@ -110,6 +120,13 @@ func (s *RDPSession) storeCredentials(host, user, password string) {
 func (s *RDPSession) Connect(config ConnectionConfig) error {
 	log.Writef("[RDP] starting connect to %s:%d as %s", config.Host, config.Port, config.User)
 
+	defer func() {
+		if r := recover(); r != nil {
+			log.Writef("[RDP] PANIC in Connect: %v", r)
+			s.setStatus(StatusError)
+		}
+	}()
+
 	// Phase 1: quick state init (brief lock)
 	s.mu.Lock()
 	s.config = config
@@ -117,14 +134,22 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 	s.setStatus(StatusConnecting)
 	s.mu.Unlock()
 
+	runtime.LockOSThread() // pin COM STA to a dedicated OS thread
 	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
 	defer func() {
+		s.stopTracking()
+		s.mu.Lock()
+		hwnd := s.hwnd
+		s.hwnd = 0
+		s.mu.Unlock()
+		if hwnd != 0 {
+			procDestroyWindow.Call(hwnd)
+		}
 		s.mu.Lock()
 		if s.rdp != nil {
 			s.rdp.Release()
 			s.rdp = nil
 		}
-		s.hwnd = 0
 		ole.CoUninitialize()
 		s.mu.Unlock()
 	}()
@@ -175,15 +200,15 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 		uintptr(WS_POPUP|WS_CLIPSIBLINGS),
 		32000, 32000,
 		uintptr(width), uintptr(height),
-		0,
-		0, 0, 0,
+		// No owner window: avoids modal-loop deadlock with RDP ActiveX.
+		0, 0, 0, 0,
 	)
 	if hwnd == 0 {
 		log.Writef("[RDP] ERROR: CreateWindowExW failed")
 		s.setStatus(StatusError)
 		return fmt.Errorf("CreateWindowEx failed")
 	}
-	log.Writef("[RDP] hwnd=0x%x", hwnd)
+		log.Writef("[RDP] hwnd=0x%x parentHwnd=0x%x", hwnd, s.parentHwnd)
 
 	var unk *ole.IUnknown
 	procAtlAxGetControl.Call(hwnd, uintptr(unsafe.Pointer(&unk)))
@@ -217,7 +242,7 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 	dispatch.PutProperty("DesktopWidth", width)
 	dispatch.PutProperty("DesktopHeight", height)
 	dispatch.PutProperty("FullScreen", false)
-		dispatch.PutProperty("AuthenticationLevel", 0)
+	dispatch.PutProperty("AuthenticationLevel", 0)
 
 	// AdvancedSettings2
 	advObj, _ := dispatch.GetProperty("AdvancedSettings2")
@@ -298,6 +323,7 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 	// Immediate show-and-position to avoid white/black screen.
 	// Frontend will refine via RDPSetPosition shortly after.
 	s.positionFromMainWindow(width, height)
+
 	s.startTracking()
 	s.setStatus(StatusConnected)
 
@@ -323,25 +349,43 @@ type msg struct {
 func (s *RDPSession) runMessagePump() {
 	log.Writef("[RDP] message pump started")
 	var m msg
+	pumpTick := 0
+	noMsgCount := 0
 	for {
-		ret, _, _ := procGetMessage.Call(
-			uintptr(unsafe.Pointer(&m)),
-			0, 0, 0,
-		)
-		if ret == 0 || ret == ^uintptr(0) {
-			break
-		}
-		procTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
-		procDispatchMessage.Call(uintptr(unsafe.Pointer(&m)))
 		s.mu.Lock()
 		done := s.hwnd == 0
 		s.mu.Unlock()
 		if done {
 			break
 		}
+
+		ret, _, _ := procPeekMessage.Call(
+			uintptr(unsafe.Pointer(&m)),
+			0, 0, 0,
+			PM_REMOVE,
+		)
+		if ret != 0 {
+			if m.Message == 0x0012 { // WM_QUIT
+				log.Writef("[RDP-pump] WM_QUIT received, exiting")
+				return
+			}
+			procTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
+			procDispatchMessage.Call(uintptr(unsafe.Pointer(&m)))
+			pumpTick++
+			noMsgCount = 0
+		} else {
+			// No message available; sleep briefly to avoid busy-wait.
+			// Check hwnd every ~1 second via heartbeat counter.
+			time.Sleep(50 * time.Millisecond)
+			noMsgCount++
+			if noMsgCount%20 == 0 {
+				log.Writef("[RDP-pump] heartbeat idle=%d, pumpMsgs=%d, hwnd=0x%x", noMsgCount, pumpTick, s.hwnd)
+			}
+		}
 	}
 	log.Writef("[RDP] message pump exited")
 }
+
 
 func (s *RDPSession) findRdpProgID() string {
 	candidates := []string{
@@ -495,13 +539,11 @@ func (s *RDPSession) positionFromMainWindow(width, height int) {
 	log.Writef("[RDP] backend positioning: client=(%d,%d %dx%d) rdp=(x=%d y=%d w=%d h=%d)",
 		clientLeft, clientTop, clientWidth, clientHeight, x, y, w, h)
 
-	procShowWindow.Call(s.hwnd, SW_SHOW)
-	flags := uintptr(SWP_SHOWWINDOW | SWP_NOACTIVATE)
 	s.shown = true
-	procSetWindowPos.Call(s.hwnd, HWND_TOP,
+	procSetWindowPos.Call(s.hwnd, HWND_TOPMOST,
 		uintptr(x), uintptr(y),
 		uintptr(w), uintptr(h),
-		flags)
+		SWP_SHOWWINDOW|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
 
 	// Init tracking baseline
 	s.refRdpX = x
@@ -518,11 +560,15 @@ func (s *RDPSession) positionFromMainWindow(width, height int) {
 
 func (s *RDPSession) SetPosition(x, y, w, h int) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.hwnd == 0 {
+	hwnd := s.hwnd
+	if hwnd == 0 {
+		log.Writef("[RDP-SetPos] SKIP hwnd=0")
+		s.mu.Unlock()
 		return
 	}
-
+	wasHidden := !s.shown
+	s.shown = true
+	log.Writef("[RDP-SetPos] FROM FRONTEND x=%d y=%d w=%d h=%d wasHidden=%v", x, y, w, h, wasHidden)
 	// Update tracking baseline from frontend's authoritative DOM-based position
 	var wr rect
 	if ret, _, _ := procGetWindowRect.Call(s.parentHwnd, uintptr(unsafe.Pointer(&wr))); ret != 0 {
@@ -533,104 +579,211 @@ func (s *RDPSession) SetPosition(x, y, w, h int) {
 	s.refRdpY = y
 	s.trackX = x
 	s.trackY = y
+	s.mu.Unlock()
 
-	flags := uintptr(SWP_NOACTIVATE)
-	if !s.shown {
-		flags |= SWP_SHOWWINDOW
-		s.shown = true
-	}
-	procSetWindowPos.Call(s.hwnd, HWND_TOP,
+	// Include SWP_SHOWWINDOW in case window was hidden (e.g. after tab switch)
+	procSetWindowPos.Call(hwnd, HWND_TOPMOST,
 		uintptr(x), uintptr(y),
 		uintptr(w), uintptr(h),
-		flags)
+		SWP_SHOWWINDOW|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
+
+		// Restart tracking if it was stopped by Hide().
+		// Owned-window relationship handles z-order automatically.
+		if wasHidden {
+			s.startTracking()
+		}
 }
 
 func (s *RDPSession) Show() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.hwnd != 0 {
-		procSetWindowPos.Call(s.hwnd, HWND_TOP, 0, 0, 0, 0,
-			SWP_SHOWWINDOW|SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE)
-		s.shown = true
+	if s.shown {
+		s.mu.Unlock()
+		return
 	}
+	hwnd := s.hwnd
+	tX := s.trackX
+	tY := s.trackY
+	s.shown = true
+	s.mu.Unlock()
+	log.Writef("[RDP-Show] trackX=%d trackY=%d hwnd=0x%x", tX, tY, hwnd)
+	if hwnd != 0 {
+		procSetWindowPos.Call(hwnd, HWND_TOPMOST,
+			uintptr(tX), uintptr(tY),
+			0, 0,
+			SWP_SHOWWINDOW|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
+	}
+	s.startTracking()
 }
 
 func (s *RDPSession) Hide() {
+	log.Writef("[RDP-Hide] called")
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.hwnd != 0 {
-		procSetWindowPos.Call(s.hwnd, 0, 0, 0, 0, 0,
-			SWP_HIDEWINDOW|SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER)
-		s.shown = false
+	if !s.shown {
+		s.mu.Unlock()
+		return
+	}
+	hwnd := s.hwnd
+	s.shown = false
+	s.mu.Unlock()
+	s.stopTracking()
+	if hwnd != 0 {
+		procSetWindowPos.Call(hwnd, 0,
+			32000, 32000,
+			0, 0,
+			SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_ASYNCWINDOWPOS)
 	}
 }
 
-func (s *RDPSession) startTracking() {
-	s.trackStop = make(chan struct{})
+// trackParentMove checks if the parent window has moved and repositions the RDP window
+// to follow. Also detects minimize/restore to hide/re-show RDP. Called from the tracking
+// goroutine every ~16ms.
+func (s *RDPSession) trackParentMove() {
+	s.mu.Lock()
+	hwnd := s.hwnd
+	if hwnd == 0 || !s.shown {
+		s.mu.Unlock()
+		return
+	}
+	parent := s.parentHwnd
+	tick := s.tickCount
+	s.tickCount++
+	tX := s.trackX
+	tY := s.trackY
+	s.mu.Unlock()
 
+	// Heartbeat every ~60 ticks (~1 second)
+	if tick%60 == 0 {
+		log.Writef("[RDP-heartbeat] tracking alive, tick=%d, shown=true, hwnd=0x%x", tick, hwnd)
+	}
+
+	// --- Minimize / Restore ---
+	s.mu.Lock()
+	isMin, _, _ := procIsIconic.Call(parent)
+	if isMin != 0 {
+		if !s.wasMinimized {
+			s.wasMinimized = true
+			log.Writef("[RDP-track] parent minimized, hiding RDP")
+			s.mu.Unlock()
+			procSetWindowPos.Call(hwnd, 0, 32000, 32000, 0, 0,
+				SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_ASYNCWINDOWPOS)
+			return
+		}
+		s.mu.Unlock()
+		return
+	}
+	if s.wasMinimized {
+		s.wasMinimized = false
+		log.Writef("[RDP-track] parent restored, showing RDP at (%d,%d)", tX, tY)
+		s.mu.Unlock()
+		procSetWindowPos.Call(hwnd, HWND_TOPMOST, uintptr(tX), uintptr(tY), 0, 0,
+			SWP_SHOWWINDOW|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
+		return
+	}
+
+	// --- Position tracking ---
+	var wr rect
+	ret, _, _ := procGetWindowRect.Call(parent, uintptr(unsafe.Pointer(&wr)))
+	if ret == 0 {
+		s.mu.Unlock()
+		return
+	}
+	curX := int(wr.Left)
+	curY := int(wr.Top)
+
+	if curX != s.refParentX || curY != s.refParentY {
+		dx := curX - s.refParentX
+		dy := curY - s.refParentY
+		newX := s.refRdpX + dx
+		newY := s.refRdpY + dy
+		if newX != s.trackX || newY != s.trackY {
+			s.trackX = newX
+			s.trackY = newY
+			tX = newX
+			tY = newY
+			now := time.Now()
+			doCall := now.Sub(s.lastSetPos) > 200*time.Millisecond
+			if doCall {
+				s.lastSetPos = now
+			}
+			s.mu.Unlock()
+			if doCall {
+				log.Writef("[RDP-track] pos delta dx=%d dy=%d", dx, dy)
+				procSetWindowPos.Call(hwnd, 0,
+					uintptr(newX), uintptr(newY),
+					0, 0,
+					SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_ASYNCWINDOWPOS)
+			}
+			// Z-order refresh after position update
+			procSetWindowPos.Call(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+				SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
+			return
+		}
+	}
+	s.mu.Unlock()
+
+	// --- Z-order: dynamic TOPMOST based on foreground ---
+	// When uniTerm is the active app, make RDP topmost so it always stays above
+	// the main window. When user switches away, remove topmost so RDP doesn't
+	// cover other applications.
+	fg, _, _ := procGetForegroundWindow.Call()
+	fgRoot, _, _ := procGetAncestor.Call(fg, GA_ROOT)
+	if fgRoot == parent {
+		procSetWindowPos.Call(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+			SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
+	} else {
+		procSetWindowPos.Call(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+			SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
+	}
+}
+func (s *RDPSession) startTracking() {
+	s.mu.Lock()
+	if s.trackStop != nil {
+		s.mu.Unlock()
+		return
+	}
+	stop := make(chan struct{})
+	s.trackStop = stop
+	s.trackGen++
+	gen := s.trackGen
+	s.mu.Unlock()
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Writef("[RDP-track] PANIC in tracking goroutine: %v", r)
+			}
+		}()
 		ticker := time.NewTicker(16 * time.Millisecond)
 		defer ticker.Stop()
-
 		for {
 			select {
-			case <-s.trackStop:
+			case <-stop:
 				return
 			case <-ticker.C:
 				s.mu.Lock()
-				if s.hwnd == 0 {
+				if s.trackGen != gen {
 					s.mu.Unlock()
-					return
-				}
-
-				// Skip if parent is minimized (owned popup is auto-hidden by Windows)
-				iconic, _, _ := procIsIconic.Call(s.parentHwnd)
-				if iconic != 0 {
-					s.mu.Unlock()
-					continue
-				}
-
-				var wr rect
-				ret, _, _ := procGetWindowRect.Call(s.parentHwnd, uintptr(unsafe.Pointer(&wr)))
-				if ret == 0 {
-					s.mu.Unlock()
-					continue
-				}
-
-				curX := int(wr.Left)
-				curY := int(wr.Top)
-
-				if curX != s.refParentX || curY != s.refParentY {
-					dx := curX - s.refParentX
-					dy := curY - s.refParentY
-					newX := s.refRdpX + dx
-					newY := s.refRdpY + dy
-
-					if newX != s.trackX || newY != s.trackY {
-						procSetWindowPos.Call(s.hwnd, 0,
-							uintptr(newX), uintptr(newY),
-							0, 0,
-							SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER)
-						s.trackX = newX
-						s.trackY = newY
-					}
+					return // stale goroutine, new tracking has started
 				}
 				s.mu.Unlock()
+				s.trackParentMove()
 			}
 		}
 	}()
 }
 
 func (s *RDPSession) stopTracking() {
+	log.Writef("[RDP-track] stopTracking called")
+	s.mu.Lock()
 	if s.trackStop != nil {
 		close(s.trackStop)
 		s.trackStop = nil
 	}
+	s.mu.Unlock()
 }
 
 func (s *RDPSession) Disconnect() error {
-	s.mu.Lock()
 	s.stopTracking()
+	s.mu.Lock()
 	hwnd := s.hwnd
 	s.hwnd = 0
 	s.mu.Unlock()
@@ -644,15 +797,17 @@ func (s *RDPSession) Disconnect() error {
 
 func (s *RDPSession) Resize(cols, rows int) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.rdp != nil {
 		s.rdp.PutProperty("DesktopWidth", cols)
 		s.rdp.PutProperty("DesktopHeight", rows)
 	}
-	if s.hwnd != 0 {
-		procSetWindowPos.Call(s.hwnd, HWND_TOP, 0, 0,
+	hwnd := s.hwnd
+	shown := s.shown
+	s.mu.Unlock()
+	if hwnd != 0 && shown {
+		procSetWindowPos.Call(hwnd, HWND_TOPMOST, 0, 0,
 			uintptr(cols), uintptr(rows),
-			SWP_SHOWWINDOW|SWP_NOMOVE|SWP_NOACTIVATE)
+			SWP_NOACTIVATE)
 	}
 	return nil
 }

@@ -58,7 +58,7 @@ import { ElMessageBox } from 'element-plus'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useI18n } from '../i18n'
-import { SftpCancelTransfer } from '../../wailsjs/go/main/App'
+import { SftpCancelTransfer, CloseSession, RDPHide } from '../../wailsjs/go/main/App'
 import TabItem from './TabItem.vue'
 import WorkspaceTabItem from './WorkspaceTabItem.vue'
 
@@ -112,6 +112,15 @@ async function closeTab(id: string) {
           }
         }
       }
+    }
+  }
+
+  // Clean up RDP session: hide window first, then close Go-side resources
+  if (tab && tab.type === 'rdp') {
+    const rdpPanel = panelStore.getPanel(tab.panelId)
+    if (rdpPanel?.sessionId) {
+      await RDPHide(rdpPanel.sessionId)
+      try { await CloseSession(rdpPanel.sessionId) } catch (_) {}
     }
   }
 

@@ -21,6 +21,7 @@ var (
 
 	user32Dll              = windows.NewLazySystemDLL("user32.dll")
 	procSetWindowPos       = user32Dll.NewProc("SetWindowPos")
+	procShowWindow         = user32Dll.NewProc("ShowWindow")
 	procDestroyWindow      = user32Dll.NewProc("DestroyWindow")
 	procFindWindowW        = user32Dll.NewProc("FindWindowW")
 	procPeekMessage        = user32Dll.NewProc("PeekMessageW")
@@ -48,6 +49,8 @@ const (
 	WS_CLIPSIBLINGS   = 0x04000000
 	PM_REMOVE         = 0x0001
 	GWLP_HWNDPARENT   = ^uintptr(7) // -8 represented as uintptr for syscall compatibility
+	SW_HIDE           = 0
+	SW_SHOWNOACTIVATE = 4
 )
 
 type RDPSession struct {
@@ -125,20 +128,31 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 	runtime.LockOSThread() // pin COM STA to a dedicated OS thread
 	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
 	defer func() {
+		// Properly disconnect the RDP ActiveX control first.
+		// This closes network sockets and stops internal threads —
+		// skipping it leaks resources that cause progressive lag.
+		s.mu.Lock()
+		rdp := s.rdp
+		s.rdp = nil
+		s.mu.Unlock()
+		if rdp != nil {
+			rdp.CallMethod("Disconnect")
+			rdp.Release()
+		}
+
 		s.mu.Lock()
 		hwnd := s.hwnd
 		s.hwnd = 0
 		s.mu.Unlock()
 		if hwnd != 0 {
+			// Hide first to avoid visual flash during destruction
+			procSetWindowPos.Call(hwnd, 0, 32000, 32000, 0, 0,
+				SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_ASYNCWINDOWPOS)
 			procDestroyWindow.Call(hwnd)
 		}
-		s.mu.Lock()
-		if s.rdp != nil {
-			s.rdp.Release()
-			s.rdp = nil
-		}
+
 		ole.CoUninitialize()
-		s.mu.Unlock()
+		runtime.UnlockOSThread()
 	}()
 
 	if s.parentHwnd == 0 {
@@ -583,10 +597,11 @@ func (s *RDPSession) Show() {
 	s.mu.Unlock()
 	log.Writef("[RDP-Show] trackX=%d trackY=%d hwnd=0x%x", tX, tY, hwnd)
 	if hwnd != 0 {
+		procShowWindow.Call(hwnd, SW_SHOWNOACTIVATE)
 		procSetWindowPos.Call(hwnd, 0,
 			uintptr(tX), uintptr(tY),
 			0, 0,
-			SWP_SHOWWINDOW|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
+			SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_ASYNCWINDOWPOS)
 	}
 }
 
@@ -601,21 +616,22 @@ func (s *RDPSession) Hide() {
 	s.shown = false
 	s.mu.Unlock()
 	if hwnd != 0 {
-		procSetWindowPos.Call(hwnd, 0,
-			32000, 32000,
-			0, 0,
-			SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_ASYNCWINDOWPOS)
+		// SW_HIDE hides the window so the OS stops sending paint messages
+		// and the ActiveX stops rendering in background.
+		procShowWindow.Call(hwnd, SW_HIDE)
 	}
 }
 
 func (s *RDPSession) Disconnect() error {
+	// Post WM_QUIT to the COM STA message pump so it exits cleanly.
+	// Do NOT zero s.hwnd here — the defer in Connect() needs it
+	// to call DestroyWindow for proper cleanup.
 	s.mu.Lock()
 	hwnd := s.hwnd
-	s.hwnd = 0
 	s.mu.Unlock()
 
 	if hwnd != 0 {
-		procPostMessageW.Call(hwnd, WM_CLOSE, 0, 0)
+		procPostMessageW.Call(hwnd, 0x0012, 0, 0) // WM_QUIT
 	}
 	s.setStatus(StatusDisconnected)
 	return nil

@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerRef" class="rdp-tab-content">
+  <div class="rdp-tab-content">
     <!-- Connecting state -->
     <div v-if="status === 'connecting'" class="rdp-overlay">
       <el-icon class="is-loading" :size="32"><Loading /></el-icon>
@@ -21,7 +21,6 @@
     <!-- Connected: placeholder div overlaid by native RDP popup window -->
     <div
       v-show="status === 'connected'"
-      ref="rdpAreaRef"
       class="rdp-area"
       :class="{ 'rdp-fixed': sizeMode === 'fixed' }"
       :style="rdpAreaStyle"
@@ -40,11 +39,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { useI18n } from '../i18n'
 import type { ConnectionConfig } from '../types/session'
-import { CreateSession, CloseSession, RDPSetPosition, RDPSetFocus, RDPHide } from '../../wailsjs/go/main/App'
+import { CreateSession, CloseSession, RDPHide } from '../../wailsjs/go/main/App'
 import { EventsOn } from '../../wailsjs/runtime'
 
 const { t } = useI18n()
@@ -55,8 +54,6 @@ const props = defineProps<{
   sessionId: string | null
 }>()
 
-const containerRef = ref<HTMLElement>()
-const rdpAreaRef = ref<HTMLElement>()
 const status = ref<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting')
 const currentSessionId = ref<string | null>(props.sessionId)
 const sizeMode = computed(() => props.config?.rdpSizeMode || 'follow')
@@ -70,93 +67,6 @@ const rdpAreaStyle = computed(() => {
   }
   return {}
 })
-
-// --- Positioning ---
-let lastX = -1, lastY = -1, lastW = -1, lastH = -1
-
-function syncRDPPosition() {
-  if (!rdpAreaRef.value || !currentSessionId.value || status.value !== 'connected') return
-  const rect = rdpAreaRef.value.getBoundingClientRect()
-  if (rect.width <= 0 || rect.height <= 0) return
-  const dpr = window.devicePixelRatio || 1
-  const x = Math.round((window.screenLeft + rect.left) * dpr)
-  const y = Math.round((window.screenTop + rect.top) * dpr)
-  const w = Math.round(rect.width * dpr)
-  const h = Math.round(rect.height * dpr)
-  if (x === lastX && y === lastY && w === lastW && h === lastH) return
-  lastX = x; lastY = y; lastW = w; lastH = h
-  // RDPSetPosition shows the RDP at the given position (SWP_SHOWWINDOW)
-  RDPSetPosition(currentSessionId.value, x, y, w, h)
-}
-
-// --- Layout change: sync position directly ---
-// syncRDPPosition skips if position hasn't changed (lastX/lastY check),
-// so calling it directly on every event is cheap.
-
-// --- Window resize ---
-function onWindowResize() {
-  syncRDPPosition()
-}
-
-// --- Focus/blur: instant z-order switch ---
-// When uniTerm gains/loses focus, adjust RDP topmost so it doesn't float
-// above other applications when uniTerm is in the background.
-
-function onBlur() {
-  console.log('[RDP] blur — window lost focus')
-  if (currentSessionId.value && status.value === 'connected') {
-    RDPSetFocus(currentSessionId.value, false)
-  }
-}
-
-function onFocus() {
-  console.log('[RDP] focus — window gained focus')
-  if (currentSessionId.value && status.value === 'connected') {
-    RDPSetFocus(currentSessionId.value, true)
-  }
-}
-
-// --- Window move detection ---
-// Window resize events don't fire for title-bar drag moves, so poll screen pos.
-
-let movePollTimer: ReturnType<typeof setInterval> | null = null
-let lastScreenX = 0
-let lastScreenY = 0
-
-function startMovePolling() {
-  lastScreenX = window.screenLeft ?? window.screenX ?? 0
-  lastScreenY = window.screenTop ?? window.screenY ?? 0
-  movePollTimer = setInterval(() => {
-    const sx = window.screenLeft ?? window.screenX ?? 0
-    const sy = window.screenTop ?? window.screenY ?? 0
-    if (sx !== lastScreenX || sy !== lastScreenY) {
-      lastScreenX = sx
-      lastScreenY = sy
-      syncRDPPosition()
-    }
-  }, 16)
-}
-
-function stopMovePolling() {
-  if (movePollTimer) { clearInterval(movePollTimer); movePollTimer = null }
-}
-
-// --- Sidebar/panel resize detection ---
-// ResizeObserver tracks the rdpArea div; fires when sidebars change width.
-
-let resizeObserver: ResizeObserver | null = null
-
-function startResizeObserver() {
-  if (!rdpAreaRef.value) return
-  resizeObserver = new ResizeObserver(() => {
-    syncRDPPosition()
-  })
-  resizeObserver.observe(rdpAreaRef.value)
-}
-
-function stopResizeObserver() {
-  if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null }
-}
 
 // --- Connection ---
 
@@ -180,49 +90,48 @@ async function reconnect() {
   await connect()
 }
 
-// --- Events ---
+// --- Events (lifecycle-scoped to avoid listener accumulation) ---
 
-EventsOn('session:status', (data: any) => {
-  if (data.id !== currentSessionId.value) return
-  switch (data.status) {
-    case 'connected':
-      status.value = 'connected'
-      nextTick(() => requestAnimationFrame(() => syncRDPPosition()))
-      break
-    case 'disconnected':
-      if (status.value !== 'error') status.value = 'disconnected'
-      if (currentSessionId.value) RDPHide(currentSessionId.value)
-      break
-    case 'error':
-      status.value = 'error'
-      if (currentSessionId.value) RDPHide(currentSessionId.value)
-      break
-  }
-})
-
-EventsOn('session:data', (data: any) => {
-  if (data.id === currentSessionId.value && data.data?.includes('[Connection failed')) {
-    status.value = 'error'
-  }
-})
+let unsubStatus: (() => void) | null = null
+let unsubData: (() => void) | null = null
 
 onMounted(() => {
   if (props.sessionId) {
     currentSessionId.value = props.sessionId
   }
-  window.addEventListener('resize', onWindowResize)
-  window.addEventListener('blur', onBlur)
-  window.addEventListener('focus', onFocus)
-  startMovePolling()
-  nextTick(() => {
-    startResizeObserver()
-  })
   if (currentSessionId.value) {
     status.value = 'connected'
-    nextTick(() => requestAnimationFrame(() => syncRDPPosition()))
   } else {
     status.value = 'connecting'
   }
+
+  unsubStatus = EventsOn('session:status', (data: any) => {
+    if (data.id !== currentSessionId.value) return
+    switch (data.status) {
+      case 'connected':
+        status.value = 'connected'
+        break
+      case 'disconnected':
+        if (status.value !== 'error') status.value = 'disconnected'
+        if (currentSessionId.value) RDPHide(currentSessionId.value)
+        break
+      case 'error':
+        status.value = 'error'
+        if (currentSessionId.value) RDPHide(currentSessionId.value)
+        break
+    }
+  })
+
+  unsubData = EventsOn('session:data', (data: any) => {
+    if (data.id === currentSessionId.value && data.data?.includes('[Connection failed')) {
+      status.value = 'error'
+    }
+  })
+})
+
+onUnmounted(() => {
+  unsubStatus?.()
+  unsubData?.()
 })
 
 watch(() => props.sessionId, (newId) => {
@@ -230,19 +139,6 @@ watch(() => props.sessionId, (newId) => {
     currentSessionId.value = newId
   }
 })
-
-onUnmounted(() => {
-  window.removeEventListener('resize', onWindowResize)
-  window.removeEventListener('blur', onBlur)
-  window.removeEventListener('focus', onFocus)
-  stopMovePolling()
-  stopResizeObserver()
-  if (currentSessionId.value) {
-    RDPHide(currentSessionId.value)
-  }
-})
-
-defineExpose({ syncRDPPosition })
 </script>
 
 <style scoped>

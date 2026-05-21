@@ -76,7 +76,7 @@ import { useSessionStore } from './stores/sessionStore'
 import { useAIStore } from './stores/aiStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useI18n } from './i18n'
-import { CreateSession, CloseSession, RDPHide, RDPShow } from '../wailsjs/go/main/App'
+import { CreateSession, CloseSession, RDPHide, RDPShow, RDPSetPosition, RDPSetFocus } from '../wailsjs/go/main/App'
 import type { ConnectionConfig } from './types/session'
 
 const connectionStore = useConnectionStore()
@@ -87,6 +87,59 @@ const sessionStore = useSessionStore()
 const aiStore = useAIStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
+// ── Global RDP position tracker (singleton) ──
+// There is exactly ONE polling timer and ONE set of window listeners,
+// regardless of how many times RDP tabs are opened/closed.
+// It always targets the currently active RDP session.
+
+let rdpTrackTimer: ReturnType<typeof setInterval> | null = null
+let rdpLastX = -1, rdpLastY = -1, rdpLastW = -1, rdpLastH = -1
+
+function getActiveRdpSessionId(): string | null {
+  const tab = activeTab.value
+  if (!tab || tab.type !== 'rdp') return null
+  return panelStore.getPanel(tab.panelId)?.sessionId ?? null
+}
+
+function rdpSyncNow() {
+  const area = document.querySelector('.rdp-area') as HTMLElement | null
+  if (!area) return
+  const sid = getActiveRdpSessionId()
+  if (!sid) return
+  const rect = area.getBoundingClientRect()
+  if (rect.width <= 0) return
+  const dpr = window.devicePixelRatio || 1
+  const sx = window.screenLeft ?? (window as any).screenX ?? 0
+  const sy = window.screenTop ?? (window as any).screenY ?? 0
+  const x = Math.round((sx + rect.left) * dpr)
+  const y = Math.round((sy + rect.top) * dpr)
+  const w = Math.round(rect.width * dpr)
+  const h = Math.round(rect.height * dpr)
+  if (x === rdpLastX && y === rdpLastY && w === rdpLastW && h === rdpLastH) return
+  rdpLastX = x; rdpLastY = y; rdpLastW = w; rdpLastH = h
+  RDPSetPosition(sid, x, y, w, h)
+}
+
+function rdpResetTracking() {
+  rdpLastX = rdpLastY = rdpLastW = rdpLastH = -1
+  nextTick(() => rdpSyncNow())
+}
+
+function startRDPTracker() {
+  if (rdpTrackTimer) return
+  rdpTrackTimer = setInterval(rdpSyncNow, 16)
+  window.addEventListener('resize', rdpSyncNow)
+  window.addEventListener('blur', () => {
+    const sid = getActiveRdpSessionId()
+    if (sid) RDPSetFocus(sid, false)
+  })
+  window.addEventListener('focus', () => {
+    const sid = getActiveRdpSessionId()
+    if (sid) RDPSetFocus(sid, true)
+  })
+}
+
+
 const showConnectionForm = ref(false)
 const sidebarVisible = ref(true)
 
@@ -170,6 +223,7 @@ function onWheel(e: WheelEvent) {
 }
 
 onMounted(() => {
+  startRDPTracker()
   connectionStore.load()
   aiStore.initConfig()
   settingsStore.init()
@@ -200,7 +254,15 @@ function openSettings() {
   panelStore.movePanelToTab(panel.id, tab.id)
 }
 
-function closeTab(tabId: string) {
+async function closeTab(tabId: string) {
+  // Close RDP session before removing panel to clean up Go-side resources
+  const tab = tabStore.tabs.find(t => t.id === tabId)
+  if (tab && tab.type === 'rdp') {
+    const p = panelStore.getPanel(tab.panelId)
+    if (p?.sessionId) {
+      try { await CloseSession(p.sessionId) } catch (_) {}
+    }
+  }
   const panelIds = tabStore.closeTab(tabId)
   panelIds.forEach(pid => panelStore.removePanel(pid))
 }
@@ -281,15 +343,18 @@ async function onConnectRDP(config: ConnectionConfig) {
   }
 }
 
-// Show/hide native RDP window on tab switch
+// Show/hide native RDP window on tab switch.
+// Position updates are only sent to the active RDP session (see rdpSyncNow),
+// so background sessions stay at (32000,32000) and don't respond to drag.
 watch(() => activeTab.value, (newTab, oldTab) => {
   if (oldTab?.type === 'rdp') {
     const p = panelStore.getPanel(oldTab.panelId)
     if (p?.sessionId) RDPHide(p.sessionId)
   }
   if (newTab?.type === 'rdp') {
-    const p = panelStore.getPanel(newTab.panelId)
-    if (p?.sessionId) nextTick(() => RDPShow(p.sessionId!))
+    rdpResetTracking()
+    const sid = panelStore.getPanel(newTab.panelId)?.sessionId
+    if (sid) nextTick(() => RDPShow(sid))
   }
 })
 </script>

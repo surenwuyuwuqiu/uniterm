@@ -29,16 +29,12 @@ var (
 	procGetWindowRect      = user32Dll.NewProc("GetWindowRect")
 	procGetClientRect      = user32Dll.NewProc("GetClientRect")
 	procClientToScreen     = user32Dll.NewProc("ClientToScreen")
+	procSetWindowLongPtr   = user32Dll.NewProc("SetWindowLongPtrW")
 	procPostMessageW       = user32Dll.NewProc("PostMessageW")
-	procIsIconic           = user32Dll.NewProc("IsIconic")
-	procGetForegroundWindow = user32Dll.NewProc("GetForegroundWindow")
-	procGetAncestor         = user32Dll.NewProc("GetAncestor")
 )
 
 const (
 	WM_CLOSE       = 0x0010
-	HWND_TOPMOST   = ^uintptr(0) // -1 as uintptr for syscall compatibility
-	HWND_NOTOPMOST = ^uintptr(1) // -2 as uintptr for syscall compatibility
 	SWP_SHOWWINDOW = 0x0040
 	SWP_HIDEWINDOW = 0x0080
 	SWP_NOMOVE     = 0x0002
@@ -50,7 +46,6 @@ const (
 	WS_EX_NOACTIVATE  = 0x08000000
 	WS_POPUP          = 0x80000000
 	WS_CLIPSIBLINGS   = 0x04000000
-	GA_ROOT           = 2
 	PM_REMOVE         = 0x0001
 	GWLP_HWNDPARENT   = ^uintptr(7) // -8 represented as uintptr for syscall compatibility
 )
@@ -64,13 +59,8 @@ type RDPSession struct {
 	mu         sync.Mutex
 	shown     bool
 
-	// Position tracking
-	trackX, trackY       int
-	refParentX, refParentY int
-	refRdpX, refRdpY     int
-	trackStop            chan struct{}
-	trackGen             int       // incremented on each startTracking; stale goroutines exit
-	wasMinimized         bool      // tracks parent minimize→restore transitions
+	// Last known position, used by Show() after Hide()
+	trackX, trackY int
 }
 
 func NewRDPSession(id string) *RDPSession {
@@ -135,7 +125,6 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 	runtime.LockOSThread() // pin COM STA to a dedicated OS thread
 	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
 	defer func() {
-		s.stopTracking()
 		s.mu.Lock()
 		hwnd := s.hwnd
 		s.hwnd = 0
@@ -198,7 +187,8 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 		uintptr(WS_POPUP|WS_CLIPSIBLINGS),
 		32000, 32000,
 		uintptr(width), uintptr(height),
-		// No owner window: avoids modal-loop deadlock with RDP ActiveX.
+		// Create without owner in CreateWindowEx to avoid COM initialization issues.
+		// Owner is set immediately after via SetWindowLongPtr(GWLP_HWNDPARENT).
 		0, 0, 0, 0,
 	)
 	if hwnd == 0 {
@@ -206,7 +196,12 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 		s.setStatus(StatusError)
 		return fmt.Errorf("CreateWindowEx failed")
 	}
-		log.Writef("[RDP] hwnd=0x%x parentHwnd=0x%x", hwnd, s.parentHwnd)
+
+	// Make RDP window owned by uniTerm main window.
+	// Owned windows naturally stay above their owner but below other top-level windows,
+	// eliminating the need for manual HWND_TOPMOST/HWND_NOTOPMOST z-order management.
+	procSetWindowLongPtr.Call(hwnd, GWLP_HWNDPARENT, s.parentHwnd)
+	log.Writef("[RDP] hwnd=0x%x parentHwnd=0x%x (owned)", hwnd, s.parentHwnd)
 
 	var unk *ole.IUnknown
 	procAtlAxGetControl.Call(hwnd, uintptr(unsafe.Pointer(&unk)))
@@ -322,7 +317,6 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 	// Frontend will refine via RDPSetPosition shortly after.
 	s.positionFromMainWindow(width, height)
 
-	s.startTracking()
 	s.setStatus(StatusConnected)
 
 	s.runMessagePump()
@@ -538,21 +532,13 @@ func (s *RDPSession) positionFromMainWindow(width, height int) {
 		clientLeft, clientTop, clientWidth, clientHeight, x, y, w, h)
 
 	s.shown = true
-	procSetWindowPos.Call(s.hwnd, HWND_TOPMOST,
+	procSetWindowPos.Call(s.hwnd, 0,
 		uintptr(x), uintptr(y),
 		uintptr(w), uintptr(h),
 		SWP_SHOWWINDOW|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
 
-	// Init tracking baseline
-	s.refRdpX = x
-	s.refRdpY = y
 	s.trackX = x
 	s.trackY = y
-	var wr rect
-	if ret, _, _ := procGetWindowRect.Call(s.parentHwnd, uintptr(unsafe.Pointer(&wr))); ret != 0 {
-		s.refParentX = int(wr.Left)
-		s.refParentY = int(wr.Top)
-	}
 	log.Writef("[RDP] backend position done, shown=%v hwnd=0x%x", s.shown, s.hwnd)
 }
 
@@ -564,32 +550,24 @@ func (s *RDPSession) SetPosition(x, y, w, h int) {
 		s.mu.Unlock()
 		return
 	}
-	wasHidden := !s.shown
 	s.shown = true
-	log.Writef("[RDP-SetPos] FROM FRONTEND x=%d y=%d w=%d h=%d wasHidden=%v", x, y, w, h, wasHidden)
-	// Update tracking baseline from frontend's authoritative DOM-based position
-	var wr rect
-	if ret, _, _ := procGetWindowRect.Call(s.parentHwnd, uintptr(unsafe.Pointer(&wr))); ret != 0 {
-		s.refParentX = int(wr.Left)
-		s.refParentY = int(wr.Top)
-	}
-	s.refRdpX = x
-	s.refRdpY = y
 	s.trackX = x
 	s.trackY = y
+	log.Writef("[RDP-SetPos] FROM FRONTEND x=%d y=%d w=%d h=%d", x, y, w, h)
 	s.mu.Unlock()
 
-	// Include SWP_SHOWWINDOW in case window was hidden (e.g. after tab switch)
-	procSetWindowPos.Call(hwnd, HWND_TOPMOST,
+	// Owned window: z-order is automatic. SWP_SHOWWINDOW handles tab-switch restore.
+	procSetWindowPos.Call(hwnd, 0,
 		uintptr(x), uintptr(y),
 		uintptr(w), uintptr(h),
 		SWP_SHOWWINDOW|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
+}
 
-		// Restart tracking if it was stopped by Hide().
-		// Owned-window relationship handles z-order automatically.
-		if wasHidden {
-			s.startTracking()
-		}
+// SetFocus adjusts the RDP window z-order when uniTerm gains or loses focus.
+// With the owned-window model, z-order is fully automatic — the OS handles it.
+// Kept as a no-op for API compatibility with the frontend.
+func (s *RDPSession) SetFocus(focused bool) {
+	log.Writef("[RDP-focus] SetFocus focused=%v (no-op, owned-window model)", focused)
 }
 
 func (s *RDPSession) Show() {
@@ -605,12 +583,11 @@ func (s *RDPSession) Show() {
 	s.mu.Unlock()
 	log.Writef("[RDP-Show] trackX=%d trackY=%d hwnd=0x%x", tX, tY, hwnd)
 	if hwnd != 0 {
-		procSetWindowPos.Call(hwnd, HWND_TOPMOST,
+		procSetWindowPos.Call(hwnd, 0,
 			uintptr(tX), uintptr(tY),
 			0, 0,
 			SWP_SHOWWINDOW|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
 	}
-	s.startTracking()
 }
 
 func (s *RDPSession) Hide() {
@@ -623,7 +600,6 @@ func (s *RDPSession) Hide() {
 	hwnd := s.hwnd
 	s.shown = false
 	s.mu.Unlock()
-	s.stopTracking()
 	if hwnd != 0 {
 		procSetWindowPos.Call(hwnd, 0,
 			32000, 32000,
@@ -632,102 +608,7 @@ func (s *RDPSession) Hide() {
 	}
 }
 
-// trackParentMove checks if the parent window has moved and repositions the RDP window
-// to follow. Also detects minimize/restore to hide/re-show RDP. Called from the tracking
-// goroutine every ~16ms.
-// trackParentMove checks the parent window state and hides/shows RDP accordingly.
-// Position tracking during drag/resize is handled by the frontend via RDPHide/RDPSetPosition.
-// This goroutine only handles minimize/restore detection which the frontend cannot see.
-func (s *RDPSession) trackParentMove() {
-	s.mu.Lock()
-	hwnd := s.hwnd
-	if hwnd == 0 || !s.shown {
-		s.mu.Unlock()
-		return
-	}
-	parent := s.parentHwnd
-	tX := s.trackX
-	tY := s.trackY
-	s.mu.Unlock()
-
-	isMin, _, _ := procIsIconic.Call(parent)
-	if isMin != 0 {
-		if !s.wasMinimized {
-			s.wasMinimized = true
-			log.Writef("[RDP-track] parent minimized, hiding RDP")
-			procSetWindowPos.Call(hwnd, 0, 32000, 32000, 0, 0,
-				SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_ASYNCWINDOWPOS)
-		}
-		return
-	}
-	if s.wasMinimized {
-		s.wasMinimized = false
-		log.Writef("[RDP-track] parent restored, showing RDP at (%d,%d)", tX, tY)
-		procSetWindowPos.Call(hwnd, HWND_TOPMOST, uintptr(tX), uintptr(tY), 0, 0,
-			SWP_SHOWWINDOW|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
-		return
-	}
-
-	// Z-order maintenance: dynamic TOPMOST based on foreground
-	fg, _, _ := procGetForegroundWindow.Call()
-	fgRoot, _, _ := procGetAncestor.Call(fg, GA_ROOT)
-	if fgRoot == parent {
-		procSetWindowPos.Call(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-			SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
-	} else {
-		procSetWindowPos.Call(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-			SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_ASYNCWINDOWPOS)
-	}
-}
-
-func (s *RDPSession) startTracking() {
-	s.mu.Lock()
-	if s.trackStop != nil {
-		s.mu.Unlock()
-		return
-	}
-	stop := make(chan struct{})
-	s.trackStop = stop
-	s.trackGen++
-	gen := s.trackGen
-	s.mu.Unlock()
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Writef("[RDP-track] PANIC in tracking goroutine: %v", r)
-			}
-		}()
-		ticker := time.NewTicker(150 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-stop:
-				return
-			case <-ticker.C:
-				s.mu.Lock()
-				if s.trackGen != gen {
-					s.mu.Unlock()
-					return // stale goroutine, new tracking has started
-				}
-				s.mu.Unlock()
-				s.trackParentMove()
-			}
-		}
-	}()
-}
-
-func (s *RDPSession) stopTracking() {
-	log.Writef("[RDP-track] stopTracking called")
-	s.mu.Lock()
-	if s.trackStop != nil {
-		close(s.trackStop)
-		s.trackStop = nil
-	}
-	s.mu.Unlock()
-}
-
 func (s *RDPSession) Disconnect() error {
-	s.stopTracking()
 	s.mu.Lock()
 	hwnd := s.hwnd
 	s.hwnd = 0
@@ -750,7 +631,7 @@ func (s *RDPSession) Resize(cols, rows int) error {
 	shown := s.shown
 	s.mu.Unlock()
 	if hwnd != 0 && shown {
-		procSetWindowPos.Call(hwnd, HWND_TOPMOST, 0, 0,
+		procSetWindowPos.Call(hwnd, 0, 0, 0,
 			uintptr(cols), uintptr(rows),
 			SWP_NOACTIVATE)
 	}

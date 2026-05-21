@@ -44,7 +44,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { useI18n } from '../i18n'
 import type { ConnectionConfig } from '../types/session'
-import { CreateSession, CloseSession, RDPSetPosition, RDPHide } from '../../wailsjs/go/main/App'
+import { CreateSession, CloseSession, RDPSetPosition, RDPSetFocus, RDPHide } from '../../wailsjs/go/main/App'
 import { EventsOn } from '../../wailsjs/runtime'
 
 const { t } = useI18n()
@@ -96,6 +96,24 @@ function syncRDPPosition() {
 // --- Window resize ---
 function onWindowResize() {
   syncRDPPosition()
+}
+
+// --- Focus/blur: instant z-order switch ---
+// When uniTerm gains/loses focus, adjust RDP topmost so it doesn't float
+// above other applications when uniTerm is in the background.
+
+function onBlur() {
+  console.log('[RDP] blur — window lost focus')
+  if (currentSessionId.value && status.value === 'connected') {
+    RDPSetFocus(currentSessionId.value, false)
+  }
+}
+
+function onFocus() {
+  console.log('[RDP] focus — window gained focus')
+  if (currentSessionId.value && status.value === 'connected') {
+    RDPSetFocus(currentSessionId.value, true)
+  }
 }
 
 // --- Window move detection ---
@@ -193,6 +211,8 @@ onMounted(() => {
     currentSessionId.value = props.sessionId
   }
   window.addEventListener('resize', onWindowResize)
+  window.addEventListener('blur', onBlur)
+  window.addEventListener('focus', onFocus)
   startMovePolling()
   nextTick(() => {
     startResizeObserver()
@@ -213,6 +233,8 @@ watch(() => props.sessionId, (newId) => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', onWindowResize)
+  window.removeEventListener('blur', onBlur)
+  window.removeEventListener('focus', onFocus)
   stopMovePolling()
   stopResizeObserver()
   if (currentSessionId.value) {

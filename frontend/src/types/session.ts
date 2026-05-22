@@ -8,7 +8,7 @@ export interface ConnectionGroup {
 export interface ConnectionConfig {
   id: string
   name: string
-  type: 'ssh' | 'rdp'
+  type: 'ssh' | 'rdp' | 'vnc'
   host: string
   port: number
   user: string

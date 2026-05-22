@@ -254,18 +254,16 @@ watch(() => props.sessionId, (newId) => {
 }
 .vnc-area {
   flex: 1;
-  position: relative;
   min-height: 0;
   background: #000;
   outline: none;
+  overflow: auto;
 }
 .vnc-area :deep(canvas) {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
   display: block;
+  width: auto !important;
+  height: auto !important;
+  image-rendering: pixelated;
 }
 .vnc-overlay {
   position: absolute;

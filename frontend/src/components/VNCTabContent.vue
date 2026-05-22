@@ -85,36 +85,65 @@ async function reconnect() {
 }
 
 function initRFB(proxyAddr: string, password: string) {
-  if (!vncContainer.value) return
+  if (!vncContainer.value) {
+    console.error('[VNC] vncContainer is null, cannot init RFB')
+    return
+  }
 
+  console.log('[VNC] Loading noVNC module...')
   import('@novnc/novnc').then((module: any) => {
+    console.log('[VNC] noVNC module loaded:', module)
     const RFB = module.default || module
-    rfb = new RFB(vncContainer.value, proxyAddr, {
-      credentials: { password }
-    })
+    console.log('[VNC] RFB constructor:', RFB)
+
+    try {
+      rfb = new RFB(vncContainer.value, proxyAddr, {
+        credentials: { password: password || '' }
+      })
+      console.log('[VNC] RFB instance created:', rfb)
+    } catch (e) {
+      console.error('[VNC] Failed to create RFB instance:', e)
+      status.value = 'error'
+      return
+    }
 
     rfb.addEventListener('connect', () => {
-      console.log('[VNC] RFB connected')
+      console.log('[VNC] RFB connected event fired')
     })
 
     rfb.addEventListener('disconnect', (e: any) => {
+      console.log('[VNC] RFB disconnect event:', e.detail)
       if (!e.detail.clean) {
         status.value = 'error'
       }
     })
 
-    rfb.addEventListener('credentialsrequired', () => {
+    rfb.addEventListener('credentialsrequired', (e: any) => {
+      console.log('[VNC] RFB credentialsrequired event:', e.detail)
       status.value = 'error'
     })
 
-    rfb.addEventListener('securityfailure', () => {
+    rfb.addEventListener('securityfailure', (e: any) => {
+      console.log('[VNC] RFB securityfailure event:', e.detail)
       status.value = 'error'
+    })
+
+    rfb.addEventListener('desktopname', (e: any) => {
+      console.log('[VNC] RFB desktopname:', e.detail.name)
+    })
+
+    rfb.addEventListener('bell', () => {
+      console.log('[VNC] RFB bell')
     })
 
     rfb.addEventListener('clipboard', (e: any) => {
       const text = e.detail.text
+      console.log('[VNC] RFB clipboard received, length:', text?.length)
       navigator.clipboard.writeText(text).catch(() => {})
     })
+  }).catch((e: any) => {
+    console.error('[VNC] Failed to load noVNC module:', e)
+    status.value = 'error'
   })
 }
 

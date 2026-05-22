@@ -2,6 +2,7 @@ package session
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -45,6 +46,7 @@ func (p *VNCProxy) Start() (string, error) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		ws, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
+			log.Printf("[VNCProxy] WebSocket upgrade failed: %v", err)
 			return
 		}
 		p.handleWebSocket(ws)
@@ -57,6 +59,7 @@ func (p *VNCProxy) Start() (string, error) {
 	}()
 
 	addr := ln.Addr().(*net.TCPAddr)
+	log.Printf("[VNCProxy] Listening on ws://127.0.0.1:%d, target: %s", addr.Port, p.target)
 	return fmt.Sprintf("ws://127.0.0.1:%d", addr.Port), nil
 }
 
@@ -64,17 +67,21 @@ func (p *VNCProxy) handleWebSocket(ws *websocket.Conn) {
 	p.mu.Lock()
 	if p.wsConn != nil {
 		p.mu.Unlock()
+		log.Printf("[VNCProxy] Rejecting additional WebSocket connection")
 		ws.Close()
 		return
 	}
 	p.wsConn = ws
 	p.mu.Unlock()
+	log.Printf("[VNCProxy] WebSocket client connected")
 
 	tcp, err := net.Dial("tcp", p.target)
 	if err != nil {
+		log.Printf("[VNCProxy] TCP dial to %s failed: %v", p.target, err)
 		ws.Close()
 		return
 	}
+	log.Printf("[VNCProxy] TCP connection to %s established", p.target)
 
 	p.mu.Lock()
 	p.tcpConn = tcp
@@ -93,10 +100,12 @@ func (p *VNCProxy) handleWebSocket(ws *websocket.Conn) {
 			}
 			msgType, data, err := ws.ReadMessage()
 			if err != nil {
+				log.Printf("[VNCProxy] WebSocket read error: %v", err)
 				return
 			}
 			if msgType == websocket.BinaryMessage {
 				if _, err := tcp.Write(data); err != nil {
+					log.Printf("[VNCProxy] TCP write error: %v", err)
 					return
 				}
 			}
@@ -115,9 +124,11 @@ func (p *VNCProxy) handleWebSocket(ws *websocket.Conn) {
 			}
 			n, err := tcp.Read(buf)
 			if err != nil {
+				log.Printf("[VNCProxy] TCP read error: %v", err)
 				return
 			}
 			if err := ws.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+				log.Printf("[VNCProxy] WebSocket write error: %v", err)
 				return
 			}
 		}

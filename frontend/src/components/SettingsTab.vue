@@ -157,7 +157,7 @@
         <div class="about-content">
           <div class="about-appname">uniTerm</div>
           <p class="about-desc">{{ t('settings.aboutDesc') }}</p>
-          <div class="about-version">{{ t('settings.version') }}: {{ appInfo.version }}</div>
+          <div class="about-version">{{ t('settings.version') }}: {{ appVersion }}</div>
         </div>
       </div>
 
@@ -230,30 +230,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, computed, onMounted } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { Setting, Monitor, ChatDotRound, InfoFilled, Edit, Delete } from '@element-plus/icons-vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useI18n } from '../i18n'
 import { TERMINAL_THEMES, FONT_OPTIONS } from '../types/settings'
 import type { AIModelConfig } from '../types/settings'
-import { GetAppInfo } from '../../wailsjs/go/main/App'
 
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
 const activeCategory = ref('basic')
-const appInfo = ref({ name: 'uniTerm', version: '' })
-
-onMounted(async () => {
-  try {
-    const info = await GetAppInfo()
-    if (info) {
-      appInfo.value = info
-    }
-  } catch {
-    // use defaults
-  }
-})
+const appVersion = import.meta.env.VITE_VERSION || 'dev'
 
 watch(() => settingsStore.openCategory, (cat) => {
   if (cat && (cat === 'basic' || cat === 'terminal' || cat === 'ai' || cat === 'about')) {

@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	goruntime "runtime"
+
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/ys-ll/uniterm/backend/log"
 	"github.com/ys-ll/uniterm/backend/session"
@@ -192,7 +194,7 @@ func (a *App) GetDesktopPath() (string, error) {
 }
 
 func (a *App) GetPlatform() string {
-	return "windows"
+	return goruntime.GOOS
 }
 
 func (a *App) OnConnectionsChanged(callback func(session.ConnectionStoreData)) {

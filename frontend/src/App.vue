@@ -36,6 +36,13 @@
             :config="getPanelConfig(activeTab.panelId)"
             :session-id="getPanelSessionId(activeTab.panelId)"
           />
+          <VNCTabContent
+            v-else-if="activeTab.type === 'vnc'"
+            :key="activeTab.id"
+            :panel-id="activeTab.panelId"
+            :config="getPanelConfig(activeTab.panelId)"
+            :session-id="getPanelSessionId(activeTab.panelId)"
+          />
         </template>
       </div>
       <AISidebar />
@@ -67,6 +74,7 @@ import SettingsTabContent from './components/SettingsTabContent.vue'
 import WorkspaceContent from './components/WorkspaceContent.vue'
 import SFTPTabContent from './components/SFTPTabContent.vue'
 import RDPTabContent from './components/RDPTabContent.vue'
+import VNCTabContent from './components/VNCTabContent.vue'
 import ConnectionForm from './components/ConnectionForm.vue'
 import AISidebar from './components/AISidebar.vue'
 import { useConnectionStore } from './stores/connectionStore'
@@ -302,6 +310,13 @@ async function closeTab(tabId: string) {
       try { await CloseSession(p.sessionId) } catch (_) {}
     }
   }
+  // Close VNC session
+  if (tab && tab.type === 'vnc') {
+    const p = panelStore.getPanel(tab.panelId)
+    if (p?.sessionId) {
+      try { await CloseSession(p.sessionId) } catch (_) {}
+    }
+  }
   const panelIds = tabStore.closeTab(tabId)
   panelIds.forEach(pid => panelStore.removePanel(pid))
 }
@@ -320,6 +335,7 @@ function onSaveOnly(config: ConnectionConfig) {
 
 async function onConnect(config: ConnectionConfig) {
   if (config.type === 'rdp') return onConnectRDP(config)
+  if (config.type === 'vnc') return onConnectVNC(config)
   connectionStore.add(config)
   const panel = panelStore.createPanel(config, 'ssh')
   const displayTitle = config.name || `${config.user}@${config.host}`
@@ -375,6 +391,29 @@ async function onConnectRDP(config: ConnectionConfig) {
     sessionStore.initSession(info.id)
   } catch (e) {
     console.error('Failed to create RDP session:', e)
+    tabStore.closeTab(tab.id)
+    panelStore.removePanel(panel.id)
+  }
+}
+
+async function onConnectVNC(config: ConnectionConfig) {
+  connectionStore.add(config)
+
+  const displayTitle = config.name
+    ? `${config.name} (VNC)`
+    : `${config.host} (VNC)`
+
+  const panel = panelStore.createPanel(config, 'vnc')
+  panel.title = displayTitle
+  const tab = tabStore.createVNCTab(displayTitle, panel.id)
+  panelStore.movePanelToTab(panel.id, tab.id)
+
+  try {
+    const info = await CreateSession('vnc', config)
+    panelStore.bindSession(panel.id, info.id)
+    sessionStore.initSession(info.id)
+  } catch (e) {
+    console.error('Failed to create VNC session:', e)
     tabStore.closeTab(tab.id)
     panelStore.removePanel(panel.id)
   }

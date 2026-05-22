@@ -111,10 +111,6 @@ function rdpSyncPosition() {
   const x = Math.round((sx + rect.left) * dpr)
   const y = Math.round((sy + rect.top) * dpr)
 
-  // Clamp dimensions to visible container so the native RDP window
-  // never overflows the tab area. In fixed-resolution mode this makes
-  // the window smaller than the remote desktop, which triggers the
-  // MsRdpClient built-in scrollbars.
   const w = Math.round(rect.width * dpr)
   const h = Math.round(rect.height * dpr)
   RDPSetPosition(sid, x, y, w, h)
@@ -407,6 +403,16 @@ watch(() => activeTab.value, (newTab, oldTab) => {
 watch(showConnectionForm, (val) => {
   if (val) RDPHideForOverlay()
   else RDPShowForOverlay()
+})
+
+watch(sidebarVisible, () => {
+  RDPHideForOverlay()
+  nextTick(() => RDPShowForOverlay())
+})
+
+watch(() => aiStore.visible, () => {
+  RDPHideForOverlay()
+  nextTick(() => RDPShowForOverlay())
 })
 </script>
 

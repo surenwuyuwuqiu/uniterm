@@ -17,9 +17,9 @@ export interface ConnectionConfig {
   keyPath?: string
   groupId?: string
   // RDP-specific
-  rdpSizeMode?: 'follow' | 'fixed'
   rdpFixedWidth?: number
   rdpFixedHeight?: number
+  rdpSmartSizing?: boolean
 }
 
 export interface SessionInfo {

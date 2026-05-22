@@ -25,7 +25,7 @@
       <el-form-item :label="t('conn.type')">
         <el-radio-group v-model="form.type">
           <el-radio-button label="ssh">SSH</el-radio-button>
-          <el-radio-button label="rdp">RDP</el-radio-button>
+          <el-radio-button label="rdp" v-if="isWindows">RDP</el-radio-button>
         </el-radio-group>
       </el-form-item>
       <el-form-item :label="t('conn.host')" required>
@@ -50,13 +50,7 @@
         <el-input v-model="form.keyPath" :placeholder="t('conn.keyPathPlaceholder')" />
       </el-form-item>
       <template v-if="form.type === 'rdp'">
-        <el-form-item :label="t('conn.rdpSizeMode')">
-          <el-radio-group v-model="form.rdpSizeMode">
-            <el-radio-button label="follow">{{ t('conn.rdpFollowWindow') }}</el-radio-button>
-            <el-radio-button label="fixed">{{ t('conn.rdpFixedSize') }}</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item v-if="form.rdpSizeMode === 'fixed'" :label="t('rdp.resolution')">
+        <el-form-item :label="t('rdp.resolution')">
           <el-select v-model="rdpResolution" placeholder="1280×720">
             <el-option
               v-for="r in rdpResolutions"
@@ -65,6 +59,9 @@
               :value="r.label"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item :label="t('conn.rdpSmartSizing')">
+          <el-switch v-model="form.rdpSmartSizing" />
         </el-form-item>
       </template>
     </el-form>
@@ -94,13 +91,20 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, watch, ref } from 'vue'
+import { reactive, computed, watch, ref, onMounted } from 'vue'
 import { useConnectionStore } from '../stores/connectionStore'
 import { useI18n } from '../i18n'
 import type { ConnectionConfig } from '../types/session'
+import { GetPlatform } from '../../wailsjs/go/main/App'
 
 const { t } = useI18n()
 const connectionStore = useConnectionStore()
+
+const isWindows = ref(true)
+
+onMounted(async () => {
+  try { isWindows.value = (await GetPlatform()) === 'windows' } catch (_) {}
+})
 
 const props = defineProps<{
   modelValue: boolean
@@ -131,9 +135,9 @@ const form = reactive<ConnectionConfig>({
   password: '',
   keyPath: '',
   groupId: undefined,
-  rdpSizeMode: 'follow',
   rdpFixedWidth: undefined,
-  rdpFixedHeight: undefined
+  rdpFixedHeight: undefined,
+  rdpSmartSizing: true
 })
 
 const rdpResolutions = [
@@ -172,7 +176,6 @@ watch(() => form.type, (newType) => {
   else if (newType === 'ssh' && form.port === 3389) form.port = 22
   if (newType === 'rdp') {
     form.authType = 'password'
-    form.rdpSizeMode = form.rdpSizeMode || 'follow'
   }
 })
 
@@ -196,9 +199,9 @@ function resetForm() {
   form.password = ''
   form.keyPath = ''
   form.groupId = undefined
-  form.rdpSizeMode = 'follow'
   form.rdpFixedWidth = undefined
   form.rdpFixedHeight = undefined
+  form.rdpSmartSizing = true
   rdpResolution.value = '1280 × 720 (HD)'
   selectedGroupId.value = undefined
 }

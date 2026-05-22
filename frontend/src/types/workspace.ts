@@ -13,9 +13,9 @@ export interface ConnectionConfig {
   keyPath?: string
   groupId?: string
   // RDP-specific
-  rdpSizeMode?: string
   rdpFixedWidth?: number
   rdpFixedHeight?: number
+  rdpSmartSizing?: string
 }
 
 export interface Panel {

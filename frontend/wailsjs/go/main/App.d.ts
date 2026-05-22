@@ -11,6 +11,8 @@ export function CreateSession(arg1:string,arg2:session.ConnectionConfig):Promise
 
 export function GetDesktopPath():Promise<string>;
 
+export function GetPlatform():Promise<string>;
+
 export function ListSessions():Promise<Array<session.SessionInfo>>;
 
 export function LoadAIConfig():Promise<store.AIConfig>;

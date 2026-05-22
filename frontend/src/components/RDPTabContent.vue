@@ -58,7 +58,7 @@ const statusResolution = computed(() => {
   if (props.config?.rdpFixedWidth && props.config?.rdpFixedHeight) {
     return `${props.config.rdpFixedWidth}×${props.config.rdpFixedHeight}`
   }
-  return t('conn.rdpFollowWindow')
+  return '800×600'
 })
 
 // --- Connection ---

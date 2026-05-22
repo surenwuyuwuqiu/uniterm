@@ -226,9 +226,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.save': '保存',
 
     // RDP
-    'conn.rdpSizeMode': '分辨率模式',
-    'conn.rdpFollowWindow': '跟随窗口',
-    'conn.rdpFixedSize': '固定分辨率',
+    'conn.rdpSmartSizing': '智能缩放',
     'sidebar.connectRDP': '连接 RDP',
     'rdp.connecting': '正在连接到 {host}...',
     'rdp.connected': '已连接',
@@ -461,9 +459,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.save': 'Save',
 
     // RDP
-    'conn.rdpSizeMode': 'Resolution Mode',
-    'conn.rdpFollowWindow': 'Follow Window',
-    'conn.rdpFixedSize': 'Fixed Resolution',
+    'conn.rdpSmartSizing': 'Smart Sizing',
     'sidebar.connectRDP': 'Connect RDP',
     'rdp.connecting': 'Connecting to {host}...',
     'rdp.connected': 'Connected',

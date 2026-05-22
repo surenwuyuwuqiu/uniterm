@@ -317,7 +317,9 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 			adv.PutProperty("EnableCredSspSupport", false)
 			adv.PutProperty("WarnOnDirectConnect", false)
 			adv.PutProperty("ContainerHandledFullScreen", true)
-			log.Writef("[RDP] ContainerHandledFullScreen set on AdvancedSettings2")
+			if config.RdpSmartSizing {
+				adv.PutProperty("SmartSizing", true)
+			}
 			if config.Password != "" {
 				adv.PutProperty("ClearTextPassword", config.Password)
 			}
@@ -679,12 +681,6 @@ func (s *RDPSession) positionFromMainWindow(width, height int) {
 	y := clientTop + topReserve
 	w := clientWidth - sideMargin*2
 	h := clientHeight - topReserve - bottomReserve
-	if w > width {
-		w = width
-	}
-	if h > height {
-		h = height
-	}
 	log.Writef("[RDP] backend positioning: client=(%d,%d %dx%d) rdp=(x=%d y=%d w=%d h=%d)",
 		clientLeft, clientTop, clientWidth, clientHeight, x, y, w, h)
 
@@ -786,14 +782,7 @@ func (s *RDPSession) Resize(cols, rows int) error {
 		s.rdp.PutProperty("DesktopWidth", cols)
 		s.rdp.PutProperty("DesktopHeight", rows)
 	}
-	hwnd := s.hwnd
-	shown := s.shown
 	s.mu.Unlock()
-	if hwnd != 0 && shown {
-		procSetWindowPos.Call(hwnd, 0, 0, 0,
-			uintptr(cols), uintptr(rows),
-			SWP_NOACTIVATE)
-	}
 	return nil
 }
 

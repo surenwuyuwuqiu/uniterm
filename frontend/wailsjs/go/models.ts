@@ -11,9 +11,9 @@ export namespace session {
 	    password?: string;
 	    keyPath?: string;
 	    groupId?: string;
-	    rdpSizeMode?: string;
 	    rdpFixedWidth?: number;
 	    rdpFixedHeight?: number;
+	    rdpSmartSizing: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConnectionConfig(source);
@@ -31,9 +31,9 @@ export namespace session {
 	        this.password = source["password"];
 	        this.keyPath = source["keyPath"];
 	        this.groupId = source["groupId"];
-	        this.rdpSizeMode = source["rdpSizeMode"];
 	        this.rdpFixedWidth = source["rdpFixedWidth"];
 	        this.rdpFixedHeight = source["rdpFixedHeight"];
+	        this.rdpSmartSizing = source["rdpSmartSizing"];
 	    }
 	}
 	export class ConnectionGroup {

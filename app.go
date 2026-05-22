@@ -171,6 +171,10 @@ func (a *App) GetDesktopPath() (string, error) {
 	return filepath.Join(homeDir, "Desktop"), nil
 }
 
+func (a *App) GetPlatform() string {
+	return "windows"
+}
+
 func (a *App) OnConnectionsChanged(callback func(session.ConnectionStoreData)) {
 	runtime.EventsOn(a.ctx, "store:connections:changed", func(optionalData ...interface{}) {
 		if len(optionalData) > 0 {

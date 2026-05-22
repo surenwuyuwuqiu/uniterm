@@ -18,6 +18,10 @@ export function GetDesktopPath() {
   return window['go']['main']['App']['GetDesktopPath']();
 }
 
+export function GetPlatform() {
+  return window['go']['main']['App']['GetPlatform']();
+}
+
 export function ListSessions() {
   return window['go']['main']['App']['ListSessions']();
 }

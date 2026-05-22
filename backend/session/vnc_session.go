@@ -26,6 +26,9 @@ func (s *VNCSession) Connect(config ConnectionConfig) error {
 	target := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	if config.Port <= 0 {
 		target = fmt.Sprintf("%s:5900", config.Host)
+	} else if config.Port < 100 {
+		// libvirt display port format: :1 -> 5901, :23 -> 5923
+		target = fmt.Sprintf("%s:%d", config.Host, config.Port+5900)
 	}
 
 	s.title = fmt.Sprintf("%s (VNC)", config.Host)

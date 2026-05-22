@@ -190,11 +190,11 @@ onMounted(() => {
     switch (data.status) {
       case 'connected':
         status.value = 'connected'
-        if (data.proxyAddr && props.config?.password !== undefined) {
+        if (data.proxyAddr && props.config) {
           addDebug(`Initializing RFB with proxyAddr=${data.proxyAddr}`)
-          initRFB(data.proxyAddr, props.config.password)
+          initRFB(data.proxyAddr, props.config.password || '')
         } else {
-          addDebug(`Skip initRFB: proxyAddr=${data.proxyAddr}, password=${props.config?.password}`)
+          addDebug(`Skip initRFB: proxyAddr=${data.proxyAddr}, config=${props.config}`)
         }
         break
       case 'disconnected':

@@ -245,6 +245,10 @@ func (a *App) CreateSession(sessionType string, config session.ConnectionConfig)
 				payload["clientW"] = cw
 				payload["clientH"] = ch
 			}
+			// NEW: Attach proxyAddr for VNC sessions
+			if vnc, ok := s.(*session.VNCSession); ok {
+				payload["proxyAddr"] = vnc.ProxyAddr()
+			}
 		}
 		runtime.EventsEmit(a.ctx, "session:status", payload)
 	})

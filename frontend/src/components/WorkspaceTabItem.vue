@@ -2,6 +2,7 @@
   <div
     class="workspace-tab-item"
     :class="{ active: isActive, 'ai-locked': hasAILockedPanel }"
+    :data-tab-id="tab.id"
     @click="$emit('activate', tab.id)"
     draggable="true"
     @dragstart="onDragStart"
@@ -18,7 +19,9 @@
       @blur="confirmEdit"
       @click.stop
     />
-    <span v-if="hasAILockedPanel" class="tab-ai-lock locked" title="AI locked to a panel in this workspace">AI</span>
+    <span v-if="hasAILockedPanel" class="tab-ai-lock locked" title="AI locked to a panel in this workspace">
+      <svg class="ai-lock-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="none"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16v-6a2 2 0 1 1 4 0v6m-4-3h4m4-5v8"/></svg>
+    </span>
     <button
       v-if="isActive || showClose"
       class="tab-close"
@@ -203,12 +206,14 @@ onUnmounted(() => {
   background: none;
   border: none;
   color: var(--text-muted);
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px 4px;
   border-radius: 3px;
   opacity: 0;
+  display: inline-flex;
+  align-items: center;
+}
+.tab-ai-lock .ai-lock-icon {
+  display: block;
 }
 .workspace-tab-item:hover .tab-ai-lock,
 .workspace-tab-item.active .tab-ai-lock,

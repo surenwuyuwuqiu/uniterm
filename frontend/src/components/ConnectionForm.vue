@@ -1,6 +1,6 @@
 <template>
   <el-dialog v-model="visible" :title="isEdit ? t('conn.editTitle') : t('conn.newTitle')" width="500px">
-    <el-form id="conn-form" :model="form" label-width="100px" @submit.prevent="onConnect">
+    <el-form id="conn-form" :model="form" label-width="100px" @submit.prevent="onSave">
       <el-form-item :label="t('conn.name')">
         <el-input v-model="form.name" :placeholder="t('conn.namePlaceholder')" />
       </el-form-item>
@@ -68,7 +68,7 @@
     <template #footer>
       <el-button @click="visible = false">{{ t('conn.cancel') }}</el-button>
       <el-button @click="onSave">{{ t('conn.saveOnly') }}</el-button>
-      <el-button type="primary" native-type="submit" form="conn-form">{{ isEdit ? t('conn.saveConnect') : t('conn.connect') }}</el-button>
+      <el-button type="primary" @click="onConnect">{{ isEdit ? t('conn.saveConnect') : t('conn.connect') }}</el-button>
     </template>
   </el-dialog>
 
@@ -109,6 +109,7 @@ onMounted(async () => {
 const props = defineProps<{
   modelValue: boolean
   editConfig?: ConnectionConfig
+  defaultGroupId?: string
 }>()
 
 const emit = defineEmits<{
@@ -167,8 +168,19 @@ watch(() => props.editConfig, (config) => {
     if (match) rdpResolution.value = match.label
   } else {
     resetForm()
+    if (props.defaultGroupId) {
+      selectedGroupId.value = props.defaultGroupId
+      form.groupId = props.defaultGroupId
+    }
   }
 }, { immediate: true })
+
+watch(() => props.defaultGroupId, (gid) => {
+  if (!props.editConfig && gid) {
+    selectedGroupId.value = gid
+    form.groupId = gid
+  }
+})
 
 // Auto-switch default port when changing type
 watch(() => form.type, (newType) => {

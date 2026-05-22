@@ -7,7 +7,7 @@
       <div v-if="message.role === 'assistant' && message.content" class="copy-action">
         <button class="copy-md-btn" @click="copyAsMarkdown" :title="t('ai.copyMarkdown')">
           <el-icon><DocumentCopy /></el-icon>
-          {{ copyMdLabel }}
+          <span class="copy-md-label">{{ copyMdLabel }}</span>
         </button>
       </div>
 
@@ -29,10 +29,11 @@
         <div v-for="tc in message.tool_calls" :key="tc.id" class="tool-pair">
           <!-- IN box -->
           <div class="tool-box in-box">
-            <div class="tool-box-header" @click="inExpanded = !inExpanded">
-              <span class="tool-box-label">{{ t('ai.in') }}</span>
+            <div class="tool-box-header">
+              <span class="tool-box-label" @click="inExpanded = !inExpanded">{{ t('ai.in') }}</span>
               <span class="tool-box-count"></span>
-              <span class="toggle-icon">{{ inExpanded ? '▼' : '▶' }}</span>
+              <button class="tool-copy-btn" @click.stop="copyToolText(tc.function.arguments, tc.id + '-in')" :title="t('ai.copy')"><el-icon><Check v-if="copiedTool === tc.id + '-in'" /><DocumentCopy v-else /></el-icon></button>
+              <span class="toggle-icon" @click="inExpanded = !inExpanded">{{ inExpanded ? '▼' : '▶' }}</span>
             </div>
             <div v-show="inExpanded" class="tool-box-body">
               <pre class="tool-call-args">{{ formatArgs(tc.function.arguments) }}</pre>
@@ -41,10 +42,11 @@
 
           <!-- OUT box -->
           <div v-if="getToolResult(tc.id)" class="tool-box out-box">
-            <div class="tool-box-header" @click="outExpanded = !outExpanded">
-              <span class="tool-box-label">{{ t('ai.out') }}</span>
+            <div class="tool-box-header">
+              <span class="tool-box-label" @click="outExpanded = !outExpanded">{{ t('ai.out') }}</span>
               <span class="tool-box-count"></span>
-              <span class="toggle-icon">{{ outExpanded ? '▼' : '▶' }}</span>
+              <button class="tool-copy-btn" @click.stop="copyToolText(getToolResult(tc.id)?.content || '', tc.id + '-out')" :title="t('ai.copy')"><el-icon><Check v-if="copiedTool === tc.id + '-out'" /><DocumentCopy v-else /></el-icon></button>
+              <span class="toggle-icon" @click="outExpanded = !outExpanded">{{ outExpanded ? '▼' : '▶' }}</span>
             </div>
             <div v-show="outExpanded" class="tool-box-body">
               <pre class="tool-output">{{ getToolResult(tc.id)?.content }}</pre>
@@ -72,7 +74,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { DocumentCopy } from '@element-plus/icons-vue'
+import { DocumentCopy, Check } from '@element-plus/icons-vue'
 import { useAIStore } from '../stores/aiStore'
 import { useI18n } from '../i18n'
 import type { AIMessage } from '../types/ai'
@@ -140,6 +142,19 @@ async function copyDebugInfo() {
   } catch {
     copyLabel.value = t('ai.copyFailed')
     setTimeout(() => { copyLabel.value = t('ai.copyDebug') }, 2000)
+  }
+}
+
+const copiedTool = ref('')
+
+async function copyToolText(raw: string, key: string) {
+  try {
+    const text = key.endsWith('-in') ? formatArgs(raw) : raw
+    await navigator.clipboard.writeText(text)
+    copiedTool.value = key
+    setTimeout(() => { copiedTool.value = '' }, 2000)
+  } catch {
+    // ignore
   }
 }
 
@@ -390,6 +405,22 @@ function escapeHtml(text: string): string {
 .toggle-icon {
   color: var(--text-muted);
   font-size: 10px;
+  cursor: pointer;
+}
+.tool-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.tool-box-header:hover .tool-copy-btn {
+  opacity: 0.6;
+}
+.tool-copy-btn:hover {
+  opacity: 1 !important;
 }
 .tool-box-body {
   padding: 6px 8px;
@@ -523,20 +554,35 @@ function escapeHtml(text: string): string {
 .copy-md-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
+  gap: 0;
+  padding: 2px 4px;
   font-size: 11px;
   color: var(--text-muted);
   background: transparent;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
+}
+.copy-md-label {
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  white-space: nowrap;
+  padding-left: 0;
+  transition: max-width 0.2s, opacity 0.15s, padding-left 0.2s;
 }
 .copy-md-btn:hover {
+  gap: 4px;
+  padding: 2px 8px;
   color: var(--accent);
   border-color: var(--accent-glow);
   background: var(--accent-subtle);
+}
+.copy-md-btn:hover .copy-md-label {
+  max-width: 150px;
+  opacity: 1;
+  padding-left: 2px;
 }
 .continue-box {
   margin-top: 8px;

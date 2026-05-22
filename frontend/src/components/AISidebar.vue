@@ -1,15 +1,18 @@
 <template>
-  <div ref="sidebarEl" class="ai-sidebar" :class="{ collapsed: !aiStore.visible, resizing: isResizing }" :style="{ width: sidebarWidth + 'px' }">
+  <div ref="sidebarEl" class="ai-sidebar" :class="{ collapsed: !aiStore.visible, resizing: isResizing, maximized: isMaximized }" :style="{ width: sidebarWidth + 'px' }">
     <div class="resize-handle" @mousedown="onResizeStart" />
     <div class="ai-header">
       <span>{{ t('ai.title') }}</span>
       <div class="ai-actions">
-        <el-button link size="small" @click="openGlobalSettings" :title="t('settings.ai')">
+        <button class="ai-action-btn" @click="openGlobalSettings" :title="t('settings.ai')">
           <el-icon><Setting /></el-icon>
-        </el-button>
-        <el-button link size="small" @click="aiStore.toggle">
+        </button>
+        <button class="ai-action-btn" @click="toggleMaximize" :title="isMaximized ? t('ai.restore') : t('ai.maximize')">
+          <el-icon><FullScreen /></el-icon>
+        </button>
+        <button class="ai-action-btn" @click="aiStore.toggle" :title="t('sidebar.collapse')">
           <el-icon><Close /></el-icon>
-        </el-button>
+        </button>
       </div>
     </div>
 
@@ -118,7 +121,7 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <el-button v-if="!aiStore.isRunning" type="primary" size="small" :disabled="!input.trim()" @click="onSend">
+          <el-button v-if="!aiStore.isRunning && !aiStore.pendingCommand" type="primary" size="small" :disabled="!input.trim()" @click="onSend">
             {{ t('ai.send') }}
           </el-button>
           <el-button v-else type="danger" size="small" @click="onStop">{{ t('ai.stop') }}</el-button>
@@ -131,7 +134,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, computed, watch, onMounted, onUnmounted } from 'vue'
-import { Setting, Close, ArrowDown, Plus, Delete } from '@element-plus/icons-vue'
+import { Setting, Close, ArrowDown, Plus, Delete, FullScreen } from '@element-plus/icons-vue'
 import { useAIStore } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useTabStore } from '../stores/tabStore'
@@ -164,6 +167,18 @@ const messagesRef = ref<HTMLDivElement>()
 const aiMenuRef = ref<HTMLDivElement>()
 const sidebarWidth = ref(360)
 const isResizing = ref(false)
+const isMaximized = ref(false)
+const preMaxWidth = ref(360)
+
+function toggleMaximize() {
+  if (isMaximized.value) {
+    sidebarWidth.value = preMaxWidth.value
+    isMaximized.value = false
+  } else {
+    preMaxWidth.value = sidebarWidth.value
+    isMaximized.value = true
+  }
+}
 const sidebarEl = ref<HTMLDivElement>()
 const aiMenuVisible = ref(false)
 const aiMenuStyle = ref({ left: '0px', top: '0px' })
@@ -317,7 +332,7 @@ function onKeydownEnter(e: KeyboardEvent) {
 
 async function onSend() {
   const text = input.value.trim()
-  if (!text || aiStore.isRunning) return
+  if (!text || aiStore.isRunning || aiStore.pendingCommand) return
   input.value = ''
   scrollToBottom()
   await runAgent(text)
@@ -325,6 +340,18 @@ async function onSend() {
 }
 
 function onStop() {
+  if (aiStore.pendingCommand) {
+    // Just mark the pending command as cancelled — do NOT call the AI
+    const cmd = aiStore.pendingCommand
+    aiStore.clearPendingCommand()
+    aiStore.addMessage({
+      id: `msg-${Date.now()}`,
+      role: 'tool',
+      content: 'User cancelled this command.',
+      tool_call_id: cmd.toolId
+    })
+    return
+  }
   aiStore.stop()
 }
 
@@ -435,6 +462,15 @@ onUnmounted(() => {
   width: 0 !important;
   overflow: hidden;
 }
+.ai-sidebar.maximized {
+  position: absolute !important;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100% !important;
+  z-index: 100;
+}
 .ai-sidebar.resizing {
   transition: none;
 }
@@ -467,6 +503,24 @@ onUnmounted(() => {
 .ai-actions {
   display: flex;
   gap: 2px;
+}
+.ai-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.ai-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 .ai-session-bar {
   padding: 6px 12px;

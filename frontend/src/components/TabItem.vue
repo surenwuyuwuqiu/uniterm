@@ -2,6 +2,7 @@
   <div
     class="tab-item"
     :class="{ active: isActive, 'ai-locked': isAILocked }"
+    :data-tab-id="tab.id"
     @click="$emit('activate', tab.id)"
     draggable="true"
     @dragstart="onDragStart"
@@ -27,7 +28,9 @@
       :class="{ locked: isAILocked }"
       @click.stop="$emit('toggleAiLock', tab.panelId)"
       :title="isAILocked ? t('terminal.aiLocked') : t('terminal.lockAI')"
-    >AI</button>
+    >
+      <svg class="ai-lock-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="none"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16v-6a2 2 0 1 1 4 0v6m-4-3h4m4-5v8"/></svg>
+    </button>
     <button
       v-if="isActive || showClose"
       class="tab-close"
@@ -208,7 +211,7 @@ onUnmounted(() => {
 .tab-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   padding: 8px 16px;
   cursor: pointer;
   user-select: none;
@@ -230,6 +233,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-right: 6px;
 }
 .transfer-indicator {
   font-size: 12px;
@@ -253,11 +257,14 @@ onUnmounted(() => {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px 4px;
   border-radius: 3px;
   opacity: 0;
+  display: inline-flex;
+  align-items: center;
+}
+.tab-ai-lock .ai-lock-icon {
+  display: block;
 }
 .tab-item:hover .tab-ai-lock,
 .tab-item.active .tab-ai-lock,
@@ -272,14 +279,22 @@ onUnmounted(() => {
   color: var(--warning, #f59e0b);
 }
 .tab-close {
-  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
   border: none;
-  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 14px;
-  padding: 0 4px;
+  transition: all 0.12s ease;
 }
 .tab-close:hover {
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 </style>

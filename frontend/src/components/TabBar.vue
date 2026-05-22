@@ -6,7 +6,7 @@
     @dragleave="onTabsDragLeave"
     @drop="onTabsDrop"
   >
-    <div class="tabs-list">
+    <div class="tabs-list" ref="tabsListRef" @wheel="onWheel">
       <template v-for="(tab, index) in tabs" :key="tab.id">
         <!-- Drop indicator before this tab: insert-before this tab, or insert-after previous tab -->
         <div
@@ -49,6 +49,25 @@
         class="tab-drop-indicator tab-drop-indicator-end"
       ></div>
     </div>
+    <div class="tab-more" v-if="tabs.length > 0">
+      <el-dropdown trigger="click" @command="setActiveTab">
+        <span class="tab-more-btn" :title="t('tab.more')">
+          <svg class="tab-more-icon" xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="currentColor"><path d="M240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400Z"/></svg>
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item
+              v-for="tab in tabs"
+              :key="tab.id"
+              :command="tab.id"
+              :class="{ 'is-active': tab.id === activeTabId }"
+            >
+              {{ tab.name }}
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
   </div>
 </template>
 
@@ -74,8 +93,24 @@ const dragOverInsertAfter = ref(false)
 const dragOverPanel = ref(false)
 const dragOverTab = ref(false)
 
+const tabsListRef = ref<HTMLElement | null>(null)
+
+function onWheel(e: WheelEvent) {
+  if (!tabsListRef.value) return
+  tabsListRef.value.scrollLeft += e.deltaY
+}
+
 function setActiveTab(id: string) {
   tabStore.setActiveTab(id)
+  scrollToTab(id)
+}
+
+function scrollToTab(tabId: string) {
+  if (!tabsListRef.value) return
+  const el = tabsListRef.value.querySelector(`[data-tab-id="${tabId}"]`) as HTMLElement | null
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  }
 }
 
 async function closeTab(id: string) {
@@ -205,8 +240,8 @@ function onTabsDragOver(e: DragEvent) {
   const hasTab = e.dataTransfer?.types.includes('application/tab-id')
   if (hasPanel || hasTab) {
     dragOverTabs.value = true
-    dragOverPanel.value = hasPanel
-    dragOverTab.value = hasTab
+    dragOverPanel.value = !!hasPanel
+    dragOverTab.value = !!hasTab
     e.dataTransfer!.dropEffect = 'move'
   }
 }
@@ -276,7 +311,38 @@ function clearDragState() {
   display: flex;
   flex: 1;
   overflow-x: auto;
+  overflow-y: hidden;
   align-items: stretch;
+  scrollbar-width: none;
+}
+.tabs-list::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-more {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+.tab-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  user-select: none;
+  transition: all 0.15s;
+}
+.tab-more-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .tab-drop-indicator {

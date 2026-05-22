@@ -428,6 +428,7 @@ watch(() => aiStore.visible, () => {
   flex: 1;
   overflow: hidden;
   gap: 0;
+  position: relative;
 }
 
 .tab-area {

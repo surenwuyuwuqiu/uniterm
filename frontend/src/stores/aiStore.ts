@@ -46,6 +46,8 @@ async function loadSessionsFromBackend(): Promise<{ sessions: AISession[], curre
         role: m.role,
         content: m.content,
         tool_call_id: m.tool_call_id,
+        tool_calls: m.tool_calls || [],
+        pendingTools: m.pendingTools || [],
         _rawApiMsg: m._rawApiMsg ? JSON.parse(m._rawApiMsg) : undefined,
       }))
     }))
@@ -147,7 +149,13 @@ export const useAIStore = defineStore('ai', () => {
     if (currentSessionId.value) {
       const s = sessions.value.find(s => s.id === currentSessionId.value)
       if (s) {
-        messages.value = s.messages.map(m => reactive({ ...m }) as AIMessage)
+        messages.value = s.messages.map(m => {
+          const msg = { ...m }
+          if (typeof msg._rawApiMsg === 'string' && msg._rawApiMsg) {
+            try { msg._rawApiMsg = JSON.parse(msg._rawApiMsg) } catch { delete msg._rawApiMsg }
+          }
+          return reactive(msg) as AIMessage
+        })
       } else {
         createSession()
       }
@@ -207,6 +215,8 @@ export const useAIStore = defineStore('ai', () => {
             role: m.role,
             content: m.content,
             tool_call_id: m.tool_call_id || '',
+            tool_calls: m.tool_calls || [],
+            pendingTools: m.pendingTools || [],
             _rawApiMsg: m._rawApiMsg ? JSON.stringify(m._rawApiMsg) : '',
           }))
         })),
@@ -359,54 +369,44 @@ export const useAIStore = defineStore('ai', () => {
       result.push({ role: m.role, content: m.content })
     }
 
-    // Final safety pass: remove any dangling tool_use blocks that escaped filtering
-    // and orphaned tool_results whose matching tool_use is missing.
-    // This handles edge cases from truncated history or pre-fix conversations.
-    const toolResultIds = new Set<string>()
-    for (const msg of result) {
-      if (msg.role === 'user' && Array.isArray(msg.content)) {
-        for (const block of msg.content as Array<Record<string, unknown>>) {
-          if (block.type === 'tool_result') {
-            toolResultIds.add(block.tool_use_id as string)
-          }
-        }
-      }
-    }
-
-    const toolUseIds = new Set<string>()
-    for (const msg of result) {
-      if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-        for (const block of msg.content as Array<Record<string, unknown>>) {
-          if (block.type === 'tool_use') {
-            toolUseIds.add(block.id as string)
-          }
-        }
-      }
-    }
-
+    // Final safety pass: enforce that every tool_use is immediately followed
+    // by a user message containing its matching tool_result, and every
+    // tool_result is immediately preceded by an assistant with its tool_use.
+    // The Anthropic API rejects tool_use blocks that are not resolved in the
+    // very next message.
     const cleaned: Array<Record<string, unknown>> = []
-    for (const msg of result) {
+    for (let i = 0; i < result.length; i++) {
+      const msg = result[i]
+
       if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+        const nextMsg = i + 1 < result.length ? result[i + 1] : null
         const blocks = (msg.content as Array<Record<string, unknown>>).filter((block) => {
           if (block.type === 'tool_use') {
-            return toolResultIds.has(block.id as string)
+            if (!nextMsg || nextMsg.role !== 'user' || !Array.isArray(nextMsg.content)) {
+              return false
+            }
+            return (nextMsg.content as Array<Record<string, unknown>>).some(
+              (nb) => nb.type === 'tool_result' && nb.tool_use_id === block.id
+            )
           }
           return true
         })
         if (blocks.length === 0) continue
         cleaned.push({ ...msg, content: blocks })
       } else if (msg.role === 'user' && Array.isArray(msg.content)) {
+        const prevMsg = i > 0 ? result[i - 1] : null
         const blocks = (msg.content as Array<Record<string, unknown>>).filter((block) => {
           if (block.type === 'tool_result') {
-            return toolUseIds.has(block.tool_use_id as string)
+            if (!prevMsg || prevMsg.role !== 'assistant' || !Array.isArray(prevMsg.content)) {
+              return false
+            }
+            return (prevMsg.content as Array<Record<string, unknown>>).some(
+              (pb) => pb.type === 'tool_use' && pb.id === block.tool_use_id
+            )
           }
           return true
         })
-        // Only skip the message if ALL tool_results were orphaned (nothing left).
-        // If valid tool_results remain, keep the message even if it's tool-only.
-        if (blocks.length === 0) {
-          continue
-        }
+        if (blocks.length === 0) continue
         cleaned.push({ ...msg, content: blocks })
       } else {
         cleaned.push(msg)

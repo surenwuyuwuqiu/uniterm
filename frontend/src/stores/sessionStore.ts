@@ -67,7 +67,16 @@ export const useSessionStore = defineStore('session', () => {
 
   function getData(id: string): string {
     const s = sessionState.sessions.get(id)
-    return s ? s.data.join('') : ''
+    if (!s) return ''
+    const raw = s.data.join('')
+    // Strip leading partial line that may contain broken escape sequences
+    // from buffer trimming. The first \n is a safe anchor; escape sequences
+    // don't span line breaks in normal terminal output.
+    const nl = raw.indexOf('\n')
+    if (nl > 0 && nl < 4096) {
+      return raw.slice(nl + 1)
+    }
+    return raw
   }
 
   function removeSession(id: string) {

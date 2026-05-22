@@ -22,11 +22,13 @@ type AISessionEntry struct {
 }
 
 type AIMessageEntry struct {
-	ID          string `json:"id"`
-	Role        string `json:"role"`
-	Content     string `json:"content"`
-	ToolCallID  string `json:"tool_call_id,omitempty"`
-	RawAPIMsg   string `json:"_rawApiMsg,omitempty"`
+	ID          string           `json:"id"`
+	Role        string           `json:"role"`
+	Content     string           `json:"content"`
+	ToolCallID  string           `json:"tool_call_id,omitempty"`
+	ToolCalls   []interface{}    `json:"tool_calls,omitempty"`
+	PendingTools []interface{}   `json:"pendingTools,omitempty"`
+	RawAPIMsg   string           `json:"_rawApiMsg,omitempty"`
 }
 
 type AISessionStore struct {

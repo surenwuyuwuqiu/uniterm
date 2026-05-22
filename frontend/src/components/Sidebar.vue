@@ -39,7 +39,10 @@
           @dragleave="onGroupDragLeave(entry.group.id)"
           @drop.prevent="onGroupDrop(entry.group.id, $event)"
         >
-          <span class="group-arrow" :class="{ expanded: expandedGroups.has(entry.group.id) }">▸</span>
+          <span class="group-arrow">
+            <svg v-if="expandedGroups.has(entry.group.id)" class="group-arrow-icon" xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M480-360 280-560h400L480-360Z"/></svg>
+            <svg v-else class="group-arrow-icon" xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M400-280v-400l200 200-200 200Z"/></svg>
+          </span>
           <span class="group-name">{{ entry.group.name }}</span>
         </div>
         <template v-if="expandedGroups.has(entry.group.id)">
@@ -48,8 +51,7 @@
             :key="conn.id"
             class="connection-item indented"
             :class="{
-              active: selectedId === conn.id,
-              'multi-selected': multiSelectedIds.has(conn.id)
+              active: selectedIds.has(conn.id)
             }"
             draggable="true"
             @dragstart="onDragStart($event, conn)"
@@ -78,7 +80,10 @@
           @dragleave="onGroupDragLeave('__ungrouped__')"
           @drop.prevent="onGroupDrop('__ungrouped__', $event)"
         >
-          <span class="group-arrow" :class="{ expanded: expandedGroups.has('__ungrouped__') }">▸</span>
+          <span class="group-arrow">
+            <svg v-if="expandedGroups.has('__ungrouped__')" class="group-arrow-icon" xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M480-360 280-560h400L480-360Z"/></svg>
+            <svg v-else class="group-arrow-icon" xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M400-280v-400l200 200-200 200Z"/></svg>
+          </span>
           <span class="group-name">{{ t('conn.noGroup') }}</span>
         </div>
         <template v-if="expandedGroups.has('__ungrouped__')">
@@ -87,8 +92,7 @@
             :key="conn.id"
             class="connection-item indented"
             :class="{
-              active: selectedId === conn.id,
-              'multi-selected': multiSelectedIds.has(conn.id)
+              active: selectedIds.has(conn.id)
             }"
             draggable="true"
             @dragstart="onDragStart($event, conn)"
@@ -113,8 +117,7 @@
           :key="conn.id"
           class="connection-item"
           :class="{
-            active: selectedId === conn.id,
-            'multi-selected': multiSelectedIds.has(conn.id)
+            active: selectedIds.has(conn.id)
           }"
           draggable="true"
           @dragstart="onDragStart($event, conn)"
@@ -135,8 +138,8 @@
       <div
         v-if="searchQuery.trim()"
         class="connection-item virtual-new-conn"
-        :class="{ active: selectedId === '__new_connection__' }"
-        @click="selectedId = '__new_connection__'; multiSelectedIds = new Set(); lastClickId = '__new_connection__'"
+        :class="{ active: focusedId === '__new_connection__' }"
+        @click="focusedId = '__new_connection__'; selectedIds = new Set(); lastClickId = '__new_connection__'"
         @dblclick="openNewFormFromSearch"
       >
         <div class="conn-indicator" style="background: var(--accent)" />
@@ -154,7 +157,7 @@
       </div>
     </div>
 
-    <ConnectionForm v-model="showForm" :edit-config="editConfig" @save="onSave" @connect="onConnectFromForm" />
+    <ConnectionForm v-model="showForm" :edit-config="editConfig" :default-group-id="newConnGroupId" @save="onSave" @connect="onConnectFromForm" />
 
     <!-- Connection context menu (kept inside sidebar to avoid native RDP occlusion) -->
     <div
@@ -168,7 +171,7 @@
       <div v-if="!selectedConn || selectedConn.type !== 'rdp'" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
       <div class="menu-divider" />
-      <div class="menu-item" :class="{ disabled: multiSelectedIds.size > 0 }" @click="multiSelectedIds.size === 0 && doEdit()">{{ t('sidebar.edit') }}</div>
+      <div class="menu-item" :class="{ disabled: selectedIds.size > 1 }" @click="selectedIds.size <= 1 && doEdit()">{{ t('sidebar.edit') }}</div>
       <div class="menu-item" @click="doDuplicate">{{ t('sidebar.duplicate') }}</div>
       <div class="menu-divider" />
       <div class="menu-item" @click="doChangeGroup">{{ t('conn.changeGroup') }}</div>
@@ -186,6 +189,7 @@
       @click.stop
     >
       <div class="menu-item" @click="doNewGroup">{{ t('conn.newGroupTitle') }}</div>
+      <div class="menu-item" @click="doNewConnInGroup">{{ t('sidebar.newConnection') }}</div>
       <template v-if="selectedGroup && selectedGroup.id !== '__ungrouped__'">
         <div class="menu-divider" />
         <div class="menu-item" @click="doRenameGroup">{{ t('conn.renameGroup') }}</div>
@@ -316,7 +320,7 @@ watch(showForm, (val) => {
 })
 
 const searchQuery = ref('')
-const selectedId = ref<string | null>(null)
+const focusedId = ref<string | null>(null)
 
 // ── Expand/collapse state ──
 const expandedGroups = ref<Set<string>>(new Set())
@@ -330,7 +334,7 @@ function toggleGroup(groupId: string) {
 }
 
 // ── Multi-select ──
-const multiSelectedIds = ref<Set<string>>(new Set())
+const selectedIds = ref<Set<string>>(new Set())
 
 // ── Search filter ──
 const filteredGrouped = computed(() => {
@@ -379,9 +383,11 @@ watch(filteredGrouped, () => {
   for (const c of filteredGrouped.value.ungrouped) allIds.push(c.id)
 
   if (allIds.length === 0) {
-    selectedId.value = searchQuery.value.trim() ? '__new_connection__' : null
-  } else if (!selectedId.value || !allIds.includes(selectedId.value)) {
-    selectedId.value = allIds[0]
+    focusedId.value = searchQuery.value.trim() ? '__new_connection__' : null
+    selectedIds.value = new Set()
+  } else if (!focusedId.value || !allIds.includes(focusedId.value)) {
+    focusedId.value = allIds[0]
+    selectedIds.value = new Set([allIds[0]])
   }
 }, { immediate: true })
 
@@ -473,21 +479,23 @@ function onListKeydown(e: KeyboardEvent) {
   const ids = getAllVisibleIds()
   if (ids.length === 0) return
 
-  const idx = ids.indexOf(selectedId.value || '')
+  const idx = ids.indexOf(focusedId.value || '')
 
   if (e.key === 'ArrowDown') {
     e.preventDefault()
     const nextIdx = idx >= 0 && idx < ids.length - 1 ? idx + 1 : 0
-    selectedId.value = ids[nextIdx]
+    focusedId.value = ids[nextIdx]
+    selectedIds.value = new Set([ids[nextIdx]])
     scrollActiveIntoView()
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
     const prevIdx = idx > 0 ? idx - 1 : ids.length - 1
-    selectedId.value = ids[prevIdx]
+    focusedId.value = ids[prevIdx]
+    selectedIds.value = new Set([ids[prevIdx]])
     scrollActiveIntoView()
   } else if (e.key === 'Enter') {
     e.preventDefault()
-    if (selectedId.value === '__new_connection__') {
+    if (focusedId.value === '__new_connection__') {
       openNewFormFromSearch()
       return
     }
@@ -503,7 +511,7 @@ function onListKeydown(e: KeyboardEvent) {
           }
         }
       }
-      multiSelectedIds.value = new Set()
+      selectedIds.value = new Set()
     }
   }
 }
@@ -520,7 +528,7 @@ function onDragStart(e: DragEvent, conn: ConnectionConfig) {
   const ids = getSelectedConnectionIds()
   // If dragging an unselected item, drag just this one
   if (!ids.includes(conn.id)) {
-    multiSelectedIds.value = new Set()
+    selectedIds.value = new Set()
     e.dataTransfer!.setData('text/plain', JSON.stringify([conn.id]))
   } else {
     e.dataTransfer!.setData('text/plain', JSON.stringify(ids))
@@ -548,7 +556,7 @@ async function onGroupDrop(groupId: string, e: DragEvent) {
   if (raw) {
     const ids: string[] = JSON.parse(raw)
     await connectionStore.setConnectionsGroup(ids, targetGroupId)
-    multiSelectedIds.value = new Set()
+    selectedIds.value = new Set()
   }
   dragOverGroupId.value = null
 }
@@ -568,27 +576,27 @@ function onItemClick(e: MouseEvent, conn: ConnectionConfig) {
       for (let i = start; i <= end; i++) {
         selected.add(ids[i])
       }
-      multiSelectedIds.value = selected
+      selectedIds.value = selected
     }
-    selectedId.value = conn.id
+    focusedId.value = conn.id
   } else if (e.ctrlKey || e.metaKey) {
     // Toggle multi-select
-    if (multiSelectedIds.value.has(conn.id)) {
-      multiSelectedIds.value.delete(conn.id)
+    if (selectedIds.value.has(conn.id)) {
+      selectedIds.value.delete(conn.id)
     } else {
-      multiSelectedIds.value.add(conn.id)
+      selectedIds.value.add(conn.id)
     }
-    multiSelectedIds.value = new Set(multiSelectedIds.value)
+    selectedIds.value = new Set(selectedIds.value)
     lastClickId.value = conn.id
   } else {
-    selectedId.value = conn.id
-    multiSelectedIds.value = new Set()
+    focusedId.value = conn.id
+    selectedIds.value = new Set([conn.id])
     lastClickId.value = conn.id
   }
 }
 
 function onItemDblClick(conn: ConnectionConfig) {
-  multiSelectedIds.value = new Set()
+  selectedIds.value = new Set()
   if (conn.type === 'rdp') {
     emit('connectRdp', conn)
   } else {
@@ -598,14 +606,14 @@ function onItemDblClick(conn: ConnectionConfig) {
 
 // ── Context menu helper ──
 function getSelectedConnectionIds(): string[] {
-  if (multiSelectedIds.value.size > 0) {
-    return [...multiSelectedIds.value]
+  if (selectedIds.value.size > 0) {
+    return [...selectedIds.value]
   }
   if (selectedConn.value) {
     return [selectedConn.value.id]
   }
-  if (selectedId.value) {
-    return [selectedId.value]
+  if (focusedId.value) {
+    return [focusedId.value]
   }
   return []
 }
@@ -635,9 +643,10 @@ function onContextMenu(e: MouseEvent, conn: ConnectionConfig) {
   e.stopPropagation()
   window.dispatchEvent(new CustomEvent('global:close-context-menus'))
   selectedConn.value = conn
-  // If right-clicking on a non-multi-selected item, clear multi-select
-  if (!multiSelectedIds.value.has(conn.id)) {
-    multiSelectedIds.value = new Set()
+  // If right-clicking on a non-multi-selected item, clear others and select this one
+  if (!selectedIds.value.has(conn.id)) {
+    selectedIds.value = new Set([conn.id])
+    focusedId.value = conn.id
   }
   menuStyle.value = clampMenuPosition(e.clientX, e.clientY)
   menuVisible.value = true
@@ -651,7 +660,7 @@ function doConnect() {
   const ids = getSelectedConnectionIds()
   // Collect connections before any state changes
   const conns = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
-  multiSelectedIds.value = new Set()
+  selectedIds.value = new Set()
   closeMenu()
   // Emit sequentially — each onConnect runs async but tabs/panels are created synchronously
   for (const c of conns) {
@@ -662,7 +671,7 @@ function doConnect() {
 function doConnectSFTP() {
   const ids = getSelectedConnectionIds()
   const conns = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
-  multiSelectedIds.value = new Set()
+  selectedIds.value = new Set()
   closeMenu()
   for (const c of conns) {
     emit('connectSftp', c)
@@ -672,7 +681,7 @@ function doConnectSFTP() {
 function doConnectRDP() {
   const ids = getSelectedConnectionIds()
   const conns = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
-  multiSelectedIds.value = new Set()
+  selectedIds.value = new Set()
   closeMenu()
   for (const c of conns) {
     emit('connectRdp', c)
@@ -690,7 +699,7 @@ function doEdit() {
 function doDuplicate() {
   const ids = getSelectedConnectionIds()
   const conns = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
-  multiSelectedIds.value = new Set()
+  selectedIds.value = new Set()
   closeMenu()
   for (const c of conns) {
     const dupName = generateDuplicateName(c.name)
@@ -740,7 +749,7 @@ async function doDelete() {
   for (const id of ids) {
     connectionStore.remove(id)
   }
-  multiSelectedIds.value = new Set()
+  selectedIds.value = new Set()
 }
 
 // ── Standalone new group ──
@@ -753,6 +762,17 @@ function doNewGroup() {
   closeEmptyAreaMenu()
   newGroupName.value = ''
   showNewGroupDialog.value = true
+}
+
+const newConnGroupId = ref<string | undefined>(undefined)
+
+function doNewConnInGroup() {
+  closeMenu()
+  closeGroupMenu()
+  closeEmptyAreaMenu()
+  editConfig.value = undefined
+  newConnGroupId.value = selectedGroup.value?.id !== '__ungrouped__' ? selectedGroup.value?.id : undefined
+  showForm.value = true
 }
 
 async function confirmNewGroup() {
@@ -796,7 +816,7 @@ function confirmChangeGroup() {
   const groupId = val === '__none__' ? undefined : val
   const ids = getSelectedConnectionIds()
   connectionStore.setConnectionsGroup(ids, groupId)
-  multiSelectedIds.value = new Set()
+  selectedIds.value = new Set()
   showChangeGroupDialog.value = false
   changeGroupTargetId.value = undefined
 }
@@ -808,7 +828,7 @@ async function confirmChangeNewGroup() {
   const group = await connectionStore.addGroup(name)
   const ids = getSelectedConnectionIds()
   connectionStore.setConnectionsGroup(ids, group.id)
-  multiSelectedIds.value = new Set()
+  selectedIds.value = new Set()
   showChangeNewGroupDialog.value = false
   showChangeGroupDialog.value = false
   changeGroupTargetId.value = undefined
@@ -905,12 +925,14 @@ async function confirmDeleteGroup(action: 'delete-connections' | 'move-out') {
 // ── Form handlers ──
 function openNewForm() {
   editConfig.value = undefined
+  newConnGroupId.value = undefined
   showForm.value = true
 }
 
 function openNewFormFromSearch() {
   editConfig.value = { host: searchQuery.value.trim() } as ConnectionConfig
-  multiSelectedIds.value = new Set()
+  selectedIds.value = new Set()
+  newConnGroupId.value = undefined
   showForm.value = true
 }
 
@@ -1075,15 +1097,13 @@ onUnmounted(() => {
 }
 
 .group-arrow {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   width: 16px;
-  font-size: 14px;
-  transition: transform 0.15s ease;
   color: var(--text-disabled);
 }
-
-.group-arrow.expanded {
-  transform: rotate(90deg);
+.group-arrow-icon {
+  display: block;
 }
 
 .group-name {
@@ -1125,10 +1145,6 @@ onUnmounted(() => {
   color: var(--accent);
 }
 
-.connection-item.multi-selected {
-  background: var(--accent-subtle);
-  box-shadow: inset 0 0 0 1px var(--accent-dim);
-}
 
 .conn-indicator {
   width: 6px;

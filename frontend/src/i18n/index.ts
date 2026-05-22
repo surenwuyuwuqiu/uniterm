@@ -75,6 +75,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'tab.closeLeft': '关闭左侧标签',
     'tab.closeOther': '关闭其他标签',
     'tab.close': '关闭',
+    'tab.more': '更多标签',
 
     // TerminalTab
     'terminal.askAI': '问AI',
@@ -129,6 +130,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'ai.copied': '已复制',
     'ai.copyMarkdown': '复制为 Markdown',
     'ai.copyFailed': '复制失败',
+    'ai.maximize': '最大化',
+    'ai.restore': '恢复',
 
     // SFTP
     'sftp.local': '本地',
@@ -314,6 +317,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'tab.closeLeft': 'Close Tabs to the Left',
     'tab.closeOther': 'Close Other Tabs',
     'tab.close': 'Close',
+    'tab.more': 'More Tabs',
 
     // TerminalTab
     'terminal.askAI': 'Ask AI',
@@ -368,6 +372,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'ai.copyMarkdown': 'Copy as Markdown',
     'ai.copied': 'Copied',
     'ai.copyFailed': 'Copy Failed',
+    'ai.maximize': 'Maximize',
+    'ai.restore': 'Restore',
 
     // SFTP
     'sftp.local': 'Local',

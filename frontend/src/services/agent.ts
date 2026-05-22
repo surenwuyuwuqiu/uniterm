@@ -82,7 +82,7 @@ export async function runAgent(userInput: string) {
     }
     store.addMessage({
       id: `msg-${Date.now()}`,
-      role: 'assistant',
+      role: 'tool',
       content: '请先在主窗口中打开一个终端会话，这样我才能执行命令。'
     })
     return
@@ -289,7 +289,7 @@ export async function approveTool(_messageId: string) {
     store.clearPendingCommand()
     store.addMessage({
       id: `msg-${Date.now()}`,
-      role: 'assistant',
+      role: 'tool',
       content: '请先打开一个终端会话，再执行此命令。'
     })
     return

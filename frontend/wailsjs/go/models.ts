@@ -201,6 +201,8 @@ export namespace store {
 	    role: string;
 	    content: string;
 	    tool_call_id?: string;
+	    tool_calls?: any[];
+	    pendingTools?: any[];
 	    _rawApiMsg?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -213,6 +215,8 @@ export namespace store {
 	        this.role = source["role"];
 	        this.content = source["content"];
 	        this.tool_call_id = source["tool_call_id"];
+	        this.tool_calls = source["tool_calls"];
+	        this.pendingTools = source["pendingTools"];
 	        this._rawApiMsg = source["_rawApiMsg"];
 	    }
 	}

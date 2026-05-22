@@ -63,6 +63,8 @@ const status = ref<'connecting' | 'connected' | 'disconnected' | 'error'>('conne
 const currentSessionId = ref<string | null>(props.sessionId)
 const vncContainer = ref<HTMLDivElement | null>(null)
 const debugLogs = ref<string[]>([])
+const savedProxyAddr = ref<string>('')
+const savedPassword = ref<string>('')
 
 let rfb: any = null
 let unsubStatus: (() => void) | null = null
@@ -180,6 +182,13 @@ onMounted(() => {
   }
   if (currentSessionId.value) {
     status.value = 'connected'
+    // If we already have a session but no RFB (e.g. tab switch),
+    // we need to wait a tick for the DOM to be ready then init RFB.
+    // The proxyAddr will come from the saved state or a fresh status event.
+    if (savedProxyAddr.value) {
+      addDebug(`Tab restored, re-init RFB with saved proxyAddr`)
+      initRFB(savedProxyAddr.value, savedPassword.value)
+    }
   } else {
     connect()
   }
@@ -190,9 +199,18 @@ onMounted(() => {
     switch (data.status) {
       case 'connected':
         status.value = 'connected'
+        if (data.proxyAddr) {
+          savedProxyAddr.value = data.proxyAddr
+        }
+        if (props.config) {
+          savedPassword.value = props.config.password || ''
+        }
         if (data.proxyAddr && props.config) {
           addDebug(`Initializing RFB with proxyAddr=${data.proxyAddr}`)
           initRFB(data.proxyAddr, props.config.password || '')
+        } else if (savedProxyAddr.value) {
+          addDebug(`Re-initializing RFB with saved proxyAddr=${savedProxyAddr.value}`)
+          initRFB(savedProxyAddr.value, savedPassword.value)
         } else {
           addDebug(`Skip initRFB: proxyAddr=${data.proxyAddr}, config=${props.config}`)
         }
@@ -236,13 +254,18 @@ watch(() => props.sessionId, (newId) => {
 }
 .vnc-area {
   flex: 1;
+  position: relative;
+  min-height: 0;
   background: #000;
   outline: none;
 }
 .vnc-area :deep(canvas) {
-  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
+  display: block;
 }
 .vnc-overlay {
   position: absolute;

@@ -99,16 +99,21 @@ export async function chat(options: ChatOptions): Promise<void> {
 export const AVAILABLE_TOOLS = [
   {
     name: 'execute_command',
-    description: 'Execute a shell command in the active terminal session and return its output.',
+    description: 'Execute a shell command in the active terminal session and return its output. You MUST classify every command with a risk level.',
     input_schema: {
       type: 'object',
       properties: {
         command: {
           type: 'string',
           description: 'The shell command to execute. Use standard Unix syntax.'
+        },
+        risk: {
+          type: 'string',
+          enum: ['read', 'write', 'dangerous'],
+          description: 'The risk level of this command:\n- "read": only inspects/views data, absolutely no modifications (e.g. ls, cat, grep, head, tail, df, du, ps, top, find, pwd, whoami, git status, git log, docker ps, npm list)\n- "write": modifies or creates data but not system-destructive (e.g. echo > file, touch, mkdir, cp, mv, git commit, curl POST, npm install, pip install)\n- "dangerous": potentially destructive or system-altering (e.g. rm, > overwrite, chmod, chown, shutdown, mkfs, dd, reboot, force push)'
         }
       },
-      required: ['command']
+      required: ['command', 'risk']
     }
   }
 ]

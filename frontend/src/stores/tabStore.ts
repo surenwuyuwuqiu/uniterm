@@ -8,10 +8,12 @@ const tabState = reactive<{
   tabs: Tab[]
   activeTabId: string | null
   aiLockedPanelId: string | null
+  broadcastWorkspaceId: string | null
 }>({
   tabs: [],
   activeTabId: null,
-  aiLockedPanelId: null
+  aiLockedPanelId: null,
+  broadcastWorkspaceId: null
 })
 
 let idCounter = 0
@@ -35,6 +37,19 @@ export const useTabStore = defineStore('tab', () => {
     tabState.tabs.find(t => t.id === tabState.activeTabId) || null
   )
   const aiLockedPanelId = computed(() => tabState.aiLockedPanelId)
+  const broadcastWorkspaceId = computed(() => tabState.broadcastWorkspaceId)
+
+  function toggleBroadcast(workspaceId: string) {
+    if (tabState.broadcastWorkspaceId === workspaceId) {
+      tabState.broadcastWorkspaceId = null
+    } else {
+      tabState.broadcastWorkspaceId = workspaceId
+    }
+  }
+
+  function isBroadcasting(workspaceId: string): boolean {
+    return tabState.broadcastWorkspaceId === workspaceId
+  }
 
   // ── Create tabs ──
 
@@ -430,6 +445,9 @@ export const useTabStore = defineStore('tab', () => {
     movePanelInWorkspace,
     setAILockedPanel,
     getAILockedPanel,
+    broadcastWorkspaceId,
+    toggleBroadcast,
+    isBroadcasting,
     // Expose helpers for components
     collectPanelIds,
     insertPanelIntoLayout,

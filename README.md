@@ -1,28 +1,64 @@
 <div align="center">
   <img src="build/appicon.png" alt="uniTerm" width="128" height="128" />
   <h1>uniTerm</h1>
-  <p>A modern cross-platform terminal emulator with built-in AI assistant.</p>
+  <p>A modern cross-platform terminal emulator with a built-in autonomous AI Agent — capable of independently planning and executing multi-turn shell commands, like Claude Code for your terminal.</p>
 </div>
+
+[简体中文](README_zh-CN.md)
 
 ## Features
 
-- **SSH Client** — Connect to remote servers via SSH. Supports password and private key authentication.
-- **AI Assistant** — Built-in AI sidebar powered by Anthropic-compatible LLMs (DeepSeek, Claude, etc.). The AI executes shell commands in the active terminal — with configurable execution modes.
-- **Three Execution Modes** — Confirm All (approve every command), Confirm Dangerous (auto-run safe commands, prompt for destructive ones), and Bypass (fully autonomous).
-- **AI Session Management** — Persistent chat sessions with automatic compression, rename, switch, and delete.
-- **AI Debug Mode** — Toggle to inspect raw API request/response bodies in the chat.
-- **Tabs & Splits** — Flexible tab system with split-pane layouts for parallel sessions.
-- **Connection Manager** — Save, search, edit, duplicate, and organize server connections.
-- **Terminal Customization** — Configurable color scheme, font family, font size, selection behavior, right-click action, and scrollback history.
-- **Three Themes** — Dark, Deep Blue, and Light with CSS variable theming, plus system auto-detect.
-- **i18n** — Chinese (简体中文) and English language support.
-- **Cross-Platform** — Windows, macOS, and Linux via Wails.
+### AI Assistant
+
+Autonomous AI Agent that works like Claude Code — independently plans and executes multi-turn shell commands directly in your terminal.
+
+- **Autonomous Multi-Turn Execution** — The AI Agent can plan, execute, observe results, and iterate across multiple rounds of shell commands without manual intervention.
+- **LLM Integration** — Sidebar chat with Anthropic-compatible API, supporting Claude and other compliant models.
+- **Flexible Execution Modes** — Confirm all, confirm dangerous only, or bypass — you control how much oversight the AI Agent needs.
+- **Persistent Conversations** — Chat history is saved per session, so conversations survive app restarts.
+- **Direct Terminal Control** — Commands execute directly in the active terminal tab, with full access to your SSH sessions.
+- **AI Terminal Pinning** — Pin the AI Agent to a specific terminal tab or follow your active one — collaborate side-by-side in split panes, each with your own terminal context.
+
+### Full-Featured Terminal
+
+- **SSH Client** — Connect via password or private key authentication. Multi-tab management with 5 color schemes, 6 monospace fonts, adjustable font size and scrollback, configurable selection behavior and right-click actions.
+- **SFTP File Manager** — Dual-pane browser for local and remote files. Upload, download, drag-and-drop, delete, rename, and more. Transfers tracked per tab with pause, resume, and cancel support.
+- **Workspace & Split Panes** — Merge terminal tabs into a workspace with horizontal or vertical splits. Drag panel edges or title bars to resize and rearrange freely.
+- **Connection Manager** — Save, search, edit, group, and duplicate server connections. Drag-and-drop organization, multi-select or range-select for batch connect, batch delete, and more.
+- **RDP / VNC (Planned)** — Future support for remote desktop and VNC connections, making uniTerm a unified gateway for all remote access.
+- **Local Terminal (Planned)** — Full-featured local terminal with the same font, color, and behavior settings as SSH sessions. Use it as your daily driver.
+
+### Customization
+
+- **Internationalization** — Simplified Chinese and English UI, built with a clean i18n architecture ready for more languages.
+- **Themes** — Dark, Deep Blue, and Light themes with automatic system theme detection.
+- **Cross-Platform** — Built on Wails v2, runs natively on Windows, macOS, and Linux.
+
+## Quick Workflows
+
+### SSH Connection
+
+1. Click **New Connection** in the Connection Manager
+2. Fill in host, port, and authentication (password or private key)
+3. Click **Connect** to open an SSH terminal session
+
+### AI Assistant
+
+1. Go to Settings and configure your **AI provider** (API endpoint, model, and key)
+2. Open an SSH terminal tab
+3. Open the AI sidebar chat — type your task, and the AI Agent executes commands directly in your terminal
+
+### SFTP File Transfer
+
+1. In the Connection Manager, **right-click** an SSH connection
+2. Select **Connect SFTP**
+3. Browse, upload, download, and drag-and-drop files in the dual-pane file manager
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Desktop Framework | [Wails v2](https://wails.io) |
+| Desktop Framework | Wails v2 |
 | Backend | Go |
 | Frontend | Vue 3 + Pinia + Element Plus |
 | Terminal | xterm.js |
@@ -43,38 +79,32 @@
 ## Getting Started
 
 ```bash
-# Clone the repo
 git clone https://github.com/ys-ll/uniterm.git
 cd uniTerm
-
-# Install frontend dependencies
 cd frontend && npm install && cd ..
-
-# Run in development mode
-wails dev
-
-# Build for production
-wails build
+wails dev                   # Development
+wails build                 # Production build
 ```
 
 ## Project Structure
 
 ```
 uniTerm/
-├── app.go                        # Wails app bindings & LLM API proxy
 ├── main.go                       # Entry point
+├── app.go                        # Wails bindings, LLM API proxy, SFTP API
 ├── backend/
-│   ├── session/                  # SSH session management
-│   ├── store/                    # Persistent config (settings, AI config)
+│   ├── session/                  # SSH/SFTP session management
+│   ├── store/                    # Persistent config (connections, AI, settings)
 │   └── log/                      # File-based logging
 ├── frontend/
 │   └── src/
-│       ├── components/           # Vue components (13 components)
-│       ├── stores/               # Pinia stores (ai, connection, settings, tab)
-│       ├── services/             # AI agent loop, LLM client, terminal agent
-│       ├── i18n/                 # Chinese & English translations
+│       ├── components/           # Vue components
+│       ├── composables/          # Terminal composables
+│       ├── stores/               # Pinia stores
+│       ├── services/             # AI agent loop, LLM client
+│       ├── i18n/                 # Translations
 │       └── types/                # TypeScript type definitions
-└── wails.json                    # Wails project config
+└── wails.json
 ```
 
 ## License

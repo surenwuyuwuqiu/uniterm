@@ -1,3 +1,22 @@
+export namespace main {
+	
+	export class AppInfo {
+	    name: string;
+	    version: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.version = source["version"];
+	    }
+	}
+
+}
+
 export namespace session {
 	
 	export class ConnectionConfig {
@@ -177,6 +196,26 @@ export namespace store {
 	        this.model = source["model"];
 	    }
 	}
+	export class AIMessageEntry {
+	    id: string;
+	    role: string;
+	    content: string;
+	    tool_call_id?: string;
+	    _rawApiMsg?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIMessageEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.role = source["role"];
+	        this.content = source["content"];
+	        this.tool_call_id = source["tool_call_id"];
+	        this._rawApiMsg = source["_rawApiMsg"];
+	    }
+	}
 	export class AIModelConfig {
 	    id: string;
 	    name: string;
@@ -199,6 +238,77 @@ export namespace store {
 	        this.protocol = source["protocol"];
 	    }
 	}
+	export class AISessionEntry {
+	    id: string;
+	    name: string;
+	    createdAt: number;
+	    updatedAt: number;
+	    messages: AIMessageEntry[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AISessionEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.messages = this.convertValues(source["messages"], AIMessageEntry);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AISessionData {
+	    sessions: AISessionEntry[];
+	    currentSessionId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AISessionData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessions = this.convertValues(source["sessions"], AISessionEntry);
+	        this.currentSessionId = source["currentSessionId"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class AISettings {
 	    models: AIModelConfig[];
 	    activeModelId: string;

@@ -8,6 +8,7 @@
       :panel-ids="tab.panelIds"
       :active-panel-id="tab.activePanelId"
       :tab-id="tab.id"
+      :broadcast-active="tabStore.isBroadcasting(tab.id)"
       @close-panel="closePanel"
       @toggle-ai-lock="onToggleAiLock"
       @panel-drag-start="onPanelDragStart"

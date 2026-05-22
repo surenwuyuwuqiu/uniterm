@@ -14,6 +14,10 @@ export function CreateSession(arg1, arg2) {
   return window['go']['main']['App']['CreateSession'](arg1, arg2);
 }
 
+export function GetAppInfo() {
+  return window['go']['main']['App']['GetAppInfo']();
+}
+
 export function GetDesktopPath() {
   return window['go']['main']['App']['GetDesktopPath']();
 }
@@ -28,6 +32,10 @@ export function ListSessions() {
 
 export function LoadAIConfig() {
   return window['go']['main']['App']['LoadAIConfig']();
+}
+
+export function LoadAISessions() {
+  return window['go']['main']['App']['LoadAISessions']();
 }
 
 export function LoadConnections() {
@@ -76,6 +84,10 @@ export function RemoveTempFile(arg1) {
 
 export function SaveAIConfig(arg1) {
   return window['go']['main']['App']['SaveAIConfig'](arg1);
+}
+
+export function SaveAISessions(arg1) {
+  return window['go']['main']['App']['SaveAISessions'](arg1);
 }
 
 export function SaveConnections(arg1) {

@@ -150,6 +150,16 @@
         </div>
       </div>
 
+      <!-- 关于 -->
+      <div v-if="activeCategory === 'about'" class="settings-section">
+        <h2 class="section-title">{{ t('settings.about') }}</h2>
+        <div class="about-content">
+          <div class="about-appname">uniTerm</div>
+          <p class="about-desc">{{ t('settings.aboutDesc') }}</p>
+          <div class="about-version">{{ t('settings.version') }}: {{ appInfo.version }}</div>
+        </div>
+      </div>
+
       <!-- AI助理设置 -->
       <div v-if="activeCategory === 'ai'" class="settings-section">
         <h2 class="section-title">{{ t('settings.ai') }}</h2>
@@ -219,20 +229,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, computed } from 'vue'
-import { Setting, Monitor, ChatDotRound, Edit, Delete } from '@element-plus/icons-vue'
+import { ref, reactive, watch, computed, onMounted } from 'vue'
+import { Setting, Monitor, ChatDotRound, InfoFilled, Edit, Delete } from '@element-plus/icons-vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useI18n } from '../i18n'
 import { TERMINAL_THEMES, FONT_OPTIONS } from '../types/settings'
 import type { AIModelConfig } from '../types/settings'
+import { GetAppInfo } from '../../wailsjs/go/main/App'
 
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
 const activeCategory = ref('basic')
+const appInfo = ref({ name: 'uniTerm', version: '' })
+
+onMounted(async () => {
+  try {
+    const info = await GetAppInfo()
+    if (info) {
+      appInfo.value = info
+    }
+  } catch {
+    // use defaults
+  }
+})
 
 watch(() => settingsStore.openCategory, (cat) => {
-  if (cat && (cat === 'basic' || cat === 'terminal' || cat === 'ai')) {
+  if (cat && (cat === 'basic' || cat === 'terminal' || cat === 'ai' || cat === 'about')) {
     activeCategory.value = cat
     settingsStore.openCategory = null
   }
@@ -245,6 +268,7 @@ const categories = computed(() => {
     { key: 'basic', label: t('settings.basic'), icon: Setting },
     { key: 'terminal', label: t('settings.terminal'), icon: Monitor },
     { key: 'ai', label: t('settings.ai'), icon: ChatDotRound },
+    { key: 'about', label: t('settings.about'), icon: InfoFilled },
   ]
 })
 
@@ -457,5 +481,30 @@ function resetModelForm() {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+}
+
+.about-content {
+  text-align: left;
+  padding: 20px 0;
+}
+.about-appname {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.about-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 24px 0;
+  line-height: 1.6;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.about-version {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 </style>

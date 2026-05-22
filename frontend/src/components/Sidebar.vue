@@ -156,60 +156,54 @@
 
     <ConnectionForm v-model="showForm" :edit-config="editConfig" @save="onSave" @connect="onConnectFromForm" />
 
-    <!-- Connection context menu -->
-    <Teleport to="body">
-      <div
-        v-show="menuVisible"
-        ref="menuRef"
-        class="conn-context-menu"
-        :style="menuStyle"
-        @click.stop
-      >
-        <div v-if="!selectedConn || selectedConn.type !== 'rdp'" class="menu-item" @click="doConnect">{{ t('sidebar.connect') }}</div>
-        <div v-if="!selectedConn || selectedConn.type !== 'rdp'" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
-        <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
-        <div class="menu-divider" />
-        <div class="menu-item" :class="{ disabled: multiSelectedIds.size > 0 }" @click="multiSelectedIds.size === 0 && doEdit()">{{ t('sidebar.edit') }}</div>
-        <div class="menu-item" @click="doDuplicate">{{ t('sidebar.duplicate') }}</div>
-        <div class="menu-divider" />
-        <div class="menu-item" @click="doChangeGroup">{{ t('conn.changeGroup') }}</div>
-        <div class="menu-item" @click="doNewGroup">{{ t('conn.newGroupTitle') }}</div>
-        <div class="menu-divider" />
-        <div class="menu-item danger" @click="doDelete">{{ t('sidebar.delete') }}</div>
-      </div>
-    </Teleport>
+    <!-- Connection context menu (kept inside sidebar to avoid native RDP occlusion) -->
+    <div
+      v-show="menuVisible"
+      ref="menuRef"
+      class="conn-context-menu"
+      :style="menuStyle"
+      @click.stop
+    >
+      <div v-if="!selectedConn || selectedConn.type !== 'rdp'" class="menu-item" @click="doConnect">{{ t('sidebar.connect') }}</div>
+      <div v-if="!selectedConn || selectedConn.type !== 'rdp'" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
+      <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
+      <div class="menu-divider" />
+      <div class="menu-item" :class="{ disabled: multiSelectedIds.size > 0 }" @click="multiSelectedIds.size === 0 && doEdit()">{{ t('sidebar.edit') }}</div>
+      <div class="menu-item" @click="doDuplicate">{{ t('sidebar.duplicate') }}</div>
+      <div class="menu-divider" />
+      <div class="menu-item" @click="doChangeGroup">{{ t('conn.changeGroup') }}</div>
+      <div class="menu-item" @click="doNewGroup">{{ t('conn.newGroupTitle') }}</div>
+      <div class="menu-divider" />
+      <div class="menu-item danger" @click="doDelete">{{ t('sidebar.delete') }}</div>
+    </div>
 
-    <!-- Group context menu -->
-    <Teleport to="body">
-      <div
-        v-show="groupMenuVisible"
-        ref="groupMenuRef"
-        class="conn-context-menu"
-        :style="groupMenuStyle"
-        @click.stop
-      >
-        <div class="menu-item" @click="doNewGroup">{{ t('conn.newGroupTitle') }}</div>
-        <template v-if="selectedGroup && selectedGroup.id !== '__ungrouped__'">
-          <div class="menu-divider" />
-          <div class="menu-item" @click="doRenameGroup">{{ t('conn.renameGroup') }}</div>
-          <div class="menu-divider" />
-          <div class="menu-item danger" @click="doDeleteGroup">{{ t('conn.deleteGroup') }}</div>
-        </template>
-      </div>
-    </Teleport>
+    <!-- Group context menu (kept inside sidebar to avoid native RDP occlusion) -->
+    <div
+      v-show="groupMenuVisible"
+      ref="groupMenuRef"
+      class="conn-context-menu"
+      :style="groupMenuStyle"
+      @click.stop
+    >
+      <div class="menu-item" @click="doNewGroup">{{ t('conn.newGroupTitle') }}</div>
+      <template v-if="selectedGroup && selectedGroup.id !== '__ungrouped__'">
+        <div class="menu-divider" />
+        <div class="menu-item" @click="doRenameGroup">{{ t('conn.renameGroup') }}</div>
+        <div class="menu-divider" />
+        <div class="menu-item danger" @click="doDeleteGroup">{{ t('conn.deleteGroup') }}</div>
+      </template>
+    </div>
 
-    <!-- Empty area context menu -->
-    <Teleport to="body">
-      <div
-        v-show="emptyAreaMenuVisible"
-        ref="emptyAreaMenuRef"
-        class="conn-context-menu"
-        :style="emptyAreaMenuStyle"
-        @click.stop
-      >
-        <div class="menu-item" @click="doNewGroup">{{ t('conn.newGroupTitle') }}</div>
-      </div>
-    </Teleport>
+    <!-- Empty area context menu (kept inside sidebar to avoid native RDP occlusion) -->
+    <div
+      v-show="emptyAreaMenuVisible"
+      ref="emptyAreaMenuRef"
+      class="conn-context-menu"
+      :style="emptyAreaMenuStyle"
+      @click.stop
+    >
+      <div class="menu-item" @click="doNewGroup">{{ t('conn.newGroupTitle') }}</div>
+    </div>
 
     <!-- Delete group dialog -->
     <el-dialog v-model="showDeleteGroupDialog" :title="t('conn.deleteGroupTitle')" width="450px">
@@ -315,6 +309,12 @@ const connectionStore = useConnectionStore()
 const { t } = useI18n()
 const showForm = ref(false)
 const editConfig = ref<ConnectionConfig | undefined>(undefined)
+
+// Notify App.vue to hide native RDP window when edit dialog opens
+watch(showForm, (val) => {
+  window.dispatchEvent(new CustomEvent(val ? 'rdp:overlay-push' : 'rdp:overlay-pop'))
+})
+
 const searchQuery = ref('')
 const selectedId = ref<string | null>(null)
 
@@ -616,6 +616,21 @@ const menuStyle = ref({ left: '0px', top: '0px' })
 const selectedConn = ref<ConnectionConfig | null>(null)
 const menuRef = ref<HTMLDivElement>()
 
+function clampMenuPosition(x: number, y: number): { left: string, top: string } {
+  const el = sidebarEl.value
+  if (!el) return { left: x + 'px', top: y + 'px' }
+  const sr = el.getBoundingClientRect()
+  const menuW = 150
+  const menuH = 220
+  let left = x
+  let top = y
+  if (left + menuW > sr.right) left = sr.right - menuW - 4
+  if (left < sr.left) left = sr.left + 4
+  if (top + menuH > window.innerHeight) top = y - menuH
+  if (top < 0) top = 4
+  return { left: left + 'px', top: top + 'px' }
+}
+
 function onContextMenu(e: MouseEvent, conn: ConnectionConfig) {
   e.stopPropagation()
   window.dispatchEvent(new CustomEvent('global:close-context-menus'))
@@ -624,7 +639,7 @@ function onContextMenu(e: MouseEvent, conn: ConnectionConfig) {
   if (!multiSelectedIds.value.has(conn.id)) {
     multiSelectedIds.value = new Set()
   }
-  menuStyle.value = { left: e.clientX + 'px', top: e.clientY + 'px' }
+  menuStyle.value = clampMenuPosition(e.clientX, e.clientY)
   menuVisible.value = true
 }
 
@@ -809,7 +824,7 @@ function onGroupContextMenu(e: MouseEvent, group: ConnectionGroup) {
   e.stopPropagation()
   window.dispatchEvent(new CustomEvent('global:close-context-menus'))
   selectedGroup.value = group
-  groupMenuStyle.value = { left: e.clientX + 'px', top: e.clientY + 'px' }
+  groupMenuStyle.value = clampMenuPosition(e.clientX, e.clientY)
   groupMenuVisible.value = true
 }
 
@@ -824,7 +839,7 @@ const emptyAreaMenuRef = ref<HTMLDivElement>()
 
 function onEmptyAreaContextMenu(e: MouseEvent) {
   window.dispatchEvent(new CustomEvent('global:close-context-menus'))
-  emptyAreaMenuStyle.value = { left: e.clientX + 'px', top: e.clientY + 'px' }
+  emptyAreaMenuStyle.value = clampMenuPosition(e.clientX, e.clientY)
   emptyAreaMenuVisible.value = true
 }
 
@@ -837,7 +852,7 @@ function onVirtualGroupContextMenu(e: MouseEvent) {
   e.stopPropagation()
   window.dispatchEvent(new CustomEvent('global:close-context-menus'))
   selectedGroup.value = { id: '__ungrouped__', name: t('conn.noGroup') }
-  groupMenuStyle.value = { left: e.clientX + 'px', top: e.clientY + 'px' }
+  groupMenuStyle.value = clampMenuPosition(e.clientX, e.clientY)
   groupMenuVisible.value = true
 }
 

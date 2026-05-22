@@ -140,6 +140,59 @@ function startRDPTracker() {
 }
 
 
+// ── RDP overlay tracking: hide native RDP when HTML overlays are open ──
+// Native RDP window renders above WebView2, so menus/dialogs are blocked.
+const rdpOverlayCount = ref(0)
+let rdpRestoreTimer: ReturnType<typeof setTimeout> | null = null
+let rdpContextMenuOpen = false
+
+function rdpPushOverlay() {
+	rdpOverlayCount.value++
+	if (rdpOverlayCount.value === 1) {
+		const sid = getActiveRdpSessionId()
+		if (sid) RDPHide(sid)
+	}
+}
+
+function rdpPopOverlay() {
+	if (rdpOverlayCount.value > 0) rdpOverlayCount.value--
+	if (rdpRestoreTimer) clearTimeout(rdpRestoreTimer)
+	rdpRestoreTimer = setTimeout(() => {
+		rdpRestoreTimer = null
+		if (rdpOverlayCount.value === 0) {
+			const tab = activeTab.value
+			if (!tab || tab.type !== 'rdp') return
+			const sid = panelStore.getPanel(tab.panelId)?.sessionId
+			if (sid) {
+				rdpResetTracking()
+				nextTick(() => RDPShow(sid))
+			}
+		}
+	}, 150)
+}
+
+// Context menu opening: right-click on tab bar
+function onRDPContextMenu(e: MouseEvent) {
+	const target = e.target as HTMLElement
+	if (target.closest('.tab-item')) {
+		if (!rdpContextMenuOpen) {
+			rdpContextMenuOpen = true
+			rdpPushOverlay()
+		}
+	}
+}
+
+// Context menu dismissal: left-click anywhere
+function onRDPContextMenuDismiss() {
+	if (rdpContextMenuOpen) {
+		rdpContextMenuOpen = false
+		nextTick(() => rdpPopOverlay())
+	}
+}
+
+function onRDPOverlayPush() { rdpPushOverlay() }
+function onRDPOverlayPop() { rdpPopOverlay() }
+
 const showConnectionForm = ref(false)
 const sidebarVisible = ref(true)
 
@@ -231,6 +284,11 @@ onMounted(() => {
   window.addEventListener('global:close-context-menus', closeInputMenu)
   document.addEventListener('click', closeInputMenu)
   document.addEventListener('wheel', onWheel, { passive: false })
+  // RDP overlay tracking
+  window.addEventListener('rdp:overlay-push', onRDPOverlayPush)
+  window.addEventListener('rdp:overlay-pop', onRDPOverlayPop)
+  document.addEventListener('contextmenu', onRDPContextMenu, true)
+  document.addEventListener('mousedown', onRDPContextMenuDismiss, true)
 })
 
 onUnmounted(() => {
@@ -238,6 +296,11 @@ onUnmounted(() => {
   window.removeEventListener('global:close-context-menus', closeInputMenu)
   document.removeEventListener('click', closeInputMenu)
   document.removeEventListener('wheel', onWheel)
+  // RDP overlay tracking
+  window.removeEventListener('rdp:overlay-push', onRDPOverlayPush)
+  window.removeEventListener('rdp:overlay-pop', onRDPOverlayPop)
+  document.removeEventListener('contextmenu', onRDPContextMenu, true)
+  document.removeEventListener('mousedown', onRDPContextMenuDismiss, true)
 })
 
 function openSettings() {
@@ -351,11 +414,20 @@ watch(() => activeTab.value, (newTab, oldTab) => {
     const p = panelStore.getPanel(oldTab.panelId)
     if (p?.sessionId) RDPHide(p.sessionId)
   }
+  // Reset overlay tracking state on tab switch
+  rdpContextMenuOpen = false
+  if (rdpRestoreTimer) { clearTimeout(rdpRestoreTimer); rdpRestoreTimer = null }
   if (newTab?.type === 'rdp') {
     rdpResetTracking()
     const sid = panelStore.getPanel(newTab.panelId)?.sessionId
     if (sid) nextTick(() => RDPShow(sid))
   }
+})
+
+// Hide RDP when new-connection dialog opens (App.vue's ConnectionForm)
+watch(showConnectionForm, (val) => {
+  if (val) rdpPushOverlay()
+  else rdpPopOverlay()
 })
 </script>
 

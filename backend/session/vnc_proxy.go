@@ -1,0 +1,140 @@
+package session
+
+import (
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"sync"
+
+	"github.com/gorilla/websocket"
+)
+
+// VNCProxy bridges WebSocket (frontend noVNC) to TCP (VNC server).
+// One instance per VNC session, bound to a random local port.
+type VNCProxy struct {
+	listener net.Listener
+	target   string
+	stopCh   chan struct{}
+	wg       sync.WaitGroup
+	mu       sync.Mutex
+	wsConn   *websocket.Conn
+	tcpConn  net.Conn
+}
+
+func NewVNCProxy(target string) *VNCProxy {
+	return &VNCProxy{
+		target: target,
+		stopCh: make(chan struct{}),
+	}
+}
+
+// Start begins listening on a random local port and returns the WebSocket URL.
+func (p *VNCProxy) Start() (string, error) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", fmt.Errorf("vnc proxy listen: %w", err)
+	}
+	p.listener = ln
+
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		ws, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		p.handleWebSocket(ws)
+	})
+
+	p.wg.Add(1)
+	go func() {
+		defer p.wg.Done()
+		_ = http.Serve(ln, mux)
+	}()
+
+	addr := ln.Addr().(*net.TCPAddr)
+	return fmt.Sprintf("ws://127.0.0.1:%d", addr.Port), nil
+}
+
+func (p *VNCProxy) handleWebSocket(ws *websocket.Conn) {
+	p.mu.Lock()
+	p.wsConn = ws
+	p.mu.Unlock()
+
+	tcp, err := net.Dial("tcp", p.target)
+	if err != nil {
+		ws.Close()
+		return
+	}
+
+	p.mu.Lock()
+	p.tcpConn = tcp
+	p.mu.Unlock()
+
+	p.wg.Add(2)
+
+	go func() {
+		defer p.wg.Done()
+		defer tcp.Close()
+		for {
+			select {
+			case <-p.stopCh:
+				return
+			default:
+			}
+			msgType, data, err := ws.ReadMessage()
+			if err != nil {
+				return
+			}
+			if msgType == websocket.BinaryMessage {
+				if _, err := tcp.Write(data); err != nil {
+					return
+				}
+			}
+		}
+	}()
+
+	go func() {
+		defer p.wg.Done()
+		defer ws.Close()
+		buf := make([]byte, 32768)
+		for {
+			select {
+			case <-p.stopCh:
+				return
+			default:
+			}
+			n, err := tcp.Read(buf)
+			if err != nil {
+				if err != io.EOF {
+					return
+				}
+				return
+			}
+			if err := ws.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+				return
+			}
+		}
+	}()
+}
+
+// Stop closes all connections and waits for goroutines to exit.
+func (p *VNCProxy) Stop() {
+	close(p.stopCh)
+	p.mu.Lock()
+	if p.wsConn != nil {
+		p.wsConn.Close()
+	}
+	if p.tcpConn != nil {
+		p.tcpConn.Close()
+	}
+	p.mu.Unlock()
+	if p.listener != nil {
+		p.listener.Close()
+	}
+	p.wg.Wait()
+}

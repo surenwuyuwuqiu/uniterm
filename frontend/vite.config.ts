@@ -8,6 +8,9 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_VERSION': JSON.stringify(version)
   },
+  build: {
+    target: 'esnext'
+  },
   server: {
     port: 34115,
     strictPort: true

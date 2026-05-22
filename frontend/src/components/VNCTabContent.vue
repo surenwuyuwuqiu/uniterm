@@ -87,7 +87,7 @@ async function reconnect() {
 function initRFB(proxyAddr: string, password: string) {
   if (!vncContainer.value) return
 
-  import('@novnc/novnc/core/rfb.js').then((module: any) => {
+  import('@novnc/novnc').then((module: any) => {
     const RFB = module.default || module
     rfb = new RFB(vncContainer.value, proxyAddr, {
       credentials: { password }

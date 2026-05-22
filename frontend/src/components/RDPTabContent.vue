@@ -110,6 +110,7 @@ onMounted(() => {
     switch (data.status) {
       case 'connected':
         status.value = 'connected'
+        window.dispatchEvent(new CustomEvent('rdp:sync-position'))
         break
       case 'disconnected':
         if (status.value !== 'error') status.value = 'disconnected'

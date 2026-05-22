@@ -77,6 +77,7 @@ import { useAIStore } from './stores/aiStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useI18n } from './i18n'
 import { CreateSession, CloseSession, RDPHide, RDPShow, RDPSetPosition, RDPSetFocus } from '../wailsjs/go/main/App'
+import { EventsOn } from '../wailsjs/runtime'
 import type { ConnectionConfig } from './types/session'
 
 const connectionStore = useConnectionStore()
@@ -87,13 +88,8 @@ const sessionStore = useSessionStore()
 const aiStore = useAIStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
-// ── Global RDP position tracker (singleton) ──
-// There is exactly ONE polling timer and ONE set of window listeners,
-// regardless of how many times RDP tabs are opened/closed.
-// It always targets the currently active RDP session.
-
-let rdpTrackTimer: ReturnType<typeof setInterval> | null = null
-let rdpLastX = -1, rdpLastY = -1, rdpLastW = -1, rdpLastH = -1
+// ── RDP position sync ──
+// Called explicitly on tab switch and overlay restore; no polling needed.
 
 function getActiveRdpSessionId(): string | null {
   const tab = activeTab.value
@@ -101,7 +97,8 @@ function getActiveRdpSessionId(): string | null {
   return panelStore.getPanel(tab.panelId)?.sessionId ?? null
 }
 
-function rdpSyncNow() {
+function rdpSyncPosition() {
+  if (rdpOverlayCount.value > 0) return
   const area = document.querySelector('.rdp-area') as HTMLElement | null
   if (!area) return
   const sid = getActiveRdpSessionId()
@@ -115,38 +112,22 @@ function rdpSyncNow() {
   const y = Math.round((sy + rect.top) * dpr)
   const w = Math.round(rect.width * dpr)
   const h = Math.round(rect.height * dpr)
-  if (x === rdpLastX && y === rdpLastY && w === rdpLastW && h === rdpLastH) return
-  rdpLastX = x; rdpLastY = y; rdpLastW = w; rdpLastH = h
   RDPSetPosition(sid, x, y, w, h)
 }
 
 function rdpResetTracking() {
-  rdpLastX = rdpLastY = rdpLastW = rdpLastH = -1
-  nextTick(() => rdpSyncNow())
-}
-
-function startRDPTracker() {
-  if (rdpTrackTimer) return
-  rdpTrackTimer = setInterval(rdpSyncNow, 16)
-  window.addEventListener('resize', rdpSyncNow)
-  window.addEventListener('blur', () => {
-    const sid = getActiveRdpSessionId()
-    if (sid) RDPSetFocus(sid, false)
-  })
-  window.addEventListener('focus', () => {
-    const sid = getActiveRdpSessionId()
-    if (sid) RDPSetFocus(sid, true)
-  })
+  nextTick(() => rdpSyncPosition())
 }
 
 
-// ── RDP overlay tracking: hide native RDP when HTML overlays are open ──
-// Native RDP window renders above WebView2, so menus/dialogs are blocked.
+// ── RDP overlay tracking: unified show/hide entry points ──
+// ALL triggers (context menus, dialogs, drag, resize, external events)
+// MUST call RDPHideForOverlay() to hide and RDPShowForOverlay() to restore.
+// Reference-counted: nesting works correctly across multiple concurrent triggers.
 const rdpOverlayCount = ref(0)
 let rdpRestoreTimer: ReturnType<typeof setTimeout> | null = null
-let rdpContextMenuOpen = false
 
-function rdpPushOverlay() {
+function RDPHideForOverlay() {
 	rdpOverlayCount.value++
 	if (rdpOverlayCount.value === 1) {
 		const sid = getActiveRdpSessionId()
@@ -154,7 +135,7 @@ function rdpPushOverlay() {
 	}
 }
 
-function rdpPopOverlay() {
+function RDPShowForOverlay() {
 	if (rdpOverlayCount.value > 0) rdpOverlayCount.value--
 	if (rdpRestoreTimer) clearTimeout(rdpRestoreTimer)
 	rdpRestoreTimer = setTimeout(() => {
@@ -171,27 +152,6 @@ function rdpPopOverlay() {
 	}, 150)
 }
 
-// Context menu opening: right-click on tab bar
-function onRDPContextMenu(e: MouseEvent) {
-	const target = e.target as HTMLElement
-	if (target.closest('.tab-item')) {
-		if (!rdpContextMenuOpen) {
-			rdpContextMenuOpen = true
-			rdpPushOverlay()
-		}
-	}
-}
-
-// Context menu dismissal: left-click anywhere
-function onRDPContextMenuDismiss() {
-	if (rdpContextMenuOpen) {
-		rdpContextMenuOpen = false
-		nextTick(() => rdpPopOverlay())
-	}
-}
-
-function onRDPOverlayPush() { rdpPushOverlay() }
-function onRDPOverlayPop() { rdpPopOverlay() }
 
 const showConnectionForm = ref(false)
 const sidebarVisible = ref(true)
@@ -276,7 +236,6 @@ function onWheel(e: WheelEvent) {
 }
 
 onMounted(() => {
-  startRDPTracker()
   connectionStore.load()
   aiStore.initConfig()
   settingsStore.init()
@@ -284,11 +243,25 @@ onMounted(() => {
   window.addEventListener('global:close-context-menus', closeInputMenu)
   document.addEventListener('click', closeInputMenu)
   document.addEventListener('wheel', onWheel, { passive: false })
+  // RDP blur/focus: notify Go side so it can manage focus on the native RDP window
+  window.addEventListener('blur', () => {
+    const sid = getActiveRdpSessionId()
+    if (sid) RDPSetFocus(sid, false)
+  })
+  window.addEventListener('focus', () => {
+    const sid = getActiveRdpSessionId()
+    if (sid) RDPSetFocus(sid, true)
+  })
   // RDP overlay tracking
-  window.addEventListener('rdp:overlay-push', onRDPOverlayPush)
-  window.addEventListener('rdp:overlay-pop', onRDPOverlayPop)
-  document.addEventListener('contextmenu', onRDPContextMenu, true)
-  document.addEventListener('mousedown', onRDPContextMenuDismiss, true)
+  window.addEventListener('rdp:overlay-push', RDPHideForOverlay)
+  window.addEventListener('rdp:overlay-pop', RDPShowForOverlay)
+  window.addEventListener('split:resize-start', RDPHideForOverlay)
+  window.addEventListener('split:resize-end', RDPShowForOverlay)
+  window.addEventListener('rdp:sync-position', rdpResetTracking)
+  // Go-side WndProc events: window move/resize start/end
+  EventsOn('rdp:move-resize-start', () => RDPHideForOverlay())
+  EventsOn('rdp:move-resize-end', () => RDPShowForOverlay())
+
 })
 
 onUnmounted(() => {
@@ -297,10 +270,12 @@ onUnmounted(() => {
   document.removeEventListener('click', closeInputMenu)
   document.removeEventListener('wheel', onWheel)
   // RDP overlay tracking
-  window.removeEventListener('rdp:overlay-push', onRDPOverlayPush)
-  window.removeEventListener('rdp:overlay-pop', onRDPOverlayPop)
-  document.removeEventListener('contextmenu', onRDPContextMenu, true)
-  document.removeEventListener('mousedown', onRDPContextMenuDismiss, true)
+  window.removeEventListener('rdp:overlay-push', RDPHideForOverlay)
+  window.removeEventListener('rdp:overlay-pop', RDPShowForOverlay)
+  window.removeEventListener('split:resize-start', RDPHideForOverlay)
+  window.removeEventListener('split:resize-end', RDPShowForOverlay)
+  window.removeEventListener('rdp:sync-position', rdpResetTracking)
+
 })
 
 function openSettings() {
@@ -407,15 +382,14 @@ async function onConnectRDP(config: ConnectionConfig) {
 }
 
 // Show/hide native RDP window on tab switch.
-// Position updates are only sent to the active RDP session (see rdpSyncNow),
+// Position updates are only sent to the active RDP session (see rdpSyncPosition),
 // so background sessions stay at (32000,32000) and don't respond to drag.
 watch(() => activeTab.value, (newTab, oldTab) => {
   if (oldTab?.type === 'rdp') {
     const p = panelStore.getPanel(oldTab.panelId)
     if (p?.sessionId) RDPHide(p.sessionId)
   }
-  // Reset overlay tracking state on tab switch
-  rdpContextMenuOpen = false
+  // Clear pending restore timer on tab switch
   if (rdpRestoreTimer) { clearTimeout(rdpRestoreTimer); rdpRestoreTimer = null }
   if (newTab?.type === 'rdp') {
     rdpResetTracking()
@@ -426,8 +400,8 @@ watch(() => activeTab.value, (newTab, oldTab) => {
 
 // Hide RDP when new-connection dialog opens (App.vue's ConnectionForm)
 watch(showConnectionForm, (val) => {
-  if (val) rdpPushOverlay()
-  else rdpPopOverlay()
+  if (val) RDPHideForOverlay()
+  else RDPShowForOverlay()
 })
 </script>
 

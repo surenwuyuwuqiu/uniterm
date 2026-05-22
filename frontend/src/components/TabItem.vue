@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useI18n } from '../i18n'
@@ -120,6 +120,10 @@ function onContextMenu(e: MouseEvent) {
 function closeContextMenu() {
   contextMenuVisible.value = false
 }
+
+watch(contextMenuVisible, (val) => {
+  window.dispatchEvent(new CustomEvent(val ? 'rdp:overlay-push' : 'rdp:overlay-pop'))
+})
 
 function startEdit() {
   closeContextMenu()

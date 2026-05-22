@@ -7,7 +7,7 @@
       @open-settings="openSettings"
     />
     <div class="main-content">
-      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" />
+      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" />
       <div class="tab-area">
         <TabBar />
         <template v-if="activeTab">

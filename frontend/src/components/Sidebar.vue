@@ -167,9 +167,10 @@
       :style="menuStyle"
       @click.stop
     >
-      <div v-if="!selectedConn || selectedConn.type !== 'rdp'" class="menu-item" @click="doConnect">{{ t('sidebar.connect') }}</div>
-      <div v-if="!selectedConn || selectedConn.type !== 'rdp'" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
+      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc')" class="menu-item" @click="doConnect">{{ t('sidebar.connect') }}</div>
+      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc')" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
+      <div v-if="selectedConn && selectedConn.type === 'vnc'" class="menu-item" @click="doConnectVNC">{{ t('sidebar.connectVNC') }}</div>
       <div class="menu-divider" />
       <div class="menu-item" :class="{ disabled: selectedIds.size > 1 }" @click="selectedIds.size <= 1 && doEdit()">{{ t('sidebar.edit') }}</div>
       <div class="menu-item" @click="doDuplicate">{{ t('sidebar.duplicate') }}</div>
@@ -308,7 +309,7 @@ import type { ConnectionConfig, ConnectionGroup } from '../types/session'
 defineProps<{
   visible: boolean
 }>()
-const emit = defineEmits(['connect', 'connectSftp', 'connectRdp', 'toggle'])
+const emit = defineEmits(['connect', 'connectSftp', 'connectRdp', 'connectVnc', 'toggle'])
 const connectionStore = useConnectionStore()
 const { t } = useI18n()
 const showForm = ref(false)
@@ -599,6 +600,8 @@ function onItemDblClick(conn: ConnectionConfig) {
   selectedIds.value = new Set()
   if (conn.type === 'rdp') {
     emit('connectRdp', conn)
+  } else if (conn.type === 'vnc') {
+    emit('connectVnc', conn)
   } else {
     emit('connect', conn)
   }
@@ -685,6 +688,16 @@ function doConnectRDP() {
   closeMenu()
   for (const c of conns) {
     emit('connectRdp', c)
+  }
+}
+
+function doConnectVNC() {
+  const ids = getSelectedConnectionIds()
+  const conns = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
+  selectedIds.value = new Set()
+  closeMenu()
+  for (const c of conns) {
+    emit('connectVnc', c)
   }
 }
 

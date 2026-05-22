@@ -15,7 +15,7 @@
         ></div>
 
         <TabItem
-          v-if="tab.type === 'terminal' || tab.type === 'settings' || tab.type === 'sftp' || tab.type === 'rdp'"
+          v-if="tab.type === 'terminal' || tab.type === 'settings' || tab.type === 'sftp' || tab.type === 'rdp' || tab.type === 'vnc'"
           :tab="tab"
           :is-active="tab.id === activeTabId"
           @activate="setActiveTab"
@@ -156,6 +156,14 @@ async function closeTab(id: string) {
     if (rdpPanel?.sessionId) {
       await RDPHide(rdpPanel.sessionId)
       try { await CloseSession(rdpPanel.sessionId) } catch (_) {}
+    }
+  }
+
+  // Clean up VNC session
+  if (tab && tab.type === 'vnc') {
+    const vncPanel = panelStore.getPanel(tab.panelId)
+    if (vncPanel?.sessionId) {
+      try { await CloseSession(vncPanel.sessionId) } catch (_) {}
     }
   }
 

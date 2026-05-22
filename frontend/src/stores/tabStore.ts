@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, computed } from 'vue'
-import type { Tab, TerminalTab, SettingsTab, WorkspaceTab, SFTPTab, RDPTab, PanelLayout, LayoutNode } from '../types/workspace'
+import type { Tab, TerminalTab, SettingsTab, WorkspaceTab, SFTPTab, RDPTab, VNCTab, PanelLayout, LayoutNode } from '../types/workspace'
 import { usePanelStore } from './panelStore'
 import { t } from '../i18n'
 
@@ -101,6 +101,18 @@ export const useTabStore = defineStore('tab', () => {
     return tab
   }
 
+  function createVNCTab(name: string, panelId: string): VNCTab {
+    const tab: VNCTab = {
+      type: 'vnc',
+      id: genId('vnc-tab'),
+      panelId,
+      name
+    }
+    tabState.tabs.push(tab)
+    tabState.activeTabId = tab.id
+    return tab
+  }
+
   function createWorkspaceTab(name: string, panelIds: string[], layout: PanelLayout): WorkspaceTab {
     const tab: WorkspaceTab = {
       type: 'workspace',
@@ -133,7 +145,7 @@ export const useTabStore = defineStore('tab', () => {
     }
 
     // Clear AI lock if locked panel was in this tab
-    const removedPanelIds = removed.type === 'terminal' || removed.type === 'settings' || removed.type === 'rdp'
+    const removedPanelIds = removed.type === 'terminal' || removed.type === 'settings' || removed.type === 'rdp' || removed.type === 'vnc'
       ? [removed.panelId]
       : removed.type === 'workspace'
         ? removed.panelIds
@@ -432,6 +444,7 @@ export const useTabStore = defineStore('tab', () => {
     createSettingsTab,
     createSFPTab,
     createRDPTab,
+    createVNCTab,
     createWorkspaceTab,
     closeTab,
     setActiveTab,

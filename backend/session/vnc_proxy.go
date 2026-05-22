@@ -2,7 +2,6 @@ package session
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -16,6 +15,7 @@ type VNCProxy struct {
 	listener net.Listener
 	target   string
 	stopCh   chan struct{}
+	stopOnce sync.Once
 	wg       sync.WaitGroup
 	mu       sync.Mutex
 	wsConn   *websocket.Conn
@@ -62,6 +62,11 @@ func (p *VNCProxy) Start() (string, error) {
 
 func (p *VNCProxy) handleWebSocket(ws *websocket.Conn) {
 	p.mu.Lock()
+	if p.wsConn != nil {
+		p.mu.Unlock()
+		ws.Close()
+		return
+	}
 	p.wsConn = ws
 	p.mu.Unlock()
 
@@ -110,9 +115,6 @@ func (p *VNCProxy) handleWebSocket(ws *websocket.Conn) {
 			}
 			n, err := tcp.Read(buf)
 			if err != nil {
-				if err != io.EOF {
-					return
-				}
 				return
 			}
 			if err := ws.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
@@ -124,7 +126,7 @@ func (p *VNCProxy) handleWebSocket(ws *websocket.Conn) {
 
 // Stop closes all connections and waits for goroutines to exit.
 func (p *VNCProxy) Stop() {
-	close(p.stopCh)
+	p.stopOnce.Do(func() { close(p.stopCh) })
 	p.mu.Lock()
 	if p.wsConn != nil {
 		p.wsConn.Close()

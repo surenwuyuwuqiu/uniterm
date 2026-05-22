@@ -12,16 +12,6 @@
 - 不依赖原生窗口，与现有 Vue/Wails 架构完全融合，UI 风格统一
 - 每个会话独立桥接端口，会话隔离清晰
 
-对比 RDP 方案：
-
-| 维度 | RDP | VNC（本方案） |
-|---|---|---|
-| 渲染方式 | Windows 原生 ActiveX HWND 子窗口 | 前端 noVNC Canvas |
-| 跨平台 | Windows only | Windows / macOS / Linux |
-| Go 后端职责 | COM 互操作 + Win32 API | TCP↔WebSocket 桥接 |
-| 前端职责 | 状态占位 + 位置同步 | 完整 RFB 协议 + 渲染 |
-| 剪贴板 | ActiveX 内置 | noVNC `clipboard` 事件 + navigator.clipboard |
-
 ## 认证
 
 仅支持密码认证（VNC Authentication / VNC Password）。noVNC 的 `RFB` 构造函数支持通过 `credentials: { password }` 预填密码，也可以在 `credentialsrequired` 事件中动态输入。

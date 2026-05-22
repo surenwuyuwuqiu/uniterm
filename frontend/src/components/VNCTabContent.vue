@@ -138,7 +138,7 @@ function initRFB(proxyAddr: string, password: string) {
       }
     })
 
-    rfb.addEventListener('credentialsrequired', (e: any) {
+    rfb.addEventListener('credentialsrequired', (e: any) => {
       addDebug(`RFB credentialsrequired: ${JSON.stringify(e.detail)}`)
       status.value = 'error'
     })

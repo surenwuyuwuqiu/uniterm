@@ -36,13 +36,14 @@
             :config="getPanelConfig(activeTab.panelId)"
             :session-id="getPanelSessionId(activeTab.panelId)"
           />
-          <VNCTabContent
-            v-else-if="activeTab.type === 'vnc'"
-            :key="activeTab.id"
-            :panel-id="activeTab.panelId"
-            :config="getPanelConfig(activeTab.panelId)"
-            :session-id="getPanelSessionId(activeTab.panelId)"
-          />
+          <keep-alive v-else-if="activeTab.type === 'vnc'">
+            <VNCTabContent
+              :key="activeTab.id"
+              :panel-id="activeTab.panelId"
+              :config="getPanelConfig(activeTab.panelId)"
+              :session-id="getPanelSessionId(activeTab.panelId)"
+            />
+          </keep-alive>
         </template>
       </div>
       <AISidebar />

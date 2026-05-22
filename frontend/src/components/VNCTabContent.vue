@@ -87,15 +87,20 @@ async function reconnect() {
 }
 
 function adjustCanvasForDPR() {
-  const canvas = vncContainer.value?.querySelector('canvas') as HTMLCanvasElement | null
-  if (!canvas) return false
+  const canvases = vncContainer.value?.querySelectorAll('canvas')
+  if (!canvases || canvases.length === 0) return false
   const dpr = window.devicePixelRatio || 1
-  if (dpr > 1 && canvas.width > 0 && canvas.height > 0) {
-    canvas.style.width = `${canvas.width / dpr}px`
-    canvas.style.height = `${canvas.height / dpr}px`
-    return true
-  }
-  return false
+  if (dpr <= 1) return true
+  let adjusted = false
+  canvases.forEach((el) => {
+    const canvas = el as HTMLCanvasElement
+    if (canvas.width > 0 && canvas.height > 0) {
+      canvas.style.setProperty('width', `${canvas.width / dpr}px`, 'important')
+      canvas.style.setProperty('height', `${canvas.height / dpr}px`, 'important')
+      adjusted = true
+    }
+  })
+  return adjusted
 }
 
 function initRFB(proxyAddr: string, password: string) {

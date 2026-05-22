@@ -86,6 +86,18 @@ async function reconnect() {
   await connect()
 }
 
+function adjustCanvasForDPR() {
+  const canvas = vncContainer.value?.querySelector('canvas') as HTMLCanvasElement | null
+  if (!canvas) return false
+  const dpr = window.devicePixelRatio || 1
+  if (dpr > 1 && canvas.width > 0 && canvas.height > 0) {
+    canvas.style.width = `${canvas.width / dpr}px`
+    canvas.style.height = `${canvas.height / dpr}px`
+    return true
+  }
+  return false
+}
+
 function initRFB(proxyAddr: string, password: string) {
   if (!vncContainer.value) return
 
@@ -100,6 +112,15 @@ function initRFB(proxyAddr: string, password: string) {
       status.value = 'error'
       return
     }
+
+    rfb.addEventListener('connect', () => {
+      if (!adjustCanvasForDPR()) {
+        const interval = setInterval(() => {
+          if (adjustCanvasForDPR()) clearInterval(interval)
+        }, 50)
+        setTimeout(() => clearInterval(interval), 3000)
+      }
+    })
 
     rfb.addEventListener('disconnect', (e: any) => {
       if (!e.detail.clean) {

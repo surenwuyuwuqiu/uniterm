@@ -237,6 +237,7 @@ const messages: Record<Locale, Record<string, string>> = {
     // RDP
     'conn.rdpSmartSizing': '智能缩放',
     'sidebar.connectRDP': '连接 RDP',
+    'sidebar.connectVNC': '连接 VNC',
     'rdp.connecting': '正在连接到 {host}...',
     'rdp.connected': '已连接',
     'rdp.disconnected': '已断开',
@@ -245,6 +246,14 @@ const messages: Record<Locale, Record<string, string>> = {
     'rdp.retry': '重试',
     'rdp.resolution': '分辨率',
     'rdp.windowOpen': '远程桌面已在新窗口打开',
+
+    // VNC
+    'vnc.connecting': '正在连接到 {host}...',
+    'vnc.connected': '已连接',
+    'vnc.disconnected': '已断开',
+    'vnc.error': '连接失败',
+    'vnc.reconnect': '重新连接',
+    'vnc.retry': '重试',
   },
   'en': {
     // AppHeader
@@ -479,6 +488,7 @@ const messages: Record<Locale, Record<string, string>> = {
     // RDP
     'conn.rdpSmartSizing': 'Smart Sizing',
     'sidebar.connectRDP': 'Connect RDP',
+    'sidebar.connectVNC': 'Connect VNC',
     'rdp.connecting': 'Connecting to {host}...',
     'rdp.connected': 'Connected',
     'rdp.disconnected': 'Disconnected',
@@ -487,6 +497,14 @@ const messages: Record<Locale, Record<string, string>> = {
     'rdp.retry': 'Retry',
     'rdp.resolution': 'Resolution',
     'rdp.windowOpen': 'Remote desktop opened in a new window',
+
+    // VNC
+    'vnc.connecting': 'Connecting to {host}...',
+    'vnc.connected': 'Connected',
+    'vnc.disconnected': 'Disconnected',
+    'vnc.error': 'Connection failed',
+    'vnc.reconnect': 'Reconnect',
+    'vnc.retry': 'Retry',
   }
 }
 

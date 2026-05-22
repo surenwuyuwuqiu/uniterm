@@ -4,6 +4,24 @@
       <el-form-item :label="t('conn.name')">
         <el-input v-model="form.name" :placeholder="t('conn.namePlaceholder')" />
       </el-form-item>
+      <el-form-item :label="t('conn.group')">
+        <el-select v-model="selectedGroupId" :placeholder="t('conn.noGroup')" clearable @change="onGroupSelect">
+          <el-option
+            v-for="g in connectionStore.groups"
+            :key="g.id"
+            :label="g.name"
+            :value="g.id"
+          />
+          <el-option
+            :label="t('conn.noGroup')"
+            value="__none__"
+          />
+          <el-option
+            :label="t('conn.newGroup')"
+            value="__new__"
+          />
+        </el-select>
+      </el-form-item>
       <el-form-item :label="t('conn.type')">
         <el-radio-group v-model="form.type">
           <el-radio-button label="ssh">SSH</el-radio-button>
@@ -15,6 +33,21 @@
       </el-form-item>
       <el-form-item :label="t('conn.port')">
         <el-input-number v-model="form.port" :min="1" :max="65535" />
+      </el-form-item>
+      <el-form-item :label="t('conn.user')">
+        <el-input v-model="form.user" :placeholder="t('conn.userPlaceholder')" />
+      </el-form-item>
+      <el-form-item v-if="form.type !== 'rdp'" :label="t('conn.authType')">
+        <el-radio-group v-model="form.authType">
+          <el-radio-button label="password">{{ t('conn.password') }}</el-radio-button>
+          <el-radio-button label="key">{{ t('conn.keyPath') }}</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+      <el-form-item v-if="form.authType === 'password' || form.type === 'rdp'" :label="t('conn.password')">
+        <el-input v-model="form.password" type="password" show-password />
+      </el-form-item>
+      <el-form-item v-if="form.authType === 'key' && form.type !== 'rdp'" :label="t('conn.keyPath')">
+        <el-input v-model="form.keyPath" :placeholder="t('conn.keyPathPlaceholder')" />
       </el-form-item>
       <template v-if="form.type === 'rdp'">
         <el-form-item :label="t('conn.rdpSizeMode')">
@@ -34,39 +67,6 @@
           </el-select>
         </el-form-item>
       </template>
-      <el-form-item :label="t('conn.user')">
-        <el-input v-model="form.user" :placeholder="t('conn.userPlaceholder')" />
-      </el-form-item>
-      <el-form-item v-if="form.type !== 'rdp'" :label="t('conn.authType')">
-        <el-radio-group v-model="form.authType">
-          <el-radio-button label="password">{{ t('conn.password') }}</el-radio-button>
-          <el-radio-button label="key">{{ t('conn.keyPath') }}</el-radio-button>
-        </el-radio-group>
-      </el-form-item>
-      <el-form-item v-if="form.authType === 'password' || form.type === 'rdp'" :label="t('conn.password')">
-        <el-input v-model="form.password" type="password" show-password />
-      </el-form-item>
-      <el-form-item v-if="form.authType === 'key' && form.type !== 'rdp'" :label="t('conn.keyPath')">
-        <el-input v-model="form.keyPath" :placeholder="t('conn.keyPathPlaceholder')" />
-      </el-form-item>
-      <el-form-item :label="t('conn.group')">
-        <el-select v-model="selectedGroupId" :placeholder="t('conn.noGroup')" clearable @change="onGroupSelect">
-          <el-option
-            v-for="g in connectionStore.groups"
-            :key="g.id"
-            :label="g.name"
-            :value="g.id"
-          />
-          <el-option
-            :label="t('conn.noGroup')"
-            value="__none__"
-          />
-          <el-option
-            :label="t('conn.newGroup')"
-            value="__new__"
-          />
-        </el-select>
-      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="visible = false">{{ t('conn.cancel') }}</el-button>
@@ -137,12 +137,13 @@ const form = reactive<ConnectionConfig>({
 })
 
 const rdpResolutions = [
+  { label: '800 × 600 (SVGA)', w: 800, h: 600 },
+  { label: '1024 × 768 (XGA)', w: 1024, h: 768 },
   { label: '1280 × 720 (HD)', w: 1280, h: 720 },
+  { label: '1680 × 1050 (WSXGA+)', w: 1680, h: 1050 },
+  { label: '1600 × 1200 (UXGA)', w: 1600, h: 1200 },
   { label: '1920 × 1080 (Full HD)', w: 1920, h: 1080 },
   { label: '2560 × 1440 (QHD)', w: 2560, h: 1440 },
-  { label: '1024 × 768 (XGA)', w: 1024, h: 768 },
-  { label: '1600 × 1200 (UXGA)', w: 1600, h: 1200 },
-  { label: '1680 × 1050 (WSXGA+)', w: 1680, h: 1050 },
 ]
 
 const rdpResolution = ref('1280 × 720 (HD)')
@@ -157,6 +158,9 @@ watch(() => props.editConfig, (config) => {
   if (config) {
     Object.assign(form, { ...config })
     selectedGroupId.value = config.groupId || undefined
+    // Sync resolution dropdown to the config's fixed size
+    const match = rdpResolutions.find(r => r.w === config.rdpFixedWidth && r.h === config.rdpFixedHeight)
+    if (match) rdpResolution.value = match.label
   } else {
     resetForm()
   }

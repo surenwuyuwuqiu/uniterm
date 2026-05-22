@@ -22,8 +22,6 @@
     <div
       v-show="status === 'connected'"
       class="rdp-area"
-      :class="{ 'rdp-fixed': sizeMode === 'fixed' }"
-      :style="rdpAreaStyle"
     />
 
     <!-- Status bar -->
@@ -32,8 +30,8 @@
       <span>{{ t('rdp.connected') }}</span>
       <span class="rdp-status-sep">|</span>
       <span>{{ config?.host }}:{{ config?.port || 3389 }}</span>
-      <span v-if="sizeMode === 'fixed'" class="rdp-status-sep">|</span>
-      <span v-if="sizeMode === 'fixed'">{{ t('rdp.resolution') }}: {{ config?.rdpFixedWidth }}×{{ config?.rdpFixedHeight }}</span>
+      <span class="rdp-status-sep">|</span>
+      <span>{{ t('rdp.resolution') }}: {{ statusResolution }}</span>
     </div>
   </div>
 </template>
@@ -56,16 +54,11 @@ const props = defineProps<{
 
 const status = ref<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting')
 const currentSessionId = ref<string | null>(props.sessionId)
-const sizeMode = computed(() => props.config?.rdpSizeMode || 'follow')
-
-const rdpAreaStyle = computed(() => {
-  if (sizeMode.value === 'fixed' && props.config?.rdpFixedWidth && props.config?.rdpFixedHeight) {
-    return {
-      width: props.config.rdpFixedWidth + 'px',
-      height: props.config.rdpFixedHeight + 'px',
-    }
+const statusResolution = computed(() => {
+  if (props.config?.rdpFixedWidth && props.config?.rdpFixedHeight) {
+    return `${props.config.rdpFixedWidth}×${props.config.rdpFixedHeight}`
   }
-  return {}
+  return t('conn.rdpFollowWindow')
 })
 
 // --- Connection ---
@@ -154,10 +147,6 @@ watch(() => props.sessionId, (newId) => {
 .rdp-area {
   flex: 1;
   background: #000;
-}
-.rdp-area.rdp-fixed {
-  margin: 0 auto;
-  flex: none;
 }
 .rdp-overlay {
   position: absolute;

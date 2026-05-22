@@ -26,6 +26,7 @@
         <el-radio-group v-model="form.type">
           <el-radio-button label="ssh">SSH</el-radio-button>
           <el-radio-button label="rdp" v-if="isWindows">RDP</el-radio-button>
+          <el-radio-button label="vnc">VNC</el-radio-button>
         </el-radio-group>
       </el-form-item>
       <el-form-item :label="t('conn.host')" required>
@@ -37,13 +38,13 @@
       <el-form-item :label="t('conn.user')">
         <el-input v-model="form.user" :placeholder="t('conn.userPlaceholder')" />
       </el-form-item>
-      <el-form-item v-if="form.type !== 'rdp'" :label="t('conn.authType')">
+      <el-form-item v-if="form.type !== 'rdp' && form.type !== 'vnc'" :label="t('conn.authType')">
         <el-radio-group v-model="form.authType">
           <el-radio-button label="password">{{ t('conn.password') }}</el-radio-button>
           <el-radio-button label="key">{{ t('conn.keyPath') }}</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      <el-form-item v-if="form.authType === 'password' || form.type === 'rdp'" :label="t('conn.password')">
+      <el-form-item v-if="form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc'" :label="t('conn.password')">
         <el-input v-model="form.password" type="password" show-password />
       </el-form-item>
       <el-form-item v-if="form.authType === 'key' && form.type !== 'rdp'" :label="t('conn.keyPath')">
@@ -186,7 +187,9 @@ watch(() => props.defaultGroupId, (gid) => {
 watch(() => form.type, (newType) => {
   if (newType === 'rdp' && form.port === 22) form.port = 3389
   else if (newType === 'ssh' && form.port === 3389) form.port = 22
-  if (newType === 'rdp') {
+  else if (newType === 'vnc' && form.port === 22) form.port = 5900
+  else if (newType === 'ssh' && form.port === 5900) form.port = 22
+  if (newType === 'rdp' || newType === 'vnc') {
     form.authType = 'password'
   }
 })

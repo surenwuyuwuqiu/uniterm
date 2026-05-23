@@ -26,12 +26,20 @@ const panelState = reactive<{
 export const usePanelStore = defineStore('panel', () => {
   function createPanel(config: ConnectionConfig | null, type: Panel['type'] = 'ssh'): Panel {
     const id = `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    let title: string
+    if (type === 'local') {
+      title = 'Local'
+    } else if (config) {
+      title = `${config.host} ${config.user}`
+    } else {
+      title = 'New Panel'
+    }
     const panel: Panel = {
       id,
       tabId: '',
       type,
       sessionId: null,
-      title: config ? `${config.host} ${config.user}` : 'New Panel',
+      title,
       status: 'disconnected',
       config
     }

@@ -32,9 +32,27 @@ export async function executeCommand(command: string): Promise<ExecuteResult> {
   const sessionId = panel.sessionId
 
   const marker = `__AI_DONE_${Date.now()}_${Math.random().toString(36).slice(2, 8)}__`
-  const fullCommand = ` _u='${marker}';${command};echo "$_u"`
+  const shellPath = panel.config?.shellPath
+  const fullCommand = buildCommand(command, marker, shellPath)
 
-  await SessionWrite(sessionId, fullCommand + '\n')
+  // Choose line ending based on shell type and platform
+  const lowerShell = (shellPath || '').toLowerCase()
+  let newline: string
+  if (lowerShell.includes('powershell') || lowerShell.includes('pwsh')) {
+    // PowerShell via ConPTY: \r executes without leaving a trailing \n that causes the >> prompt
+    newline = '\r'
+  } else if (lowerShell.includes('cmd')) {
+    // CMD via ConPTY expects \r\n
+    newline = '\r\n'
+  } else if (lowerShell.includes('bash') || lowerShell.includes('sh')) {
+    // Bash/Git Bash via ConPTY: \r\n is treated as Enter by the Windows console layer
+    newline = '\r\n'
+  } else {
+    // Default / Unix: \n
+    newline = '\n'
+  }
+
+  await SessionWrite(sessionId, fullCommand + newline)
 
   return new Promise((resolve) => {
     let output = ''
@@ -74,6 +92,20 @@ export async function executeCommand(command: string): Promise<ExecuteResult> {
       resolve({ output: result, exitCode: -1 })
     }, 60000)
   })
+}
+
+function buildCommand(command: string, marker: string, shellPath?: string): string {
+  const lower = (shellPath || '').toLowerCase()
+  if (lower.includes('powershell') || lower.includes('pwsh')) {
+    // PowerShell syntax
+    return `$u='${marker}';${command};Write-Output $u`
+  }
+  if (lower.includes('cmd')) {
+    // CMD syntax
+    return `set u=${marker}&${command}&echo %u%`
+  }
+  // Default: bash / sh / zsh / fish
+  return ` u='${marker}';${command};echo "$u"`
 }
 
 // Simple ANSI stripper for extracting readable text from terminal output

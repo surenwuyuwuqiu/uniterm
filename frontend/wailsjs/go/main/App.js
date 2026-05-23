@@ -18,6 +18,14 @@ export function GetAppInfo() {
   return window['go']['main']['App']['GetAppInfo']();
 }
 
+export function GetAvailableShells() {
+  return window['go']['main']['App']['GetAvailableShells']();
+}
+
+export function GetDefaultShell() {
+  return window['go']['main']['App']['GetDefaultShell']();
+}
+
 export function GetDesktopPath() {
   return window['go']['main']['App']['GetDesktopPath']();
 }

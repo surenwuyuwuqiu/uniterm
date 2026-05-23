@@ -54,6 +54,19 @@ function shouldConfirm(risk: RiskLevel): boolean {
   }
 }
 
+function getShellName(path?: string): string {
+  if (!path) return 'Unknown'
+  const lower = path.toLowerCase()
+  if (lower.includes('pwsh')) return 'PowerShell'
+  if (lower.includes('powershell')) return 'Windows PowerShell'
+  if (lower.includes('bash')) return 'Bash'
+  if (lower.includes('zsh')) return 'Zsh'
+  if (lower.includes('fish')) return 'Fish'
+  if (lower.includes('cmd')) return 'CMD'
+  if (lower.includes('sh')) return 'Sh'
+  return path.split(/[\\/]/).pop() || 'Unknown'
+}
+
 function buildSystemPrompt(): string {
   const store = useAIStore()
   const activePanel = getActivePanel()
@@ -63,10 +76,51 @@ function buildSystemPrompt(): string {
 
   const parts: string[] = []
   parts.push(`Current active terminal panel: "${activePanel.title}" (id: ${activePanel.id}, type: ${activePanel.type})`)
+
+  const shellPath = activePanel.config?.shellPath
+  if (shellPath) {
+    parts.push(`Current shell: ${getShellName(shellPath)} (${shellPath})`)
+  } else if (activePanel.type === 'ssh') {
+    parts.push(`Current shell: remote SSH session (Unix-like)`)
+  }
+
   if (activePanel.type === 'ssh' && activePanel.config) {
     parts.push(`Connected to: ${activePanel.config.user}@${activePanel.config.host}:${activePanel.config.port}`)
   }
-  return base + '\n\n--- Current Context ---\n' + parts.join('\n') + '\n---'
+
+  // Detect terminal switch and inject explicit notice
+  const lastCtx = store.lastPanelContext
+  let switchNotice = ''
+  if (lastCtx && lastCtx.panelId !== activePanel.id) {
+    const prev = lastCtx.shellPath ? getShellName(lastCtx.shellPath) : 'another terminal'
+    const curr = shellPath ? getShellName(shellPath) : (activePanel.type === 'ssh' ? 'SSH' : 'local terminal')
+    switchNotice = `\n\n【TERMINAL SWITCHED】The user has switched from "${prev}" to "${curr}". This is a DIFFERENT terminal environment — previous results (current directory, env vars, files created) may be COMPLETELY INVALID here. You MUST use command syntax appropriate for the NEW terminal type ONLY. Do NOT mix commands from different shell types. Reassess the environment from scratch if needed.`
+  }
+
+  const isWindowsShell = shellPath && (
+    shellPath.toLowerCase().includes('powershell') ||
+    shellPath.toLowerCase().includes('pwsh') ||
+    shellPath.toLowerCase().includes('cmd')
+  )
+
+  if (isWindowsShell) {
+    base += '\n\nIMPORTANT: The active terminal is a Windows shell. Use Windows command syntax, not Unix syntax.\n- For PowerShell: use cmdlets like Get-ChildItem, Set-Location, Get-Content, etc.\n- For CMD: use dir, cd, type, etc.'
+  } else if (activePanel.type === 'ssh' || activePanel.type === 'local') {
+    base += '\n\nThe active terminal is a Unix-like shell. Use standard Unix syntax (ls, cat, grep, find, etc.).'
+  }
+
+  // Build a highly-visible current-shell banner at the very top
+  const shellName = shellPath
+    ? getShellName(shellPath)
+    : (activePanel.type === 'ssh' ? 'SSH (Unix-like)' : 'Unknown')
+  const syntaxStyle = isWindowsShell
+    ? (shellPath?.toLowerCase().includes('cmd') ? 'Windows CMD (dir, cd, type, wmic)' : 'Windows PowerShell (cmdlets like Get-ChildItem, Set-Location)')
+    : 'Unix (ls, cat, grep, df, find)'
+  const shellBanner = `========================================\n当前终端 (CURRENT SHELL): ${shellName}\n终端ID (PANEL ID): ${activePanel.id}\n========================================`
+
+  const selfCheck = `⚠️ 每次回复前，你必须先大声确认以下三项：\n- 当前终端类型：${shellName}\n- 当前 Shell 路径：${shellPath || activePanel.type}\n- 本次将使用的命令语法风格：${syntaxStyle}\n\n如果说不出来，请重新阅读上下文。`
+
+  return shellBanner + '\n\n' + selfCheck + switchNotice + '\n\n' + base + '\n\n--- Current Context ---\n' + parts.join('\n') + '\n---'
 }
 
 export async function runAgent(userInput: string) {
@@ -101,6 +155,12 @@ export async function runAgent(userInput: string) {
 
   store.resetStop()
   store.isRunning = true
+
+  // Record current panel context so buildSystemPrompt can detect terminal switches
+  const activePanel = getActivePanel()
+  if (activePanel) {
+    store.setLastPanelContext(activePanel.id, activePanel.config?.shellPath || '')
+  }
 
   if (userInput) {
     store.addMessage({
@@ -148,6 +208,8 @@ export async function runAgent(userInput: string) {
       if (chatOptions._rawApiMsg) {
         assistantMsg._rawApiMsg = chatOptions._rawApiMsg
       }
+      // Save immediately so the complete assistant content and raw API message are persisted
+      store.doSave()
     } catch (e: any) {
       const errMsg = e.message ?? String(e)
       // Convert the failed assistant placeholder to a display-only tool message.
@@ -269,6 +331,7 @@ export async function runAgent(userInput: string) {
   }
 
   store.isRunning = false
+  store.doSave()
 }
 
 export async function continueAgent() {

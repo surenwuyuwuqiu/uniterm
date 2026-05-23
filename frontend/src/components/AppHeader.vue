@@ -23,6 +23,32 @@
           <el-icon><Plus /></el-icon>
           <span>{{ t('header.newConnection') }}</span>
         </button>
+        <el-dropdown
+          v-if="settingsStore.availableShells.length > 0"
+          trigger="click"
+          @command="(path: string) => $emit('new-local-terminal-with-shell', path)"
+        >
+          <button class="header-btn secondary">
+            <el-icon><Monitor /></el-icon>
+            <span>{{ t('header.newLocalTerminal') }}</span>
+            <el-icon><ArrowDown /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item
+                v-for="sh in settingsStore.availableShells"
+                :key="sh"
+                :command="sh"
+              >
+                {{ getShellLabel(sh) }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <button v-else class="header-btn secondary" @click="$emit('new-local-terminal')">
+          <el-icon><Monitor /></el-icon>
+          <span>{{ t('header.newLocalTerminal') }}</span>
+        </button>
       </div>
     </div>
 
@@ -57,8 +83,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Plus, ChatDotRound, Connection, Setting } from '@element-plus/icons-vue'
+import { Plus, ChatDotRound, Connection, Setting, Monitor, ArrowDown } from '@element-plus/icons-vue'
 import { useI18n } from '../i18n'
+import { useSettingsStore } from '../stores/settingsStore'
 import WindowControls from './WindowControls.vue'
 import {
   Environment,
@@ -69,8 +96,18 @@ import {
 } from '../../wailsjs/runtime'
 
 const { t } = useI18n()
+const settingsStore = useSettingsStore()
 
-defineEmits(['new-connection', 'toggle-ai', 'toggle-sidebar', 'open-settings'])
+defineEmits(['new-connection', 'new-local-terminal', 'new-local-terminal-with-shell', 'toggle-ai', 'toggle-sidebar', 'open-settings'])
+
+function getShellLabel(path: string): string {
+  const lower = path.toLowerCase()
+  if (lower.includes('pwsh')) return 'PowerShell'
+  if (lower.includes('powershell')) return 'Windows PowerShell'
+  if (lower.includes('bash')) return 'Git Bash'
+  if (lower.includes('cmd')) return 'Command Prompt'
+  return path.split(/[\\/]/).pop() || path
+}
 
 const platform = ref<'windows' | 'darwin' | 'linux'>('windows')
 const isMaximised = ref(false)

@@ -1,4 +1,4 @@
-export type PanelType = 'ssh' | 'sftp' | 'settings' | 'rdp' | 'other'
+export type PanelType = 'ssh' | 'sftp' | 'settings' | 'rdp' | 'local' | 'other'
 export type PanelStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 export interface ConnectionConfig {
@@ -16,6 +16,8 @@ export interface ConnectionConfig {
   rdpFixedWidth?: number
   rdpFixedHeight?: number
   rdpSmartSizing?: string
+  // Local terminal shell path
+  shellPath?: string
 }
 
 export interface Panel {

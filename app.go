@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime/debug"
 	"strconv"
@@ -620,4 +621,84 @@ func (a *App) RemoveTempFile(path string) error {
 		}
 	}
 	return os.Remove(path)
+}
+
+// GetAvailableShells returns a list of shell executables found on the system.
+func (a *App) GetAvailableShells() []string {
+	var shells []string
+	var seen = make(map[string]bool)
+
+	add := func(path string) {
+		if path == "" {
+			return
+		}
+		abs, err := exec.LookPath(path)
+		if err != nil {
+			return
+		}
+		// Deduplicate by normalized path (lower case, forward slashes).
+		key := strings.ToLower(strings.ReplaceAll(abs, `\`, `/`))
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		shells = append(shells, abs)
+	}
+
+	// Check if a shell with the given base name is already in the list.
+	hasShell := func(name string) bool {
+		for _, sh := range shells {
+			if strings.EqualFold(filepath.Base(sh), name) {
+				return true
+			}
+		}
+		return false
+	}
+
+	switch goruntime.GOOS {
+	case "windows":
+		add("pwsh.exe")
+		add("powershell.exe")
+		add("bash.exe")
+		add("cmd.exe")
+		// Only add explicit Git for Windows paths if bash wasn't found via PATH.
+		if !hasShell("bash.exe") {
+			add(`C:\Program Files\Git\bin\bash.exe`)
+			add(`C:\Program Files (x86)\Git\bin\bash.exe`)
+			add(`C:\ProgramData\chocolatey\bin\bash.exe`)
+		}
+	default:
+		add(os.Getenv("SHELL"))
+		add("bash")
+		add("zsh")
+		add("fish")
+		add("sh")
+	}
+
+	return shells
+}
+
+// GetDefaultShell returns the system's default shell path for local terminals.
+func (a *App) GetDefaultShell() string {
+	switch goruntime.GOOS {
+	case "windows":
+		if _, err := exec.LookPath("pwsh.exe"); err == nil {
+			return "pwsh.exe"
+		}
+		if _, err := exec.LookPath("powershell.exe"); err == nil {
+			return "powershell.exe"
+		}
+		if _, err := exec.LookPath("bash.exe"); err == nil {
+			return "bash.exe"
+		}
+		return "cmd.exe"
+	default:
+		if shell := os.Getenv("SHELL"); shell != "" {
+			return shell
+		}
+		if _, err := exec.LookPath("bash"); err == nil {
+			return "bash"
+		}
+		return "sh"
+	}
 }

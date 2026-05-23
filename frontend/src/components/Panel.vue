@@ -9,7 +9,7 @@
       <span class="panel-title">{{ panel.title }}</span>
       <div class="panel-header-actions">
         <button
-          v-if="panel.type === 'ssh' && workspaceId"
+          v-if="(panel.type === 'ssh' || panel.type === 'local') && workspaceId"
           class="panel-broadcast"
           :class="{ active: broadcastActive }"
           @click.stop="tabStore.toggleBroadcast(workspaceId)"
@@ -18,7 +18,7 @@
           <svg class="broadcast-icon" xmlns="http://www.w3.org/2000/svg" height="14" viewBox="0 -960 960 960" width="14" fill="currentColor"><path d="M600-160v-80H440v-200h-80v80H80v-240h280v80h80v-200h160v-80h280v240H600v-80h-80v320h80v-80h280v240H600Zm80-80h120v-80H680v80ZM160-440h120v-80H160v80Zm520-200h120v-80H680v80Zm0 400v-80 80ZM280-440v-80 80Zm400-200v-80 80Z"/></svg>
         </button>
         <button
-          v-if="panel.type === 'ssh'"
+          v-if="panel.type === 'ssh' || panel.type === 'local'"
           class="panel-ai-lock"
           :class="{ locked: isAILocked }"
           @click.stop="emit('toggleAiLock', panel.id)"
@@ -31,7 +31,7 @@
     </div>
     <BaseTerminal
       ref="baseTerminalRef"
-      mode="ssh"
+      :mode="panel.type === 'local' ? 'local' : 'ssh'"
       :session-id="panel.sessionId"
       :on-session-status="onSessionStatus"
       :broadcast-active="broadcastActive"
@@ -47,9 +47,11 @@ import BaseTerminal from './BaseTerminal.vue'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useSessionStore } from '../stores/sessionStore'
+import { useSettingsStore } from '../stores/settingsStore'
 import { CreateSession } from '../../wailsjs/go/main/App'
 import { useI18n } from '../i18n'
 import type { Panel } from '../types/workspace'
+import type { ConnectionConfig } from '../types/session'
 
 const { t } = useI18n()
 
@@ -70,6 +72,7 @@ const emit = defineEmits<{
 const tabStore = useTabStore()
 const panelStore = usePanelStore()
 const sessionStore = useSessionStore()
+const settingsStore = useSettingsStore()
 
 const isAILocked = computed(() =>
   tabStore.aiLockedPanelId === props.panel.id
@@ -84,6 +87,21 @@ function onSessionStatus(status: string) {
 }
 
 async function retryConnection() {
+  if (props.panel.type === 'local') {
+    // Local terminal: reconnect with the same shell used when created
+    baseTerminalRef.value?.write('\r\n\x1b[33mRestarting local shell...\x1b[0m\r\n')
+    try {
+      const shellPath = props.panel.config?.shellPath || ''
+      const config = { ...props.panel.config, type: 'local', shellPath } as ConnectionConfig
+      const info = await CreateSession('local', config)
+      panelStore.bindSession(props.panel.id, info.id)
+      sessionStore.initSession(info.id)
+    } catch (e: any) {
+      baseTerminalRef.value?.write(`\r\n\x1b[31mFailed to start local shell: ${e}\x1b[0m\r\n`)
+      baseTerminalRef.value?.setRetryOnEnter(true)
+    }
+    return
+  }
   if (!props.panel.config) return
   baseTerminalRef.value?.write('\r\n\x1b[33mReconnecting...\x1b[0m\r\n')
   try {

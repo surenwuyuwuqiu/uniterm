@@ -8,6 +8,7 @@ const messages: Record<Locale, Record<string, string>> = {
     // AppHeader
     'header.connections': '连接列表',
     'header.newConnection': '新建连接',
+    'header.newLocalTerminal': '本地终端',
     'header.settings': '设置',
     'header.ai': 'AI',
 
@@ -221,6 +222,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.selectionActionDesc': '选中文字后的默认操作',
     'settings.rightClickDesc': '右键点击终端的行为',
     'settings.maxHistoryDesc': '终端保留的最大输出行数',
+    'settings.localShell': '本地终端 Shell',
+    'settings.localShellDesc': '本地终端使用的 Shell 路径（留空使用系统默认）',
     'settings.modelList': '模型列表',
     'settings.modelListDesc': '配置和管理 AI 模型',
     'settings.addModel': '添加模型',
@@ -250,6 +253,7 @@ const messages: Record<Locale, Record<string, string>> = {
     // AppHeader
     'header.connections': 'Connections',
     'header.newConnection': 'New Connection',
+    'header.newLocalTerminal': 'Local Terminal',
     'header.settings': 'Settings',
     'header.ai': 'AI',
 
@@ -463,6 +467,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.selectionActionDesc': 'Default action after selecting text',
     'settings.rightClickDesc': 'Right-click behavior in terminal',
     'settings.maxHistoryDesc': 'Maximum output lines to keep in terminal',
+    'settings.localShell': 'Local Terminal Shell',
+    'settings.localShellDesc': 'Shell path for local terminal (leave empty for system default)',
     'settings.modelList': 'Model List',
     'settings.modelListDesc': 'Configure and manage AI models',
     'settings.addModel': 'Add Model',

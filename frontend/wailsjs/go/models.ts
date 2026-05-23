@@ -33,6 +33,7 @@ export namespace session {
 	    rdpFixedWidth?: number;
 	    rdpFixedHeight?: number;
 	    rdpSmartSizing: boolean;
+	    shellPath?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConnectionConfig(source);
@@ -53,6 +54,7 @@ export namespace session {
 	        this.rdpFixedWidth = source["rdpFixedWidth"];
 	        this.rdpFixedHeight = source["rdpFixedHeight"];
 	        this.rdpSmartSizing = source["rdpSmartSizing"];
+	        this.shellPath = source["shellPath"];
 	    }
 	}
 	export class ConnectionGroup {

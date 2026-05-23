@@ -11,13 +11,16 @@ When you need to run a command, use the execute_command tool. The command will b
 CRITICAL RULES:
 - You can only send ONE execute_command tool call at a time. Never send multiple tool calls in a single response.
 - Always explain what you are about to do before executing commands.
-- Prefer using standard Unix tools (ls, cat, grep, find, etc.).
-- For file editing, use sed, awk, or echo with redirection.
+- Use commands appropriate for the current shell (the shell type will be provided in the context below).
 - If a command might be destructive, warn the user.
 - Chain multiple commands with && or ; when appropriate.
 - If the output is too long, summarize the key findings.
 - Commands have a 60-second timeout. If a command times out, you will see "[Command timed out after 60s...]". In that case, you can either wait (the command may still be running) or suggest canceling it with Ctrl+C.
 - Do NOT send a new command if the previous one might still be running, unless you intend to cancel it first.
+- At the START of EVERY response, you MUST read the "当前终端 (CURRENT SHELL)" line at the very top of this prompt. IGNORE any memory of what the previous shell was — only the CURRENT SHELL line matters. Do NOT assume the shell type based on previous turns.
+- The user may switch terminal tabs at any time. Each terminal is an independent environment with its own working directory, environment variables, and file system state. Previous command results (like current directory, env vars, created files) may be COMPLETELY INVALID in the new terminal. ALWAYS reassess the environment before proceeding.
+- When the terminal program type changes (e.g. PowerShell -> Git Bash, or CMD -> PowerShell), you MUST immediately switch to the NEW shell's command syntax. NEVER mix commands from different shell types in the same response. The current shell type is shown at the top of this prompt and takes ABSOLUTE PRECEDENCE over any previous turns or your memory.
+- Do NOT invoke a different shell executable (e.g. powershell.exe, cmd.exe, bash.exe, pwsh.exe, wsl.exe) from within the current terminal to run commands. ALWAYS use the native syntax of the CURRENT shell only. For example, if the current shell is Git Bash, do NOT run "powershell.exe -Command ..." or "cmd /c ..."; use bash-native commands like "df -h" or "ls -la" instead. If a native equivalent does not exist, use the closest native workaround rather than spawning another shell.
 
 RISK CLASSIFICATION:
 Every execute_command call MUST include a "risk" field. Classify each command honestly:
@@ -25,7 +28,19 @@ Every execute_command call MUST include a "risk" field. Classify each command ho
 - "write": modifies or creates data, but not system-destructive (echo > file, touch, mkdir, cp, mv, git add/commit/push, curl POST, npm install, pip install, apt install, brew install, etc.)
 - "dangerous": potentially destructive or system-altering (rm, > overwrite important files, chmod, chown, shutdown, reboot, mkfs, dd, force push, kill -9, etc.)
 
-For chained commands with && or ;, classify based on the MOST risky operation in the chain.`
+For chained commands with && or ;, classify based on the MOST risky operation in the chain.
+
+--- NEGATIVE EXAMPLES (STRICTLY FORBIDDEN) ---
+You MUST NEVER do the following. These are common mistakes caused by relying on memory instead of reading the CURRENT SHELL line:
+❌ In Git Bash, do NOT run: Get-CimInstance Win32_LogicalDisk
+❌ In PowerShell, do NOT run: ls -la /mnt/c/
+❌ In CMD, do NOT run: df -h
+❌ In Git Bash, do NOT run: powershell.exe -Command "..."
+❌ In PowerShell, do NOT run: bash -c "..."
+If the native equivalent does not exist in the CURRENT shell, find a workaround using ONLY the CURRENT shell's syntax.
+
+--- VIOLATION CONSEQUENCE ---
+If you use command syntax from a shell type that does NOT match the CURRENT SHELL, the command will be treated as INVALID. You MUST stop, re-read the CURRENT SHELL line at the top, and rewrite the command using the correct syntax. Do NOT attempt to bypass this by spawning another interpreter (e.g. bash -c, powershell.exe -Command, cmd /c).`
 
 const DEFAULT_CONFIG: AIConfig = {
   apiKey: '',
@@ -75,6 +90,11 @@ export const useAIStore = defineStore('ai', () => {
     risk: string
     dangerous: boolean
   } | null>(null)
+  const lastPanelContext = ref<{ panelId: string; shellPath: string } | null>(null)
+
+  function setLastPanelContext(panelId: string, shellPath: string) {
+    lastPanelContext.value = { panelId, shellPath }
+  }
 
   function setDebugInfo(request: unknown, error: string) {
     try {
@@ -120,7 +140,7 @@ export const useAIStore = defineStore('ai', () => {
             s.name = trimmed.length > 20 ? trimmed.slice(0, 20) + '...' : trimmed
           }
         }
-        scheduleSave()
+        doSave()
       }
     }
     return r
@@ -133,7 +153,7 @@ export const useAIStore = defineStore('ai', () => {
       if (s) {
         s.messages = []
         s.updatedAt = Date.now()
-        scheduleSave()
+        doSave()
       }
     }
   }
@@ -195,13 +215,6 @@ export const useAIStore = defineStore('ai', () => {
     config.value = { ...config.value, ...updates }
   }
 
-  let saveTimer: ReturnType<typeof setTimeout> | null = null
-
-  function scheduleSave() {
-    if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => doSave(), 300)
-  }
-
   async function doSave() {
     try {
       const data = {
@@ -240,7 +253,7 @@ export const useAIStore = defineStore('ai', () => {
     sessions.value.unshift(session)
     currentSessionId.value = session.id
     messages.value = []
-    scheduleSave()
+    doSave()
   }
 
   function switchSession(sessionId: string) {
@@ -254,7 +267,7 @@ export const useAIStore = defineStore('ai', () => {
     const idx = sessions.value.findIndex(s => s.id === sessionId)
     if (idx === -1) return
     sessions.value.splice(idx, 1)
-    scheduleSave()
+    doSave()
     if (currentSessionId.value === sessionId) {
       if (sessions.value.length > 0) {
         switchSession(sessions.value[0].id)
@@ -268,7 +281,7 @@ export const useAIStore = defineStore('ai', () => {
     const s = sessions.value.find(s => s.id === sessionId)
     if (s) {
       s.name = name
-      scheduleSave()
+      doSave()
     }
   }
 
@@ -461,6 +474,9 @@ export const useAIStore = defineStore('ai', () => {
     setPendingCommand,
     clearPendingCommand,
     initialized,
-    init
+    init,
+    lastPanelContext,
+    setLastPanelContext,
+    doSave
   }
 })

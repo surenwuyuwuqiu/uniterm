@@ -2,6 +2,8 @@
   <div class="app-container">
     <AppHeader
       @new-connection="showConnectionForm = true"
+      @new-local-terminal="createLocalTerminal"
+      @new-local-terminal-with-shell="createLocalTerminalWithShell"
       @toggle-ai="aiStore.toggle"
       @toggle-sidebar="sidebarVisible = !sidebarVisible"
       @open-settings="openSettings"
@@ -306,7 +308,7 @@ function openSettings() {
 }
 
 async function closeTab(tabId: string) {
-  // Close RDP session before removing panel to clean up Go-side resources
+  // Close session before removing panel to clean up Go-side resources
   const tab = tabStore.tabs.find(t => t.id === tabId)
   if (tab && tab.type === 'rdp') {
     const p = panelStore.getPanel(tab.panelId)
@@ -321,6 +323,13 @@ async function closeTab(tabId: string) {
       try { await CloseSession(p.sessionId) } catch (_) {}
     }
     panelStore.removeVNCCache(tab.panelId)
+  }
+  // Local terminals must be explicitly closed to terminate the shell process
+  if (tab && tab.type === 'terminal') {
+    const p = panelStore.getPanel(tab.panelId)
+    if (p?.type === 'local' && p?.sessionId) {
+      try { await CloseSession(p.sessionId) } catch (_) {}
+    }
   }
   const panelIds = tabStore.closeTab(tabId)
   panelIds.forEach(pid => panelStore.removePanel(pid))
@@ -354,6 +363,49 @@ async function onConnect(config: ConnectionConfig) {
     sessionStore.initSession(info.id)
   } catch (e) {
     console.error('Failed to create session:', e)
+    tabStore.closeTab(tab.id)
+    panelStore.removePanel(panel.id)
+  }
+}
+
+function getShellLabel(path: string): string {
+  if (!path) return 'Local'
+  const lower = path.toLowerCase()
+  if (lower.includes('pwsh')) return 'PowerShell'
+  if (lower.includes('powershell')) return 'Windows PowerShell'
+  if (lower.includes('bash')) return 'Git Bash'
+  if (lower.includes('cmd')) return 'Command Prompt'
+  return path.replace(/\\/g, '/').split('/').pop() || 'Local'
+}
+
+async function createLocalTerminalWithShell(shellPath: string) {
+  await createLocalTerminal(shellPath)
+}
+
+async function createLocalTerminal(shellPath?: string) {
+  const panel = panelStore.createPanel(null, 'local')
+  const shellName = getShellLabel(shellPath)
+  panel.title = shellName
+  const tab = tabStore.createTerminalTab(shellName, panel.id)
+  panelStore.movePanelToTab(panel.id, tab.id)
+
+  try {
+    const config: ConnectionConfig = {
+      id: '',
+      name: shellName,
+      type: 'local' as any,
+      host: '',
+      port: 0,
+      user: '',
+      authType: 'password' as any,
+      shellPath: shellPath || undefined
+    }
+    panel.config = config
+    const info = await CreateSession('local', config)
+    panelStore.bindSession(panel.id, info.id)
+    sessionStore.initSession(info.id)
+  } catch (e) {
+    console.error('Failed to create local terminal:', e)
     tabStore.closeTab(tab.id)
     panelStore.removePanel(panel.id)
   }

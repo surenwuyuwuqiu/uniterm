@@ -45,7 +45,7 @@
         </el-radio-group>
       </el-form-item>
       <el-form-item v-if="form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc'" :label="t('conn.password')">
-        <el-input v-model="form.password" type="password" show-password />
+        <el-input v-model="form.password" type="password" show-password :key="passwordInputKey" />
       </el-form-item>
       <el-form-item v-if="form.authType === 'key' && form.type !== 'rdp'" :label="t('conn.keyPath')">
         <el-input v-model="form.keyPath" :placeholder="t('conn.keyPathPlaceholder')" />
@@ -102,9 +102,16 @@ const { t } = useI18n()
 const connectionStore = useConnectionStore()
 
 const isWindows = ref(true)
+const passwordInputKey = ref(0)
 
 onMounted(async () => {
   try { isWindows.value = (await GetPlatform()) === 'windows' } catch (_) {}
+})
+
+watch(visible, (val) => {
+  if (val) {
+    passwordInputKey.value++
+  }
 })
 
 const props = defineProps<{

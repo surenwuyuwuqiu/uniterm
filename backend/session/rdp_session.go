@@ -121,9 +121,13 @@ func (s *RDPSession) storeCredentials(host, user, password string) {
 func (s *RDPSession) autoDismissSecurityDialogs(stop <-chan struct{}) {
 	dialogTitles := []string{
 		"远程桌面连接",
+		"远程桌面连接安全警告",
 		"Remote Desktop Connection",
+		"Remote Desktop Connection Security Warning",
 		"Windows 安全",
 		"Windows Security",
+		"安全警告",
+		"Security Warning",
 	}
 	clsName, _ := windows.UTF16PtrFromString("#32770")
 
@@ -144,16 +148,26 @@ func (s *RDPSession) autoDismissSecurityDialogs(stop <-chan struct{}) {
 				if hwnd == 0 {
 					continue
 				}
+				log.Writef("[RDP] found security dialog: %s hwnd=0x%x", title, hwnd)
+
 				// Dismiss via standard dialog button IDs
 				procPostMessageW.Call(hwnd, WM_COMMAND, IDYES, 0)
 				procPostMessageW.Call(hwnd, WM_COMMAND, IDOK, 0)
+				procPostMessageW.Call(hwnd, WM_COMMAND, IDYES+1, 0) // IDNO sometimes maps to 7
 
-				// Also try clicking the "是" / "Yes" button directly
-				for _, btnText := range []string{"是(&Y)", "是", "Yes", "&Yes", "连接(&C)", "连接", "Connect", "&Connect"} {
+				// Also try clicking buttons directly (Windows 11 may use different labels)
+				for _, btnText := range []string{
+					"是(&Y)", "是", "Yes", "&Yes",
+					"连接(&C)", "连接", "Connect", "&Connect",
+					"确认", "确认(&Y)", "确认(&O)",
+					"确定", "确定(&O)", "OK", "&OK",
+					"继续", "继续(&C)", "Continue", "&Continue",
+				} {
 					btnPtr, _ := windows.UTF16PtrFromString(btnText)
 					btnHwnd, _, _ := procFindWindowExW.Call(hwnd, 0, 0, uintptr(unsafe.Pointer(btnPtr)))
 					if btnHwnd != 0 {
 						procSendMessageW.Call(btnHwnd, BM_CLICK, 0, 0)
+						log.Writef("[RDP] clicked button '%s' on dialog hwnd=0x%x", btnText, hwnd)
 						break
 					}
 				}
@@ -371,13 +385,21 @@ func (s *RDPSession) Connect(config ConnectionConfig) error {
 	// Auto-dismiss any security dialogs that appear during Connect (e.g.
 	// "网站正在尝试启动远程连接"). The goroutine polls for dialog windows
 	// and clicks "Yes" to dismiss them.
+	// On Windows 11, the dialog may appear after Connect succeeds, so keep
+	// polling for a few seconds after connection.
 	stopDismiss := make(chan struct{})
 	go s.autoDismissSecurityDialogs(stopDismiss)
+	defer func() {
+		// Keep polling for dialogs after Connect completes. On Windows 11
+		// the security warning may appear slightly after connection.
+		go func() {
+			time.Sleep(5 * time.Second)
+			close(stopDismiss)
+		}()
+	}()
 
 	log.Writef("[RDP] calling Connect...")
 	_, err = dispatch.CallMethod("Connect")
-
-	close(stopDismiss)
 	if err != nil {
 		log.Writef("[RDP] Connect failed: %v", err)
 		s.mu.Lock()
@@ -523,15 +545,24 @@ func setAuthLevelOverride() {
 	}
 	defer k.Close()
 	k.SetDWordValue("AuthenticationLevelOverride", 0)
+	// Also disable the redirection warning dialog via the non-policy key
+	k.SetDWordValue("ShowRedirectionWarningDialog", 0)
 
 	// RedirectionWarningDialogVersion = 1 suppresses the "unknown remote
 	// connection" security warning dialog. Check if already set first.
 	if isRDWAlreadySet() {
 		return
 	}
-	// Try direct HKLM write first. If it fails, elevate via UAC.
-	rdwPath := `SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client`
-	if writeRegDWORD(registry.LOCAL_MACHINE, rdwPath, "RedirectionWarningDialogVersion", 1) {
+
+	// Write to HKCU policy path (no elevation needed, works on Windows 11)
+	rdwPath := `Software\Policies\Microsoft\Windows NT\Terminal Services\Client`
+	if writeRegDWORD(registry.CURRENT_USER, rdwPath, "RedirectionWarningDialogVersion", 1) {
+		return
+	}
+
+	// Fallback: try HKLM policy path (requires admin)
+	rdwPathLM := `SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client`
+	if writeRegDWORD(registry.LOCAL_MACHINE, rdwPathLM, "RedirectionWarningDialogVersion", 1) {
 		return
 	}
 	elevateRegWrite()

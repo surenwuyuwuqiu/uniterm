@@ -20,6 +20,8 @@ export interface ConnectionConfig {
   rdpFixedWidth?: number
   rdpFixedHeight?: number
   rdpSmartSizing?: boolean
+  // Local terminal shell path
+  shellPath?: string
 }
 
 export interface SessionInfo {

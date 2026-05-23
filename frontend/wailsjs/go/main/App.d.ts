@@ -12,6 +12,10 @@ export function CreateSession(arg1:string,arg2:session.ConnectionConfig):Promise
 
 export function GetAppInfo():Promise<main.AppInfo>;
 
+export function GetAvailableShells():Promise<Array<string>>;
+
+export function GetDefaultShell():Promise<string>;
+
 export function GetDesktopPath():Promise<string>;
 
 export function GetPlatform():Promise<string>;

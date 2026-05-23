@@ -2,11 +2,12 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import type { AppSettings, AIModelConfig } from '../types/settings'
 import { DEFAULT_SETTINGS } from '../types/settings'
-import { SaveSettings, LoadSettings } from '../../wailsjs/go/main/App'
+import { SaveSettings, LoadSettings, GetAvailableShells } from '../../wailsjs/go/main/App'
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<AppSettings>({ ...DEFAULT_SETTINGS })
   const loaded = ref(false)
+  const availableShells = ref<string[]>([])
 
   const theme = computed(() => settings.value.theme)
   const language = computed(() => settings.value.language)
@@ -17,6 +18,8 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value.ai.models.find(m => m.id === settings.value.ai.activeModelId) || settings.value.ai.models[0]
   )
 
+  // Current active category in the settings page (persisted across tab switches)
+  const activeCategory = ref('basic')
   // For navigating to a specific settings category from other components
   const openCategory = ref<string | null>(null)
 
@@ -39,6 +42,11 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     } catch {
       // use defaults
+    }
+    try {
+      availableShells.value = await GetAvailableShells()
+    } catch {
+      availableShells.value = []
     }
     applyTheme()
   }
@@ -111,11 +119,13 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     settings,
     loaded,
+    availableShells,
     theme,
     language,
     terminal,
     ai,
     activeModel,
+    activeCategory,
     openCategory,
     init,
     save,

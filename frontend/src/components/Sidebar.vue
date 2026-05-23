@@ -40,8 +40,8 @@
           @drop.prevent="onGroupDrop(entry.group.id, $event)"
         >
           <span class="group-arrow">
-            <svg v-if="expandedGroups.has(entry.group.id)" class="group-arrow-icon" xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M480-360 280-560h400L480-360Z"/></svg>
-            <svg v-else class="group-arrow-icon" xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M400-280v-400l200 200-200 200Z"/></svg>
+            <el-icon v-if="expandedGroups.has(entry.group.id)"><CaretBottom /></el-icon>
+            <el-icon v-else><CaretRight /></el-icon>
           </span>
           <span class="group-name">{{ entry.group.name }}</span>
         </div>
@@ -81,8 +81,8 @@
           @drop.prevent="onGroupDrop('__ungrouped__', $event)"
         >
           <span class="group-arrow">
-            <svg v-if="expandedGroups.has('__ungrouped__')" class="group-arrow-icon" xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M480-360 280-560h400L480-360Z"/></svg>
-            <svg v-else class="group-arrow-icon" xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill="currentColor"><path d="M400-280v-400l200 200-200 200Z"/></svg>
+            <el-icon v-if="expandedGroups.has('__ungrouped__')"><CaretBottom /></el-icon>
+            <el-icon v-else><CaretRight /></el-icon>
           </span>
           <span class="group-name">{{ t('conn.noGroup') }}</span>
         </div>
@@ -299,7 +299,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { Plus, Close } from '@element-plus/icons-vue'
+import { Plus, Close, CaretRight, CaretBottom } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useConnectionStore } from '../stores/connectionStore'
 import { useI18n } from '../i18n'

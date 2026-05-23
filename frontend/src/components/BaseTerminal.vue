@@ -40,7 +40,7 @@ import { useI18n } from '../i18n'
 import { getXtermTheme } from '../composables/useTerminal'
 
 const props = defineProps<{
-  mode: 'ssh' | 'sftp'
+  mode: 'ssh' | 'sftp' | 'local'
   sessionId: string | null | undefined
   onSessionStatus?: (status: string) => void
   broadcastActive?: boolean
@@ -91,7 +91,7 @@ function getSelection(): string {
 }
 
 function resize() {
-  if (props.mode === 'ssh') {
+  if (props.mode === 'ssh' || props.mode === 'local') {
     const sid = props.sessionId
     if (!terminal || !fitAddon || !sid) return
     const el = terminalRef.value
@@ -220,7 +220,7 @@ onMounted(() => {
   void terminalRef.value.offsetHeight
   fitAddon.fit()
 
-  if (props.mode === 'ssh') {
+  if (props.mode === 'ssh' || props.mode === 'local') {
     // Restore terminal content from session buffer
     const sid = props.sessionId
     if (sid) {
@@ -235,7 +235,7 @@ onMounted(() => {
 
   // Input handling
   terminal.onData((data) => {
-    if (props.mode === 'ssh') {
+    if (props.mode === 'ssh' || props.mode === 'local') {
       if (retryOnEnter && (data === '\r' || data === '\n')) {
         retryOnEnter = false
         if (props.onSessionStatus) {
@@ -250,7 +250,7 @@ onMounted(() => {
           if (tab && tab.type === 'workspace') {
             for (const pid of tab.panelIds) {
               const p = panelStore.getPanel(pid)
-              if (p?.sessionId) {
+              if (p?.sessionId && (p.type === 'ssh' || p.type === 'local')) {
                 SessionWrite(p.sessionId, data)
               }
             }
@@ -315,8 +315,8 @@ onMounted(() => {
     }
   })
 
-  // SSH: session status events
-  if (props.mode === 'ssh') {
+  // SSH/Local: session status events
+  if (props.mode === 'ssh' || props.mode === 'local') {
     retryOnEnter = false
     statusUnsubscribe = EventsOn('session:status', (payload: { id: string; status: string }) => {
       if (payload.id !== props.sessionId) return
@@ -367,7 +367,7 @@ onMounted(() => {
 
 // Watch sessionId changes to rebind session data
 watch(() => props.sessionId, (newId) => {
-  if (newId && terminal && props.mode === 'ssh') {
+  if (newId && terminal && (props.mode === 'ssh' || props.mode === 'local')) {
     const history = sessionStore.getData(newId)
     if (history) {
       terminal.write(history)
@@ -418,7 +418,7 @@ function pasteToTerminal(text: string) {
 }
 
 async function pasteToSession(text: string) {
-  if (props.mode === 'ssh') {
+  if (props.mode === 'ssh' || props.mode === 'local') {
     const sid = props.sessionId
     if (sid) {
       SessionWrite(sid, text)
@@ -429,7 +429,7 @@ async function pasteToSession(text: string) {
 const menu = useTerminalMenu({
   getSelection,
   onPaste: async (text) => {
-    if (props.mode === 'ssh') {
+    if (props.mode === 'ssh' || props.mode === 'local') {
       await pasteToSession(text)
     } else {
       pasteToTerminal(text)

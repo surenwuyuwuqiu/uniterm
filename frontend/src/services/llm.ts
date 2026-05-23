@@ -105,7 +105,7 @@ export const AVAILABLE_TOOLS = [
       properties: {
         command: {
           type: 'string',
-          description: 'The shell command to execute. Use standard Unix syntax.'
+          description: 'The shell command to execute. Use syntax appropriate for the current shell (provided in context).'
         },
         risk: {
           type: 'string',

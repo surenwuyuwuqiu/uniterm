@@ -5,18 +5,17 @@
         v-for="cat in categories"
         :key="cat.key"
         class="settings-category"
-        :class="{ active: activeCategory === cat.key }"
-        @click="activeCategory = cat.key"
+        :class="{ active: settingsStore.activeCategory === cat.key }"
+        @click="settingsStore.activeCategory = cat.key"
       >
-        <svg v-if="cat.key === 'about'" class="category-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-        <el-icon v-else class="category-icon"><component :is="cat.icon" /></el-icon>
+        <el-icon class="category-icon"><component :is="cat.icon" /></el-icon>
         <span class="category-label">{{ cat.label }}</span>
       </div>
     </div>
 
     <div class="settings-panel">
       <!-- 基础设置 -->
-      <div v-if="activeCategory === 'basic'" class="settings-section">
+      <div v-if="settingsStore.activeCategory === 'basic'" class="settings-section">
         <h2 class="section-title">{{ t('settings.basic') }}</h2>
 
         <div class="settings-group">
@@ -52,7 +51,7 @@
       </div>
 
       <!-- 终端配置 -->
-      <div v-if="activeCategory === 'terminal'" class="settings-section">
+      <div v-if="settingsStore.activeCategory === 'terminal'" class="settings-section">
         <h2 class="section-title">{{ t('settings.terminal') }}</h2>
 
         <div class="settings-group">
@@ -148,11 +147,12 @@
               />
             </div>
           </div>
+
         </div>
       </div>
 
       <!-- 关于 -->
-      <div v-if="activeCategory === 'about'" class="settings-section">
+      <div v-if="settingsStore.activeCategory === 'about'" class="settings-section">
         <h2 class="section-title">{{ t('settings.about') }}</h2>
         <div class="about-content">
           <div class="about-appname">uniTerm</div>
@@ -162,7 +162,7 @@
       </div>
 
       <!-- AI助理设置 -->
-      <div v-if="activeCategory === 'ai'" class="settings-section">
+      <div v-if="settingsStore.activeCategory === 'ai'" class="settings-section">
         <h2 class="section-title">{{ t('settings.ai') }}</h2>
 
         <div class="settings-group">
@@ -240,15 +240,14 @@ import type { AIModelConfig } from '../types/settings'
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
-const activeCategory = ref('basic')
 const appVersion = import.meta.env.VITE_VERSION || 'dev'
 
 watch(() => settingsStore.openCategory, (cat) => {
   if (cat && (cat === 'basic' || cat === 'terminal' || cat === 'ai' || cat === 'about')) {
-    activeCategory.value = cat
+    settingsStore.settingsStore.activeCategory = cat
     settingsStore.openCategory = null
   }
-}, { immediate: true })
+})
 
 const categories = computed(() => {
   // Explicitly read language to ensure reactivity tracking
@@ -300,6 +299,15 @@ function resetModelForm() {
   modelForm.baseURL = ''
   modelForm.model = ''
   modelForm.apiKey = ''
+}
+
+function getShellLabel(path: string): string {
+  const lower = path.toLowerCase()
+  if (lower.includes('pwsh')) return 'PowerShell'
+  if (lower.includes('powershell')) return 'Windows PowerShell'
+  if (lower.includes('bash')) return 'Git Bash'
+  if (lower.includes('cmd')) return 'Command Prompt'
+  return path.split(/[\\/]/).pop() || path
 }
 </script>
 

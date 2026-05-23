@@ -50,9 +50,9 @@
       ></div>
     </div>
     <div class="tab-more" v-if="tabs.length > 0">
-      <el-dropdown trigger="click" @command="setActiveTab">
+      <el-dropdown trigger="click" @command="setActiveTab" @visible-change="onMoreDropdownVisibleChange">
         <span class="tab-more-btn" :title="t('tab.more')">
-          <svg class="tab-more-icon" xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="currentColor"><path d="M240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400Z"/></svg>
+          <el-icon class="tab-more-icon"><MoreFilled /></el-icon>
         </span>
         <template #dropdown>
           <el-dropdown-menu>
@@ -74,6 +74,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { MoreFilled } from '@element-plus/icons-vue'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useI18n } from '../i18n'
@@ -98,6 +99,14 @@ const tabsListRef = ref<HTMLElement | null>(null)
 function onWheel(e: WheelEvent) {
   if (!tabsListRef.value) return
   tabsListRef.value.scrollLeft += e.deltaY
+}
+
+function onMoreDropdownVisibleChange(visible: boolean) {
+  if (visible) {
+    window.dispatchEvent(new CustomEvent('rdp:overlay-push'))
+  } else {
+    window.dispatchEvent(new CustomEvent('rdp:overlay-pop'))
+  }
 }
 
 function setActiveTab(id: string) {

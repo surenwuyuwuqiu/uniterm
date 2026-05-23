@@ -32,6 +32,8 @@ type ConnectionConfig struct {
 	RdpFixedWidth  int  `json:"rdpFixedWidth,omitempty"`
 	RdpFixedHeight int  `json:"rdpFixedHeight,omitempty"`
 	RdpSmartSizing bool `json:"rdpSmartSizing"`
+	// Local terminal shell path
+	ShellPath string `json:"shellPath,omitempty"`
 }
 
 // ConnectionStoreData is the top-level structure persisted to connections.json.

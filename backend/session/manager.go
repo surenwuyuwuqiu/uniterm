@@ -32,8 +32,13 @@ func (sm *SessionManager) Create(sessionType string, config ConnectionConfig) (S
 		s = NewSFTPSession(config.ID)
 	case "rdp":
 		s = NewRDPSession(config.ID)
+
 	case "vnc":
 		s = NewVNCSession(config.ID)
+
+	case "local":
+		s = NewLocalSession(config.ID)
+
 	default:
 		return nil, fmt.Errorf("unsupported session type: %s", sessionType)
 	}

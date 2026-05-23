@@ -35,7 +35,7 @@
       <el-form-item :label="t('conn.port')">
         <el-input-number v-model="form.port" :min="1" :max="65535" />
       </el-form-item>
-      <el-form-item :label="t('conn.user')">
+      <el-form-item v-if="form.type !== 'vnc'" :label="t('conn.user')">
         <el-input v-model="form.user" :placeholder="t('conn.userPlaceholder')" />
       </el-form-item>
       <el-form-item v-if="form.type !== 'rdp' && form.type !== 'vnc'" :label="t('conn.authType')">

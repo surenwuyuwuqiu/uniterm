@@ -1,22 +1,8 @@
 export type PanelType = 'ssh' | 'sftp' | 'settings' | 'rdp' | 'vnc' | 'other'
 export type PanelStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
-export interface ConnectionConfig {
-  id: string
-  name: string
-  type: string
-  host: string
-  port: number
-  user: string
-  authType: string
-  password?: string
-  keyPath?: string
-  groupId?: string
-  // RDP-specific
-  rdpFixedWidth?: number
-  rdpFixedHeight?: number
-  rdpSmartSizing?: string
-}
+import type { ConnectionConfig } from './session'
+export type { ConnectionConfig }
 
 export interface Panel {
   id: string

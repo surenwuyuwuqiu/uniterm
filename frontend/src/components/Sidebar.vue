@@ -63,7 +63,7 @@
             <div class="conn-indicator" :class="{ connected: false }" />
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
-              <span class="host">{{ conn.user }}@{{ conn.host }}</span>
+              <span class="host">{{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
             </div>
           </div>
         </template>
@@ -104,7 +104,7 @@
             <div class="conn-indicator" :class="{ connected: false }" />
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
-              <span class="host">{{ conn.user }}@{{ conn.host }}</span>
+              <span class="host">{{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
             </div>
           </div>
         </template>
@@ -129,7 +129,7 @@
           <div class="conn-indicator" :class="{ connected: false }" />
           <div class="conn-details">
             <span class="name">{{ conn.name }}</span>
-            <span class="host">{{ conn.user }}@{{ conn.host }}</span>
+            <span class="host">{{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
           </div>
         </div>
       </template>

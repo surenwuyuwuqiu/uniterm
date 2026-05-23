@@ -15,14 +15,21 @@ export interface TransferTaskUI {
   total: number
 }
 
+export interface VNCCache {
+  rfb: any
+  container: HTMLDivElement
+}
+
 const panelState = reactive<{
   panels: Map<string, Panel>
   transferTasks: Map<string, TransferTaskUI[]>
   proxyAddrs: Map<string, string>
+  vncCaches: Map<string, VNCCache>
 }>({
   panels: new Map(),
   transferTasks: new Map(),
-  proxyAddrs: new Map()
+  proxyAddrs: new Map(),
+  vncCaches: new Map()
 })
 
 export const usePanelStore = defineStore('panel', () => {
@@ -88,10 +95,30 @@ export const usePanelStore = defineStore('panel', () => {
     panelState.proxyAddrs.delete(panelId)
   }
 
+  function setVNCCache(panelId: string, cache: VNCCache) {
+    panelState.vncCaches.set(panelId, cache)
+  }
+
+  function getVNCCache(panelId: string): VNCCache | undefined {
+    return panelState.vncCaches.get(panelId)
+  }
+
+  function removeVNCCache(panelId: string) {
+    const cached = panelState.vncCaches.get(panelId)
+    if (cached) {
+      try { cached.rfb?.disconnect() } catch (_) {}
+      if (cached.container.parentNode) {
+        cached.container.parentNode.removeChild(cached.container)
+      }
+      panelState.vncCaches.delete(panelId)
+    }
+  }
+
   return {
     panels: panelState.panels,
     transferTasks: panelState.transferTasks,
     proxyAddrs: panelState.proxyAddrs,
+    vncCaches: panelState.vncCaches,
     getTransferTasks,
     createPanel,
     removePanel,
@@ -102,6 +129,9 @@ export const usePanelStore = defineStore('panel', () => {
     movePanelToTab,
     setProxyAddr,
     getProxyAddr,
-    removeProxyAddr
+    removeProxyAddr,
+    setVNCCache,
+    getVNCCache,
+    removeVNCCache
   }
 })

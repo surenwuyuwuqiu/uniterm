@@ -320,6 +320,7 @@ async function closeTab(tabId: string) {
     if (p?.sessionId) {
       try { await CloseSession(p.sessionId) } catch (_) {}
     }
+    panelStore.removeVNCCache(tab.panelId)
   }
   const panelIds = tabStore.closeTab(tabId)
   panelIds.forEach(pid => panelStore.removePanel(pid))

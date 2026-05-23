@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { useI18n } from '../i18n'
 import { usePanelStore } from '../stores/panelStore'
@@ -194,6 +194,18 @@ onMounted(() => {
     currentSessionId.value = props.sessionId
   }
 
+  // Restore cached DOM + RFB if available (zero-delay tab switch)
+  const cached = panelStore.getVNCCache(props.panelId)
+  if (cached && vncContainer.value) {
+    const children = Array.from(cached.container.children)
+    children.forEach(child => vncContainer.value!.appendChild(child))
+    rfb = cached.rfb
+    panelStore.removeVNCCache(props.panelId)
+    status.value = 'connected'
+    document.addEventListener('keydown', handleKeyDown)
+    return
+  }
+
   const storedProxy = panelStore.getProxyAddr(props.panelId)
   if (storedProxy && props.config) {
     savedPassword.value = props.config.password || ''
@@ -238,16 +250,22 @@ onMounted(() => {
   })
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeyDown)
   unsubStatus?.()
-  if (rfb) {
+
+  // Cache DOM + RFB so switching back is instant
+  if (rfb && vncContainer.value && vncContainer.value.childElementCount > 0) {
+    const container = document.createElement('div')
+    container.style.display = 'none'
+    const children = Array.from(vncContainer.value.children)
+    children.forEach(child => container.appendChild(child))
+    document.body.appendChild(container)
+    panelStore.setVNCCache(props.panelId, { rfb, container })
+  } else if (rfb) {
     rfb.disconnect()
     rfb = null
   }
-  // NOTE: we intentionally do NOT close the session here so that
-  // switching tabs doesn't kill the VNC connection. The session is
-  // closed when the tab/panel is explicitly closed.
 })
 
 watch(() => props.sessionId, (newId) => {

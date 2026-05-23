@@ -111,52 +111,62 @@ function initRFB(proxyAddr: string, password: string) {
     vncContainer.value.innerHTML = ''
   }
 
+  const RFB = (window as any).__novnc_RFB
+  if (RFB) {
+    createRFB(RFB, proxyAddr, password)
+    return
+  }
+
   import('@novnc/novnc').then((module: any) => {
-    const RFB = module.default || module
-
-    if (!vncContainer.value || vncContainer.value.childElementCount > 0) {
-      isIniting = false
-      return
-    }
-
-    try {
-      rfb = new RFB(vncContainer.value, proxyAddr, {
-        credentials: { password: password || '' }
-      })
-    } catch (e: any) {
-      console.error('Failed to create RFB instance:', e)
-      status.value = 'error'
-      isIniting = false
-      return
-    }
-
-    rfb.scaleViewport = scaleViewport.value
-
-    rfb.addEventListener('disconnect', (e: any) => {
-      if (!e.detail.clean) {
-        status.value = 'error'
-      }
-    })
-
-    rfb.addEventListener('credentialsrequired', () => {
-      status.value = 'error'
-    })
-
-    rfb.addEventListener('securityfailure', () => {
-      status.value = 'error'
-    })
-
-    rfb.addEventListener('clipboard', (e: any) => {
-      const text = e.detail.text
-      ClipboardSetText(text).catch(() => {})
-    })
-
-    isIniting = false
+    const LoadedRFB = module.default || module
+    ;(window as any).__novnc_RFB = LoadedRFB
+    createRFB(LoadedRFB, proxyAddr, password)
   }).catch((e: any) => {
     console.error('Failed to load noVNC module:', e)
     status.value = 'error'
     isIniting = false
   })
+}
+
+function createRFB(RFB: any, proxyAddr: string, password: string) {
+  if (!vncContainer.value || vncContainer.value.childElementCount > 0) {
+    isIniting = false
+    return
+  }
+
+  try {
+    rfb = new RFB(vncContainer.value, proxyAddr, {
+      credentials: { password: password || '' }
+    })
+  } catch (e: any) {
+    console.error('Failed to create RFB instance:', e)
+    status.value = 'error'
+    isIniting = false
+    return
+  }
+
+  rfb.scaleViewport = scaleViewport.value
+
+  rfb.addEventListener('disconnect', (e: any) => {
+    if (!e.detail.clean) {
+      status.value = 'error'
+    }
+  })
+
+  rfb.addEventListener('credentialsrequired', () => {
+    status.value = 'error'
+  })
+
+  rfb.addEventListener('securityfailure', () => {
+    status.value = 'error'
+  })
+
+  rfb.addEventListener('clipboard', (e: any) => {
+    const text = e.detail.text
+    ClipboardSetText(text).catch(() => {})
+  })
+
+  isIniting = false
 }
 
 function onPaste(e: ClipboardEvent) {

@@ -248,6 +248,10 @@ onMounted(() => {
   connectionStore.load()
   aiStore.init()
   settingsStore.init()
+  // Pre-load noVNC so VNC tab switches don't pay the dynamic import cost.
+  import('@novnc/novnc').then((m: any) => {
+    ;(window as any).__novnc_RFB = m.default || m
+  }).catch(() => {})
   window.addEventListener('input:contextmenu', onInputContextMenu)
   window.addEventListener('global:close-context-menus', closeInputMenu)
   document.addEventListener('click', closeInputMenu)

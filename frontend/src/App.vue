@@ -322,6 +322,7 @@ async function closeTab(tabId: string) {
     if (p?.sessionId) {
       try { await CloseSession(p.sessionId) } catch (_) {}
     }
+    panelStore.disconnectVNCCache(tab.panelId)
     panelStore.removeVNCCache(tab.panelId)
   }
   // Local terminals must be explicitly closed to terminate the shell process

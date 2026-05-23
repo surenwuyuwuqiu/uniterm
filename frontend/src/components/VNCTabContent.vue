@@ -28,11 +28,16 @@
     />
 
     <!-- Status bar -->
-    <div v-if="status === 'connected'" class="vnc-statusbar">
+    <div v-show="status === 'connected'" class="vnc-statusbar">
       <span class="vnc-status-dot" />
       <span>{{ t('vnc.connected') }}</span>
       <span class="vnc-status-sep">|</span>
       <span>{{ config?.host }}:{{ config?.port || 5900 }}</span>
+      <span class="vnc-status-sep">|</span>
+      <span class="vnc-zoom-label">缩放</span>
+      <el-select v-model="zoomMode" size="small" style="width: 90px">
+        <el-option v-for="opt in zoomOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+      </el-select>
     </div>
   </div>
 </template>
@@ -58,9 +63,19 @@ const currentSessionId = ref<string | null>(props.sessionId)
 const vncContainer = ref<HTMLDivElement | null>(null)
 const savedProxyAddr = ref<string>('')
 const savedPassword = ref<string>('')
+const zoomMode = ref<'auto' | number>('auto')
+const zoomOptions: { label: string; value: 'auto' | number }[] = [
+  { label: '自动缩放', value: 'auto' },
+  { label: '50%', value: 50 },
+  { label: '75%', value: 75 },
+  { label: '100%', value: 100 },
+  { label: '125%', value: 125 },
+  { label: '150%', value: 150 },
+]
 
 let rfb: any = null
 let unsubStatus: (() => void) | null = null
+let resizeHandler: (() => void) | null = null
 
 async function connect() {
   if (!props.config) return
@@ -86,21 +101,18 @@ async function reconnect() {
   await connect()
 }
 
-function adjustCanvasForDPR() {
-  const canvases = vncContainer.value?.querySelectorAll('canvas')
-  if (!canvases || canvases.length === 0) return false
-  const dpr = window.devicePixelRatio || 1
-  if (dpr <= 1) return true
-  let adjusted = false
-  canvases.forEach((el) => {
-    const canvas = el as HTMLCanvasElement
-    if (canvas.width > 0 && canvas.height > 0) {
-      canvas.style.setProperty('width', `${canvas.width / dpr}px`, 'important')
-      canvas.style.setProperty('height', `${canvas.height / dpr}px`, 'important')
-      adjusted = true
-    }
-  })
-  return adjusted
+function applyZoom() {
+  if (!rfb) return
+
+  rfb.scaleViewport = false
+  rfb.clipViewport = true
+
+  if (zoomMode.value === 'auto') {
+    const size = rfb._screenSize()
+    rfb._display.autoscale(size.w, size.h)
+  } else {
+    rfb._display.scale = Number(zoomMode.value) / 100
+  }
 }
 
 function initRFB(proxyAddr: string, password: string) {
@@ -119,11 +131,14 @@ function initRFB(proxyAddr: string, password: string) {
     }
 
     rfb.addEventListener('connect', () => {
-      if (!adjustCanvasForDPR()) {
-        const interval = setInterval(() => {
-          if (adjustCanvasForDPR()) clearInterval(interval)
-        }, 50)
-        setTimeout(() => clearInterval(interval), 3000)
+      applyZoom()
+      if (!resizeHandler) {
+        resizeHandler = () => {
+          if (zoomMode.value !== 'auto') {
+            applyZoom()
+          }
+        }
+        window.addEventListener('resize', resizeHandler)
       }
     })
 
@@ -200,6 +215,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   unsubStatus?.()
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+    resizeHandler = null
+  }
   if (rfb) {
     rfb.disconnect()
     rfb = null
@@ -214,34 +233,39 @@ watch(() => props.sessionId, (newId) => {
     currentSessionId.value = newId
   }
 })
+
+watch(zoomMode, () => {
+  if (status.value === 'connected') {
+    applyZoom()
+  }
+})
 </script>
 
 <style scoped>
 .vnc-tab-content {
-  display: flex;
-  flex-direction: column;
+  position: relative;
   width: 100%;
   height: 100%;
   background: #000;
-  position: relative;
 }
 .vnc-area {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 24px;
   background: #000;
   outline: none;
-  overflow: auto;
+  overflow: hidden;
 }
 .vnc-area :deep(canvas) {
   display: block;
-  width: auto !important;
-  height: auto !important;
   image-rendering: pixelated;
 }
 .vnc-overlay {
   position: absolute;
   inset: 0;
+  bottom: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -252,19 +276,38 @@ watch(() => props.sessionId, (newId) => {
 }
 .vnc-error-text { color: #f56c6c; }
 .vnc-statusbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px;
+  padding: 0 12px;
   background: #1e1e1e;
   color: #999;
   font-size: 12px;
-  flex-shrink: 0;
+  box-sizing: border-box;
+  z-index: 5;
 }
 .vnc-status-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
   background: #67c23a;
+  flex-shrink: 0;
 }
 .vnc-status-sep { color: #444; }
+.vnc-zoom-label {
+  margin-left: auto;
+  font-size: 11px;
+}
+.vnc-statusbar :deep(.el-select .el-input__wrapper) {
+  padding: 0 4px;
+  font-size: 11px;
+}
+.vnc-statusbar :deep(.el-select .el-input__inner) {
+  height: 18px;
+  line-height: 18px;
+}
 </style>

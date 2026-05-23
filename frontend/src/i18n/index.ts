@@ -254,6 +254,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'vnc.error': '连接失败',
     'vnc.reconnect': '重新连接',
     'vnc.retry': '重试',
+    'vnc.scale': '自动缩放',
+    'vnc.scaleOn': '开',
+    'vnc.scaleOff': '关',
   },
   'en': {
     // AppHeader
@@ -505,6 +508,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'vnc.error': 'Connection failed',
     'vnc.reconnect': 'Reconnect',
     'vnc.retry': 'Retry',
+    'vnc.scale': 'Scale',
+    'vnc.scaleOn': 'On',
+    'vnc.scaleOff': 'Off',
   }
 }
 

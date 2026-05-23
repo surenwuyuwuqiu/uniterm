@@ -18,9 +18,11 @@ export interface TransferTaskUI {
 const panelState = reactive<{
   panels: Map<string, Panel>
   transferTasks: Map<string, TransferTaskUI[]>
+  proxyAddrs: Map<string, string>
 }>({
   panels: new Map(),
-  transferTasks: new Map()
+  transferTasks: new Map(),
+  proxyAddrs: new Map()
 })
 
 export const usePanelStore = defineStore('panel', () => {
@@ -74,9 +76,22 @@ export const usePanelStore = defineStore('panel', () => {
     return panelState.transferTasks.get(panelId)!
   }
 
+  function setProxyAddr(panelId: string, addr: string) {
+    panelState.proxyAddrs.set(panelId, addr)
+  }
+
+  function getProxyAddr(panelId: string): string | undefined {
+    return panelState.proxyAddrs.get(panelId)
+  }
+
+  function removeProxyAddr(panelId: string) {
+    panelState.proxyAddrs.delete(panelId)
+  }
+
   return {
     panels: panelState.panels,
     transferTasks: panelState.transferTasks,
+    proxyAddrs: panelState.proxyAddrs,
     getTransferTasks,
     createPanel,
     removePanel,
@@ -84,6 +99,9 @@ export const usePanelStore = defineStore('panel', () => {
     bindSession,
     updateStatus,
     updateTitle,
-    movePanelToTab
+    movePanelToTab,
+    setProxyAddr,
+    getProxyAddr,
+    removeProxyAddr
   }
 })

@@ -34,10 +34,14 @@
       <span class="vnc-status-sep">|</span>
       <span>{{ config?.host }}:{{ config?.port || 5900 }}</span>
       <span class="vnc-status-sep">|</span>
-      <span class="vnc-zoom-label">缩放</span>
-      <el-select v-model="zoomMode" size="small" style="width: 90px">
-        <el-option v-for="opt in zoomOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-      </el-select>
+      <span class="vnc-scale-label">{{ t('vnc.scale') }}</span>
+      <el-switch
+        v-model="scaleViewport"
+        :active-text="t('vnc.scaleOn')"
+        :inactive-text="t('vnc.scaleOff')"
+        inline-prompt
+        style="--el-switch-on-color: #67c23a; --el-switch-off-color: #606266"
+      />
     </div>
   </div>
 </template>
@@ -46,11 +50,13 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { useI18n } from '../i18n'
+import { usePanelStore } from '../stores/panelStore'
 import type { ConnectionConfig } from '../types/session'
 import { CreateSession, CloseSession } from '../../wailsjs/go/main/App'
-import { EventsOn } from '../../wailsjs/runtime'
+import { EventsOn, ClipboardSetText, ClipboardGetText } from '../../wailsjs/runtime'
 
 const { t } = useI18n()
+const panelStore = usePanelStore()
 
 const props = defineProps<{
   panelId: string
@@ -61,24 +67,16 @@ const props = defineProps<{
 const status = ref<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting')
 const currentSessionId = ref<string | null>(props.sessionId)
 const vncContainer = ref<HTMLDivElement | null>(null)
-const savedProxyAddr = ref<string>('')
 const savedPassword = ref<string>('')
-const zoomMode = ref<'auto' | number>('auto')
-const zoomOptions: { label: string; value: 'auto' | number }[] = [
-  { label: '自动缩放', value: 'auto' },
-  { label: '50%', value: 50 },
-  { label: '75%', value: 75 },
-  { label: '100%', value: 100 },
-  { label: '125%', value: 125 },
-  { label: '150%', value: 150 },
-]
+const scaleViewport = ref(false)
 
 let rfb: any = null
 let unsubStatus: (() => void) | null = null
-let resizeHandler: (() => void) | null = null
+let isIniting = false
 
 async function connect() {
   if (!props.config) return
+  if (status.value === 'connecting' || status.value === 'connected') return
   status.value = 'connecting'
   try {
     const info = await CreateSession('vnc', props.config)
@@ -101,25 +99,26 @@ async function reconnect() {
   await connect()
 }
 
-function applyZoom() {
-  if (!rfb) return
-
-  rfb.scaleViewport = false
-  rfb.clipViewport = true
-
-  if (zoomMode.value === 'auto') {
-    const size = rfb._screenSize()
-    rfb._display.autoscale(size.w, size.h)
-  } else {
-    rfb._display.scale = Number(zoomMode.value) / 100
-  }
-}
-
 function initRFB(proxyAddr: string, password: string) {
-  if (!vncContainer.value) return
+  if (isIniting) return
+  isIniting = true
+
+  if (rfb) {
+    try { rfb.disconnect() } catch (_) {}
+    rfb = null
+  }
+  if (vncContainer.value) {
+    vncContainer.value.innerHTML = ''
+  }
 
   import('@novnc/novnc').then((module: any) => {
     const RFB = module.default || module
+
+    if (!vncContainer.value || vncContainer.value.childElementCount > 0) {
+      isIniting = false
+      return
+    }
+
     try {
       rfb = new RFB(vncContainer.value, proxyAddr, {
         credentials: { password: password || '' }
@@ -127,20 +126,11 @@ function initRFB(proxyAddr: string, password: string) {
     } catch (e: any) {
       console.error('Failed to create RFB instance:', e)
       status.value = 'error'
+      isIniting = false
       return
     }
 
-    rfb.addEventListener('connect', () => {
-      applyZoom()
-      if (!resizeHandler) {
-        resizeHandler = () => {
-          if (zoomMode.value !== 'auto') {
-            applyZoom()
-          }
-        }
-        window.addEventListener('resize', resizeHandler)
-      }
-    })
+    rfb.scaleViewport = scaleViewport.value
 
     rfb.addEventListener('disconnect', (e: any) => {
       if (!e.detail.clean) {
@@ -158,11 +148,14 @@ function initRFB(proxyAddr: string, password: string) {
 
     rfb.addEventListener('clipboard', (e: any) => {
       const text = e.detail.text
-      navigator.clipboard.writeText(text).catch(() => {})
+      ClipboardSetText(text).catch(() => {})
     })
+
+    isIniting = false
   }).catch((e: any) => {
     console.error('Failed to load noVNC module:', e)
     status.value = 'error'
+    isIniting = false
   })
 }
 
@@ -173,18 +166,37 @@ function onPaste(e: ClipboardEvent) {
   }
 }
 
+function handleKeyDown(e: KeyboardEvent) {
+  if (!rfb || status.value !== 'connected') return
+  // Ctrl+Shift+V: paste from local clipboard to VNC
+  if (e.ctrlKey && e.shiftKey && (e.key === 'v' || e.key === 'V')) {
+    e.preventDefault()
+    ClipboardGetText().then(text => {
+      if (text && rfb) {
+        rfb.clipboardPasteFrom(text)
+      }
+    }).catch(() => {})
+  }
+}
+
 onMounted(() => {
   if (props.sessionId) {
     currentSessionId.value = props.sessionId
   }
-  if (currentSessionId.value) {
+
+  const storedProxy = panelStore.getProxyAddr(props.panelId)
+  if (storedProxy && props.config) {
+    savedPassword.value = props.config.password || ''
     status.value = 'connected'
-    if (savedProxyAddr.value) {
-      initRFB(savedProxyAddr.value, savedPassword.value)
-    }
+    initRFB(storedProxy, savedPassword.value)
+  } else if (currentSessionId.value) {
+    status.value = 'connected'
+    connect()
   } else {
     connect()
   }
+
+  document.addEventListener('keydown', handleKeyDown)
 
   unsubStatus = EventsOn('session:status', (data: any) => {
     if (data.id !== currentSessionId.value) return
@@ -192,15 +204,18 @@ onMounted(() => {
       case 'connected':
         status.value = 'connected'
         if (data.proxyAddr) {
-          savedProxyAddr.value = data.proxyAddr
+          panelStore.setProxyAddr(props.panelId, data.proxyAddr)
         }
         if (props.config) {
           savedPassword.value = props.config.password || ''
         }
         if (data.proxyAddr && props.config) {
           initRFB(data.proxyAddr, props.config.password || '')
-        } else if (savedProxyAddr.value) {
-          initRFB(savedProxyAddr.value, savedPassword.value)
+        } else {
+          const proxy = panelStore.getProxyAddr(props.panelId)
+          if (proxy) {
+            initRFB(proxy, savedPassword.value)
+          }
         }
         break
       case 'disconnected':
@@ -214,18 +229,15 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeyDown)
   unsubStatus?.()
-  if (resizeHandler) {
-    window.removeEventListener('resize', resizeHandler)
-    resizeHandler = null
-  }
   if (rfb) {
     rfb.disconnect()
     rfb = null
   }
-  if (currentSessionId.value) {
-    CloseSession(currentSessionId.value).catch(() => {})
-  }
+  // NOTE: we intentionally do NOT close the session here so that
+  // switching tabs doesn't kill the VNC connection. The session is
+  // closed when the tab/panel is explicitly closed.
 })
 
 watch(() => props.sessionId, (newId) => {
@@ -234,9 +246,9 @@ watch(() => props.sessionId, (newId) => {
   }
 })
 
-watch(zoomMode, () => {
-  if (status.value === 'connected') {
-    applyZoom()
+watch(scaleViewport, (val) => {
+  if (rfb) {
+    rfb.scaleViewport = val
   }
 })
 </script>
@@ -256,11 +268,12 @@ watch(zoomMode, () => {
   bottom: 24px;
   background: #000;
   outline: none;
-  overflow: hidden;
+  overflow: auto;
 }
 .vnc-area :deep(canvas) {
   display: block;
   image-rendering: pixelated;
+  flex-shrink: 0;
 }
 .vnc-overlay {
   position: absolute;
@@ -298,16 +311,8 @@ watch(zoomMode, () => {
   flex-shrink: 0;
 }
 .vnc-status-sep { color: #444; }
-.vnc-zoom-label {
+.vnc-scale-label {
   margin-left: auto;
   font-size: 11px;
-}
-.vnc-statusbar :deep(.el-select .el-input__wrapper) {
-  padding: 0 4px;
-  font-size: 11px;
-}
-.vnc-statusbar :deep(.el-select .el-input__inner) {
-  height: 18px;
-  line-height: 18px;
 }
 </style>

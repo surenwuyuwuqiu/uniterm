@@ -75,6 +75,15 @@ func (p *VNCProxy) handleWebSocket(ws *websocket.Conn) {
 	p.mu.Unlock()
 	log.Printf("[VNCProxy] WebSocket client connected")
 
+	// Clean up wsConn when this client disconnects so new clients can connect.
+	defer func() {
+		p.mu.Lock()
+		if p.wsConn == ws {
+			p.wsConn = nil
+		}
+		p.mu.Unlock()
+	}()
+
 	tcp, err := net.Dial("tcp", p.target)
 	if err != nil {
 		log.Printf("[VNCProxy] TCP dial to %s failed: %v", p.target, err)

@@ -50,7 +50,7 @@
       ></div>
     </div>
     <div class="tab-more" v-if="tabs.length > 0">
-      <el-dropdown trigger="click" @command="setActiveTab">
+      <el-dropdown trigger="click" @command="setActiveTab" @visible-change="onMoreDropdownVisibleChange">
         <span class="tab-more-btn" :title="t('tab.more')">
           <el-icon class="tab-more-icon"><MoreFilled /></el-icon>
         </span>
@@ -99,6 +99,14 @@ const tabsListRef = ref<HTMLElement | null>(null)
 function onWheel(e: WheelEvent) {
   if (!tabsListRef.value) return
   tabsListRef.value.scrollLeft += e.deltaY
+}
+
+function onMoreDropdownVisibleChange(visible: boolean) {
+  if (visible) {
+    window.dispatchEvent(new CustomEvent('rdp:overlay-push'))
+  } else {
+    window.dispatchEvent(new CustomEvent('rdp:overlay-pop'))
+  }
 }
 
 function setActiveTab(id: string) {

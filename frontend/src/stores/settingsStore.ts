@@ -18,6 +18,8 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value.ai.models.find(m => m.id === settings.value.ai.activeModelId) || settings.value.ai.models[0]
   )
 
+  // Current active category in the settings page (persisted across tab switches)
+  const activeCategory = ref('basic')
   // For navigating to a specific settings category from other components
   const openCategory = ref<string | null>(null)
 
@@ -123,6 +125,7 @@ export const useSettingsStore = defineStore('settings', () => {
     terminal,
     ai,
     activeModel,
+    activeCategory,
     openCategory,
     init,
     save,

@@ -27,6 +27,7 @@
           v-if="settingsStore.availableShells.length > 0"
           trigger="click"
           @command="(path: string) => $emit('new-local-terminal-with-shell', path)"
+          @visible-change="onShellDropdownVisibleChange"
         >
           <button class="header-btn secondary">
             <el-icon><Monitor /></el-icon>
@@ -132,6 +133,14 @@ async function onMaximise() {
 
 function onClose() {
   Quit()
+}
+
+function onShellDropdownVisibleChange(visible: boolean) {
+  if (visible) {
+    window.dispatchEvent(new CustomEvent('rdp:overlay-push'))
+  } else {
+    window.dispatchEvent(new CustomEvent('rdp:overlay-pop'))
+  }
 }
 
 function onDblClick(e: MouseEvent) {

@@ -2,7 +2,7 @@
   <div class="vnc-tab-content">
     <!-- Connecting state -->
     <div v-if="status === 'connecting'" class="vnc-overlay">
-      <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+      <el-icon class="is-loading" :size="32"><Loader /></el-icon>
       <p>{{ t('vnc.connecting', { host: config?.host || '...' }) }}</p>
     </div>
 
@@ -48,7 +48,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
-import { Loading } from '@element-plus/icons-vue'
+import { Loader } from '@lucide/vue'
 import { useI18n } from '../i18n'
 import { usePanelStore } from '../stores/panelStore'
 import type { ConnectionConfig } from '../types/session'

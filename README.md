@@ -25,8 +25,8 @@ Autonomous AI Agent that works like Claude Code — independently plans and exec
 - **SFTP File Manager** — Dual-pane browser for local and remote files. Upload, download, drag-and-drop, delete, rename, and more. Transfers tracked per tab with pause, resume, and cancel support.
 - **Workspace & Split Panes** — Merge terminal tabs into a workspace with horizontal or vertical splits. Drag panel edges or title bars to resize and rearrange freely.
 - **Connection Manager** — Save, search, edit, group, and duplicate server connections. Drag-and-drop organization, multi-select or range-select for batch connect, batch delete, and more.
-- **Local Terminal** — Full-featured local terminal powered by ConPTY (Windows) / pty (Unix). Supports PowerShell, CMD, Git Bash, and other shells with the same font, color, and behavior settings as SSH sessions.
-- **RDP / VNC (Planned)** — Future support for remote desktop and VNC connections, making uniTerm a unified gateway for all remote access.
+- **Local Terminal** — Full-featured local terminal supporting PowerShell, CMD, Git Bash, and other shells with the same font, color, and behavior settings as SSH sessions.
+- **RDP / VNC** — Remote desktop and VNC connections, making uniTerm a unified gateway for all remote access.
 
 ### Customization
 

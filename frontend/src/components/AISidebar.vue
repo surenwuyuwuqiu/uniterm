@@ -5,13 +5,13 @@
       <span>{{ t('ai.title') }}</span>
       <div class="ai-actions">
         <button class="ai-action-btn" @click="openGlobalSettings" :title="t('settings.ai')">
-          <el-icon><Setting /></el-icon>
+          <el-icon><Settings :size="14" /></el-icon>
         </button>
         <button class="ai-action-btn" @click="toggleMaximize" :title="isMaximized ? t('ai.restore') : t('ai.maximize')">
-          <el-icon><FullScreen /></el-icon>
+          <el-icon><Expand :size="14" /></el-icon>
         </button>
         <button class="ai-action-btn" @click="onClose" :title="t('sidebar.collapse')">
-          <el-icon><Close /></el-icon>
+          <el-icon><X :size="14" /></el-icon>
         </button>
       </div>
     </div>
@@ -20,12 +20,12 @@
       <el-dropdown trigger="click" @command="onSessionCommand">
         <div class="session-trigger">
           <span class="session-name">{{ currentSessionName }}</span>
-          <el-icon><ArrowDown /></el-icon>
+          <el-icon><ChevronDown :size="14" /></el-icon>
         </div>
         <template #dropdown>
           <el-dropdown-menu class="dark-dropdown">
             <el-dropdown-item command="new">
-              <el-icon><Plus /></el-icon> {{ t('ai.newSession') }}
+              <el-icon><Plus :size="14" /></el-icon> {{ t('ai.newSession') }}
             </el-dropdown-item>
             <el-dropdown-item divided v-if="aiStore.sessions.length > 0" disabled>
               {{ t('ai.recentSessions') }}
@@ -38,7 +38,7 @@
             >
               <span class="session-item-name">{{ s.name }}</span>
               <span class="session-time">{{ formatRelativeTime(s.updatedAt) }}</span>
-              <el-icon class="session-delete" @click.stop="aiStore.deleteSession(s.id)"><Delete /></el-icon>
+              <el-icon class="session-delete" @click.stop="aiStore.deleteSession(s.id)"><Trash2 :size="14" /></el-icon>
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -134,7 +134,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, computed, watch, onMounted, onUnmounted } from 'vue'
-import { Setting, Close, ArrowDown, Plus, Delete, FullScreen } from '@element-plus/icons-vue'
+import { Settings, X, ChevronDown, Plus, Trash2, Expand } from '@lucide/vue'
 import { useAIStore } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useTabStore } from '../stores/tabStore'

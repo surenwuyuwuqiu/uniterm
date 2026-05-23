@@ -15,12 +15,12 @@
       />
 
       <div class="left-actions">
-        <button class="header-btn" @click="$emit('toggle-sidebar')">
-          <el-icon><Connection /></el-icon>
+        <button class="header-btn secondary" @click="$emit('toggle-sidebar')">
+          <el-icon><Network :size="14" /></el-icon>
           <span>{{ t('header.connections') }}</span>
         </button>
         <button class="header-btn secondary" @click="$emit('new-connection')">
-          <el-icon><Plus /></el-icon>
+          <el-icon><Plus :size="14" /></el-icon>
           <span>{{ t('header.newConnection') }}</span>
         </button>
         <el-dropdown
@@ -30,9 +30,9 @@
           @visible-change="onShellDropdownVisibleChange"
         >
           <button class="header-btn secondary">
-            <el-icon><Monitor /></el-icon>
+            <el-icon><Laptop :size="14" /></el-icon>
             <span>{{ t('header.newLocalTerminal') }}</span>
-            <el-icon><ArrowDown /></el-icon>
+            <el-icon><ChevronDown :size="14" /></el-icon>
           </button>
           <template #dropdown>
             <el-dropdown-menu>
@@ -47,7 +47,7 @@
           </template>
         </el-dropdown>
         <button v-else class="header-btn secondary" @click="$emit('new-local-terminal')">
-          <el-icon><Monitor /></el-icon>
+          <el-icon><Laptop :size="14" /></el-icon>
           <span>{{ t('header.newLocalTerminal') }}</span>
         </button>
       </div>
@@ -60,11 +60,11 @@
     <div class="header-right">
       <div class="right-actions">
         <button class="header-btn secondary" @click="$emit('open-settings')">
-          <el-icon><Setting /></el-icon>
+          <el-icon><Settings :size="14" /></el-icon>
           <span>{{ t('header.settings') }}</span>
         </button>
         <button class="header-btn accent" @click="$emit('toggle-ai')">
-          <el-icon><ChatDotRound /></el-icon>
+          <el-icon><MessageCircleMore :size="14" /></el-icon>
           <span>{{ t('header.ai') }}</span>
         </button>
       </div>
@@ -84,7 +84,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Plus, ChatDotRound, Connection, Setting, Monitor, ArrowDown } from '@element-plus/icons-vue'
+import { Plus, MessageCircleMore, Network, Settings, Laptop, ChevronDown } from '@lucide/vue'
 import { useI18n } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import WindowControls from './WindowControls.vue'

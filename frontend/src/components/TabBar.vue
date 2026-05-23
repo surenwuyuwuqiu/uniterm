@@ -52,7 +52,7 @@
     <div class="tab-more" v-if="tabs.length > 0">
       <el-dropdown trigger="click" @command="setActiveTab" @visible-change="onMoreDropdownVisibleChange">
         <span class="tab-more-btn" :title="t('tab.more')">
-          <el-icon class="tab-more-icon"><MoreFilled /></el-icon>
+          <el-icon class="tab-more-icon"><MoreHorizontal /></el-icon>
         </span>
         <template #dropdown>
           <el-dropdown-menu>
@@ -74,7 +74,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MoreFilled } from '@element-plus/icons-vue'
+import { MoreHorizontal } from '@lucide/vue'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useI18n } from '../i18n'

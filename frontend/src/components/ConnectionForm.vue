@@ -108,12 +108,6 @@ onMounted(async () => {
   try { isWindows.value = (await GetPlatform()) === 'windows' } catch (_) {}
 })
 
-watch(visible, (val) => {
-  if (val) {
-    passwordInputKey.value++
-  }
-})
-
 const props = defineProps<{
   modelValue: boolean
   editConfig?: ConnectionConfig
@@ -129,6 +123,12 @@ const emit = defineEmits<{
 const visible = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v)
+})
+
+watch(visible, (val) => {
+  if (val) {
+    passwordInputKey.value++
+  }
 })
 
 const isEdit = computed(() => !!props.editConfig?.id)

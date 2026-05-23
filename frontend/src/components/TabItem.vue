@@ -9,6 +9,7 @@
     @contextmenu="onContextMenu"
   >
     <span v-if="!editing" class="tab-name" @dblclick.stop="startEdit">
+      <component :is="tabIcon" class="tab-type-icon" :size="14" />
       <span v-if="hasActiveTransfers" class="transfer-indicator" title="Transferring...">&#8595;</span>
       {{ tab.name }}
     </span>
@@ -63,10 +64,11 @@ import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useI18n } from '../i18n'
 import { CreateSession } from '../../wailsjs/go/main/App'
-import type { TerminalTab, SettingsTab, SFTPTab } from '../types/workspace'
+import type { TerminalTab, SettingsTab, SFTPTab, RDPTab, VNCTab } from '../types/workspace'
+import { SquareTerminal, Laptop, FolderUp, Monitor, MonitorCloud, Settings } from '@lucide/vue'
 
 const props = defineProps<{
-  tab: TerminalTab | SettingsTab | SFTPTab
+  tab: TerminalTab | SettingsTab | SFTPTab | RDPTab | VNCTab
   isActive: boolean
   showClose?: boolean
 }>()
@@ -91,6 +93,20 @@ const editInputRef = ref<HTMLInputElement>()
 const isAILocked = computed(() => {
   if (props.tab.type !== 'terminal') return false
   return tabStore.aiLockedPanelId === props.tab.panelId
+})
+
+const tabIcon = computed(() => {
+  const t = props.tab
+  if (t.type === 'settings') return Settings
+  if (t.type === 'sftp') return FolderUp
+  if (t.type === 'rdp') return Monitor
+  if (t.type === 'vnc') return MonitorCloud
+  if (t.type === 'terminal') {
+    const panel = panelStore.getPanel(t.panelId)
+    if (panel?.type === 'local') return Laptop
+    return SquareTerminal
+  }
+  return null
 })
 
 const hasActiveTransfers = computed(() => {
@@ -234,6 +250,13 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   margin-right: 6px;
+}
+.tab-type-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.tab-item.active .tab-type-icon {
+  color: var(--accent);
 }
 .transfer-indicator {
   font-size: 12px;

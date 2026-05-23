@@ -14,7 +14,7 @@
       <el-button
         v-if="task.status === 'running'"
         size="small"
-        :icon="VideoPause"
+        :icon="Pause"
         circle
         @click="emit('pause', task.id)"
         :title="t('sftp.pauseTransfer')"
@@ -23,7 +23,7 @@
         v-else-if="task.status === 'paused'"
         size="small"
         type="success"
-        :icon="VideoPlay"
+        :icon="Play"
         circle
         @click="emit('resume', task.id)"
         :title="t('sftp.resumeTransfer')"
@@ -32,7 +32,7 @@
         v-if="task.status === 'running' || task.status === 'paused'"
         size="small"
         type="danger"
-        :icon="Close"
+        :icon="X"
         circle
         @click="emit('cancel', task.id)"
         :title="t('sftp.cancelTransfer')"
@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { Close, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import { X, Pause, Play } from '@lucide/vue'
 import { useI18n } from '../i18n'
 
 interface TransferTaskUI {

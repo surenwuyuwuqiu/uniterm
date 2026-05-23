@@ -414,9 +414,7 @@ async function createLocalTerminal(shellPath?: string) {
 
 async function onConnectSftp(config: ConnectionConfig) {
   const panel = panelStore.createPanel(config, 'sftp')
-  const displayTitle = config.name
-    ? `${config.name} (SFTP)`
-    : `${config.user}@${config.host} (SFTP)`
+  const displayTitle = config.name || `${config.user}@${config.host}`
   panel.title = displayTitle
   const tab = tabStore.createSFPTab(displayTitle, panel.id)
   panelStore.movePanelToTab(panel.id, tab.id)
@@ -434,9 +432,7 @@ async function onConnectSftp(config: ConnectionConfig) {
 async function onConnectRDP(config: ConnectionConfig) {
   connectionStore.add(config)
 
-  const displayTitle = config.name
-    ? `${config.name} (RDP)`
-    : `${config.user}@${config.host} (RDP)`
+  const displayTitle = config.name || `${config.user}@${config.host}`
 
   const panel = panelStore.createPanel(config, 'rdp')
   panel.title = displayTitle
@@ -457,9 +453,7 @@ async function onConnectRDP(config: ConnectionConfig) {
 async function onConnectVNC(config: ConnectionConfig) {
   connectionStore.add(config)
 
-  const displayTitle = config.name
-    ? `${config.name} (VNC)`
-    : `${config.host} (VNC)`
+  const displayTitle = config.name || config.host
 
   const panel = panelStore.createPanel(config, 'vnc')
   panel.title = displayTitle

@@ -10,10 +10,10 @@
       <span class="header-label">{{ t('sidebar.title') }}</span>
       <div class="header-actions">
         <button class="icon-btn" @click="openNewForm" :title="t('sidebar.newConnection')">
-          <el-icon><Plus /></el-icon>
+          <el-icon><Plus :size="14" /></el-icon>
         </button>
         <button class="icon-btn" @click="emit('toggle')" :title="t('sidebar.collapse')">
-          <el-icon><Close /></el-icon>
+          <el-icon><X :size="14" /></el-icon>
         </button>
       </div>
     </div>
@@ -40,8 +40,8 @@
           @drop.prevent="onGroupDrop(entry.group.id, $event)"
         >
           <span class="group-arrow">
-            <el-icon v-if="expandedGroups.has(entry.group.id)"><CaretBottom /></el-icon>
-            <el-icon v-else><CaretRight /></el-icon>
+            <el-icon v-if="expandedGroups.has(entry.group.id)"><ChevronDown :size="14" /></el-icon>
+            <el-icon v-else><ChevronRight :size="14" /></el-icon>
           </span>
           <span class="group-name">{{ entry.group.name }}</span>
         </div>
@@ -60,10 +60,11 @@
             @dblclick="onItemDblClick(conn)"
             @contextmenu.prevent="onContextMenu($event, conn)"
           >
-            <div class="conn-indicator" :class="{ connected: false }" />
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
-              <span class="host">{{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
+              <span class="conn-meta">
+                <span class="host">{{ conn.type }} {{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
+              </span>
             </div>
           </div>
         </template>
@@ -81,8 +82,8 @@
           @drop.prevent="onGroupDrop('__ungrouped__', $event)"
         >
           <span class="group-arrow">
-            <el-icon v-if="expandedGroups.has('__ungrouped__')"><CaretBottom /></el-icon>
-            <el-icon v-else><CaretRight /></el-icon>
+            <el-icon v-if="expandedGroups.has('__ungrouped__')"><ChevronDown :size="14" /></el-icon>
+            <el-icon v-else><ChevronRight :size="14" /></el-icon>
           </span>
           <span class="group-name">{{ t('conn.noGroup') }}</span>
         </div>
@@ -101,10 +102,11 @@
             @dblclick="onItemDblClick(conn)"
             @contextmenu.prevent="onContextMenu($event, conn)"
           >
-            <div class="conn-indicator" :class="{ connected: false }" />
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
-              <span class="host">{{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
+              <span class="conn-meta">
+                <span class="host">{{ conn.type }} {{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
+              </span>
             </div>
           </div>
         </template>
@@ -126,10 +128,12 @@
           @dblclick="onItemDblClick(conn)"
           @contextmenu.prevent="onContextMenu($event, conn)"
         >
-          <div class="conn-indicator" :class="{ connected: false }" />
           <div class="conn-details">
             <span class="name">{{ conn.name }}</span>
-            <span class="host">{{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
+            <span class="conn-meta">
+              <span class="conn-type">{{ conn.type.toUpperCase() }}</span>
+              <span class="host">{{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
+            </span>
           </div>
         </div>
       </template>
@@ -142,7 +146,6 @@
         @click="focusedId = '__new_connection__'; selectedIds = new Set(); lastClickId = '__new_connection__'"
         @dblclick="openNewFormFromSearch"
       >
-        <div class="conn-indicator" style="background: var(--accent)" />
         <div class="conn-details">
           <span class="name virtual-name">{{ t('sidebar.newConnectionFromSearch') }}</span>
           <span class="host">{{ t('conn.host') }}: {{ searchQuery.trim() }}</span>
@@ -167,7 +170,7 @@
       :style="menuStyle"
       @click.stop
     >
-      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc')" class="menu-item" @click="doConnect">{{ t('sidebar.connect') }}</div>
+      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc')" class="menu-item" @click="doConnect">{{ connectLabel }}</div>
       <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc')" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'vnc'" class="menu-item" @click="doConnectVNC">{{ t('sidebar.connectVNC') }}</div>
@@ -299,7 +302,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { Plus, Close, CaretRight, CaretBottom } from '@element-plus/icons-vue'
+import { Plus, X, ChevronRight, ChevronDown } from '@lucide/vue'
 import { ElMessageBox } from 'element-plus'
 import { useConnectionStore } from '../stores/connectionStore'
 import { useI18n } from '../i18n'
@@ -625,6 +628,10 @@ function getSelectedConnectionIds(): string[] {
 const menuVisible = ref(false)
 const menuStyle = ref({ left: '0px', top: '0px' })
 const selectedConn = ref<ConnectionConfig | null>(null)
+const connectLabel = computed(() => {
+  if (selectedConn.value?.type === 'ssh') return t('sidebar.connectSSH')
+  return t('sidebar.connect')
+})
 const menuRef = ref<HTMLDivElement>()
 
 function clampMenuPosition(x: number, y: number): { left: string, top: string } {
@@ -1159,20 +1166,6 @@ onUnmounted(() => {
 }
 
 
-.conn-indicator {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-disabled);
-  flex-shrink: 0;
-  transition: background 0.2s ease;
-}
-
-.conn-indicator.connected {
-  background: var(--success);
-  box-shadow: 0 0 6px rgba(52, 211, 153, 0.4);
-}
-
 .conn-details {
   display: flex;
   flex-direction: column;
@@ -1197,6 +1190,13 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.conn-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .empty-state {

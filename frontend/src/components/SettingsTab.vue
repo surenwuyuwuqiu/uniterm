@@ -194,10 +194,10 @@
             </div>
             <div class="model-actions">
               <el-button link size="small" @click="editModel(model)">
-                <el-icon><Edit /></el-icon>
+                <el-icon><Pencil :size="14" /></el-icon>
               </el-button>
               <el-button link size="small" type="danger" @click="settingsStore.removeModel(model.id)">
-                <el-icon><Delete /></el-icon>
+                <el-icon><Trash2 :size="14" /></el-icon>
               </el-button>
             </div>
           </div>
@@ -231,7 +231,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
-import { Setting, Monitor, ChatDotRound, InfoFilled, Edit, Delete } from '@element-plus/icons-vue'
+import { Settings, Monitor, MessageCircleMore, Info, Pencil, Trash2 } from '@lucide/vue'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useI18n } from '../i18n'
 import { TERMINAL_THEMES, FONT_OPTIONS } from '../types/settings'
@@ -253,10 +253,10 @@ const categories = computed(() => {
   // Explicitly read language to ensure reactivity tracking
   void settingsStore.settings.language
   return [
-    { key: 'basic', label: t('settings.basic'), icon: Setting },
+    { key: 'basic', label: t('settings.basic'), icon: Settings },
     { key: 'terminal', label: t('settings.terminal'), icon: Monitor },
-    { key: 'ai', label: t('settings.ai'), icon: ChatDotRound },
-    { key: 'about', label: t('settings.about'), icon: InfoFilled },
+    { key: 'ai', label: t('settings.ai'), icon: MessageCircleMore },
+    { key: 'about', label: t('settings.about'), icon: Info },
   ]
 })
 

@@ -6,14 +6,14 @@
 
       <div v-if="message.role === 'assistant' && message.content" class="copy-action">
         <button class="copy-md-btn" @click="copyAsMarkdown" :title="t('ai.copyMarkdown')">
-          <el-icon><DocumentCopy /></el-icon>
+          <el-icon><Copy :size="14" /></el-icon>
           <span class="copy-md-label">{{ copyMdLabel }}</span>
         </button>
       </div>
 
       <div v-if="isError && aiStore.lastDebugInfo" class="debug-actions">
         <button class="debug-copy-btn" @click="copyDebugInfo">
-          <el-icon><DocumentCopy /></el-icon>
+          <el-icon><Copy :size="14" /></el-icon>
           {{ copyLabel }}
         </button>
       </div>
@@ -32,7 +32,7 @@
             <div class="tool-box-header">
               <span class="tool-box-label" @click="inExpanded = !inExpanded">{{ t('ai.in') }}</span>
               <span class="tool-box-count"></span>
-              <button class="tool-copy-btn" @click.stop="copyToolText(tc.function.arguments, tc.id + '-in')" :title="t('ai.copy')"><el-icon><Check v-if="copiedTool === tc.id + '-in'" /><DocumentCopy v-else /></el-icon></button>
+              <button class="tool-copy-btn" @click.stop="copyToolText(tc.function.arguments, tc.id + '-in')" :title="t('ai.copy')"><el-icon><Check v-if="copiedTool === tc.id + '-in'" :size="14" /><Copy v-else :size="14" /></el-icon></button>
               <span class="toggle-icon" @click="inExpanded = !inExpanded">{{ inExpanded ? '▼' : '▶' }}</span>
             </div>
             <div v-show="inExpanded" class="tool-box-body">
@@ -45,7 +45,7 @@
             <div class="tool-box-header">
               <span class="tool-box-label" @click="outExpanded = !outExpanded">{{ t('ai.out') }}</span>
               <span class="tool-box-count"></span>
-              <button class="tool-copy-btn" @click.stop="copyToolText(getToolResult(tc.id)?.content || '', tc.id + '-out')" :title="t('ai.copy')"><el-icon><Check v-if="copiedTool === tc.id + '-out'" /><DocumentCopy v-else /></el-icon></button>
+              <button class="tool-copy-btn" @click.stop="copyToolText(getToolResult(tc.id)?.content || '', tc.id + '-out')" :title="t('ai.copy')"><el-icon><Check v-if="copiedTool === tc.id + '-out'" :size="14" /><Copy v-else :size="14" /></el-icon></button>
               <span class="toggle-icon" @click="outExpanded = !outExpanded">{{ outExpanded ? '▼' : '▶' }}</span>
             </div>
             <div v-show="outExpanded" class="tool-box-body">
@@ -74,7 +74,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { DocumentCopy, Check } from '@element-plus/icons-vue'
+import { Copy, Check } from '@lucide/vue'
 import { useAIStore } from '../stores/aiStore'
 import { useI18n } from '../i18n'
 import type { AIMessage } from '../types/ai'
@@ -415,6 +415,7 @@ function escapeHtml(text: string): string {
   padding: 0 2px;
   opacity: 0;
   transition: opacity 0.15s;
+  color: var(--text-muted);
 }
 .tool-box-header:hover .tool-copy-btn {
   opacity: 0.6;

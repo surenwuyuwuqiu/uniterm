@@ -15,7 +15,7 @@
           @click.stop="tabStore.toggleBroadcast(workspaceId)"
           :title="t('terminal.broadcastInput')"
         >
-          <svg class="broadcast-icon" xmlns="http://www.w3.org/2000/svg" height="14" viewBox="0 -960 960 960" width="14" fill="currentColor"><path d="M600-160v-80H440v-200h-80v80H80v-240h280v80h80v-200h160v-80h280v240H600v-80h-80v320h80v-80h280v240H600Zm80-80h120v-80H680v80ZM160-440h120v-80H160v80Zm520-200h120v-80H680v80Zm0 400v-80 80ZM280-440v-80 80Zm400-200v-80 80Z"/></svg>
+          <Radio :size="14" />
         </button>
         <button
           v-if="panel.type === 'ssh' || panel.type === 'local'"
@@ -43,6 +43,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
+import { Radio } from '@lucide/vue'
 import BaseTerminal from './BaseTerminal.vue'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'

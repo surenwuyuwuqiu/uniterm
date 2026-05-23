@@ -8,16 +8,16 @@
         clearable
       />
       <el-button size="small" @click="emit('refresh')" :title="t('sftp.refresh')">
-        <el-icon><Refresh /></el-icon>
+        <el-icon><RefreshCw :size="14" /></el-icon>
       </el-button>
       <el-button size="small" @click="showHidden = !showHidden" :type="showHidden ? 'primary' : undefined" :title="showHidden ? t('sftp.hideHidden') : t('sftp.showHidden')">
-        <el-icon><View /></el-icon>
+        <el-icon><Eye :size="14" /></el-icon>
       </el-button>
       <el-button size="small" @click="emit('mkdir')" :title="t('sftp.newDirectory')">
-        <el-icon><FolderAdd /></el-icon>
+        <el-icon><FolderPlus :size="14" /></el-icon>
       </el-button>
       <el-button v-if="mode === 'remote'" size="small" type="primary" @click="emit('upload')" :title="t('sftp.upload')">
-        <el-icon><Upload /></el-icon>
+        <el-icon><Upload :size="14" /></el-icon>
       </el-button>
     </div>
     <div class="table-wrapper">
@@ -40,9 +40,9 @@
       <el-table-column :label="t('sftp.name')" min-width="160" sortable :sort-method="sortByName">
         <template #default="{ row }">
           <div class="name-cell" :draggable="true" @dragstart="onDragStart($event, row)">
-            <el-icon v-if="isSymlink(row)"><Link /></el-icon>
-            <el-icon v-else-if="row.isDir"><Folder /></el-icon>
-            <el-icon v-else><Document /></el-icon>
+            <el-icon v-if="isSymlink(row)"><Link :size="14" /></el-icon>
+            <el-icon v-else-if="row.isDir"><Folder :size="14" /></el-icon>
+            <el-icon v-else><File :size="14" /></el-icon>
             <div class="name-info">
               <span class="file-name" :class="{ selected: isSelected(row) }">{{ row.name }}</span>
               <span class="file-mode">{{ row.mode }}</span>
@@ -94,7 +94,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { Folder, Document, Link, Refresh, FolderAdd, View, Upload } from '@element-plus/icons-vue'
+import { Folder, File, Link, RefreshCw, FolderPlus, Eye, Upload } from '@lucide/vue'
 import { useI18n } from '../i18n'
 
 export interface FileItem {

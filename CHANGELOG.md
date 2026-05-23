@@ -1,5 +1,18 @@
 # 更新日志
 
+## v2026.05.23-alpha
+
+- **new** VNC 远程桌面。支持通过 noVNC 连接 VNC 服务器（TigerVNC、TightVNC、QEMU 等），内置 WebSocket↔TCP 代理桥接；标签页切换时 DOM 保活实现零延迟恢复画面，支持自动缩放开关、剪贴板双向共享（Ctrl+Shift+V 粘贴本地剪贴板）。
+- **new** 本地终端支持。可直接打开本地 shell（Windows PowerShell/CMD、macOS/Linux bash/zsh），无需 SSH 连接。
+- **new** AI Shell 感知。AI 可以感知当前终端的 shell 类型，生成更准确的命令。
+- **improve** 连接列表显示端口。Sidebar 中连接条目从 `user@host` 改为 `user@host:port`，用户名为空时仅显示 `host:port`。
+- **improve** VNC 新建连接时隐藏用户名字段（VNC 认证只需要密码）。
+- **improve** 图标统一。
+- **bugfix** RDP 窗口在弹出菜单、对话框、窗口拖拽时正确隐藏/显示，避免遮挡。
+- **bugfix** 设置页状态持久化问题修复。
+- **bugfix** 密码输入框可见性切换修复。
+- **bugfix** Windows 11 安全对话框抑制修复。
+
 ## v2026.05.22-alpha
 
 - **new** RDP 远程桌面。支持通过 Microsoft RDP ActiveX 控件连接 Windows 远程桌面，原生安全对话框已完全抑制，RDP 窗口无缝嵌入 uniTerm 标签页，窗口拖拽和缩放时平滑跟随。

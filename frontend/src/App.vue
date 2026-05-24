@@ -63,6 +63,8 @@
       <div class="input-menu-item" @click="inputMenuPaste">{{ t('input.paste') }}</div>
       <div class="input-menu-item" @click="inputMenuSelectAll">{{ t('input.selectAll') }}</div>
     </div>
+
+    <SyncConflictDialog />
   </div>
 </template>
 
@@ -79,6 +81,7 @@ import RDPTabContent from './components/RDPTabContent.vue'
 import VNCTabContent from './components/VNCTabContent.vue'
 import ConnectionForm from './components/ConnectionForm.vue'
 import AISidebar from './components/AISidebar.vue'
+import SyncConflictDialog from './components/SyncConflictDialog.vue'
 import { useConnectionStore } from './stores/connectionStore'
 import { useTabStore } from './stores/tabStore'
 import { usePanelStore } from './stores/panelStore'

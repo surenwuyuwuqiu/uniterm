@@ -259,6 +259,12 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.syncTestFailed': '连接测试失败: {error}',
     'settings.syncSuccess': '同步完成',
     'settings.syncFailed': '同步失败',
+    'sync.conflictTitle': '配置冲突',
+    'sync.conflictDesc': '本地和远端都有未同步的修改，请选择覆盖方向：',
+    'sync.conflictLocal': '本地修改时间',
+    'sync.conflictRemote': '远端修改时间',
+    'sync.conflictUseLocal': '用本地覆盖远端',
+    'sync.conflictUseRemote': '用远端覆盖本地',
 
     // RDP
     'conn.rdpSmartSizing': '智能缩放',
@@ -539,6 +545,12 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.syncTestFailed': 'Connection test failed: {error}',
     'settings.syncSuccess': 'Sync completed',
     'settings.syncFailed': 'Sync failed',
+    'sync.conflictTitle': 'Config Conflict',
+    'sync.conflictDesc': 'Both local and remote have unsynchronized changes. Choose which to keep:',
+    'sync.conflictLocal': 'Local modification time',
+    'sync.conflictRemote': 'Remote modification time',
+    'sync.conflictUseLocal': 'Use local, overwrite remote',
+    'sync.conflictUseRemote': 'Use remote, overwrite local',
 
     // RDP
     'conn.rdpSmartSizing': 'Smart Sizing',

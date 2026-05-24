@@ -49,6 +49,17 @@
 - **SSH Key**：复用系统已有 SSH Key（`~/.ssh/`）
 - **HTTPS + Personal Access Token**：用户在设置页填入 Token
 
+## 仓库可见性校验
+
+**只允许私有仓库同步。** 在"测试连接"和"立即同步"时校验仓库可见性：
+
+- GitHub：`GET https://api.github.com/repos/<owner>/<repo>` → `private: true/false`
+- Gitee：`GET https://gitee.com/api/v5/repos/<owner>/<repo>` → `private: true/false`
+
+公有仓库返回错误提示："配置同步仅支持私有仓库，请使用私有仓库以确保数据安全。"
+
+首次配置仓库地址后未测试连接，直接在"立即同步"时检测到公有仓库也同样拒绝。
+
 ## Git 实现
 
 使用 `go-git` 纯 Go 库，不依赖系统安装 git。

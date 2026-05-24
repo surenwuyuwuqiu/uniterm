@@ -3,6 +3,7 @@
 import {session} from '../models';
 import {main} from '../models';
 import {store} from '../models';
+import {sync} from '../models';
 
 export function ChatCompletion(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
 
@@ -97,5 +98,17 @@ export function SftpRemove(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 export function SftpRename(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SftpResumeTransfer(arg1:string,arg2:string):Promise<void>;
+
+export function SyncGetConfig():Promise<sync.SyncConfig>;
+
+export function SyncGetLastSyncTime():Promise<string>;
+
+export function SyncNow():Promise<sync.SyncResult>;
+
+export function SyncResolveConflict(arg1:boolean):Promise<sync.SyncResult>;
+
+export function SyncSaveConfig(arg1:sync.SyncConfig,arg2:string):Promise<void>;
+
+export function SyncTestConnection():Promise<void>;
 
 export function WriteTempFile(arg1:string,arg2:string):Promise<string>;

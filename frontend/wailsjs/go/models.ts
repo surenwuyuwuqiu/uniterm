@@ -408,3 +408,115 @@ export namespace store {
 
 }
 
+export namespace sync {
+	
+	export class ConflictInfo {
+	    // Go type: time
+	    LocalTime: any;
+	    // Go type: time
+	    RemoteTime: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConflictInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.LocalTime = this.convertValues(source["LocalTime"], null);
+	        this.RemoteTime = this.convertValues(source["RemoteTime"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SyncConfig {
+	    repoUrl: string;
+	    branch: string;
+	    authType: string;
+	    autoSync: boolean;
+	    // Go type: time
+	    lastSyncAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new SyncConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.repoUrl = source["repoUrl"];
+	        this.branch = source["branch"];
+	        this.authType = source["authType"];
+	        this.autoSync = source["autoSync"];
+	        this.lastSyncAt = this.convertValues(source["lastSyncAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SyncResult {
+	    Direction: number;
+	    Message: string;
+	    Conflict?: ConflictInfo;
+	
+	    static createFrom(source: any = {}) {
+	        return new SyncResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Direction = source["Direction"];
+	        this.Message = source["Message"];
+	        this.Conflict = this.convertValues(source["Conflict"], ConflictInfo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+

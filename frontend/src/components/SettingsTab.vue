@@ -151,6 +151,106 @@
         </div>
       </div>
 
+      <!-- Sync settings -->
+      <div v-if="settingsStore.activeCategory === 'sync'" class="settings-section sync-settings">
+        <div class="section-header">
+          <h2>{{ t('settings.sync') }}</h2>
+          <p class="section-desc">{{ t('settings.syncDesc') }}</p>
+        </div>
+
+        <div class="sync-warning">
+          <AlertTriangle :size="16" />
+          <span>{{ t('settings.syncWarning') }}</span>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-label">
+            <label>{{ t('settings.syncRepoUrl') }}</label>
+            <p class="setting-desc">{{ t('settings.syncRepoUrlDesc') }}</p>
+          </div>
+          <div class="setting-control">
+            <el-input
+              v-model="syncStore.config.repoUrl"
+              :placeholder="t('settings.syncRepoUrlPlaceholder')"
+              size="default"
+              style="width: 400px"
+            />
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-label">
+            <label>{{ t('settings.syncAuthType') }}</label>
+          </div>
+          <div class="setting-control">
+            <el-radio-group v-model="syncStore.config.authType">
+              <el-radio value="ssh">SSH Key</el-radio>
+              <el-radio value="token">Personal Access Token</el-radio>
+            </el-radio-group>
+          </div>
+        </div>
+
+        <div v-if="syncStore.config.authType === 'token'" class="setting-item">
+          <div class="setting-label">
+            <label>{{ t('settings.syncToken') }}</label>
+          </div>
+          <div class="setting-control">
+            <el-input
+              v-model="tokenInput"
+              :type="showToken ? 'text' : 'password'"
+              :placeholder="t('settings.syncTokenPlaceholder')"
+              size="default"
+              style="width: 300px"
+            >
+              <template #suffix>
+                <el-button link @click="showToken = !showToken">
+                  {{ showToken ? t('settings.syncHide') : t('settings.syncShow') }}
+                </el-button>
+              </template>
+            </el-input>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-label">
+            <label>{{ t('settings.syncAuto') }}</label>
+            <p class="setting-desc">{{ t('settings.syncAutoDesc') }}</p>
+          </div>
+          <div class="setting-control">
+            <el-switch v-model="syncStore.config.autoSync" />
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-label">
+            <label>{{ t('settings.syncLastTime') }}</label>
+          </div>
+          <div class="setting-control sync-time">
+            {{ syncStore.lastSyncTime }}
+          </div>
+        </div>
+
+        <div class="sync-actions">
+          <el-button
+            :loading="syncStore.testingConnection"
+            @click="handleTestConnection"
+          >
+            {{ t('settings.syncTestConnection') }}
+          </el-button>
+          <el-button
+            type="primary"
+            :loading="syncStore.syncing"
+            @click="handleSyncNow"
+          >
+            {{ t('settings.syncNow') }}
+          </el-button>
+        </div>
+
+        <div v-if="syncStore.lastResult" class="sync-result">
+          {{ syncStore.lastResult }}
+        </div>
+      </div>
+
       <!-- 关于 -->
       <div v-if="settingsStore.activeCategory === 'about'" class="settings-section">
         <h2 class="section-title">{{ t('settings.about') }}</h2>
@@ -231,19 +331,49 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
-import { Settings, Monitor, MessageCircleMore, Info, Pencil, Trash2 } from '@lucide/vue'
+import { Settings, Monitor, MessageCircleMore, Info, RefreshCw, AlertTriangle, Pencil, Trash2 } from '@lucide/vue'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useSyncStore } from '../stores/syncStore'
 import { useI18n } from '../i18n'
 import { TERMINAL_THEMES, FONT_OPTIONS } from '../types/settings'
 import type { AIModelConfig } from '../types/settings'
 
 const settingsStore = useSettingsStore()
+const syncStore = useSyncStore()
 const { t } = useI18n()
 
 const appVersion = import.meta.env.VITE_VERSION || 'dev'
 
+const tokenInput = ref('')
+const showToken = ref(false)
+
+async function handleTestConnection() {
+  await syncStore.saveConfig(tokenInput.value)
+  const err = await syncStore.testConnection()
+  if (err) {
+    ElMessage.error(t('settings.syncTestFailed', { error: err }))
+  } else {
+    ElMessage.success(t('settings.syncTestSuccess'))
+  }
+}
+
+async function handleSyncNow() {
+  await syncStore.saveConfig(tokenInput.value)
+  const result = await syncStore.doSync()
+  if (!result) {
+    ElMessage.error(syncStore.lastResult || t('settings.syncFailed'))
+    return
+  }
+  if (result.direction === 3) {
+    return  // conflict — handled by SyncConflictDialog
+  }
+  ElMessage.success(result.message || t('settings.syncSuccess'))
+}
+
+syncStore.loadConfig()
+
 watch(() => settingsStore.openCategory, (cat) => {
-  if (cat && (cat === 'basic' || cat === 'terminal' || cat === 'ai' || cat === 'about')) {
+  if (cat && (cat === 'basic' || cat === 'terminal' || cat === 'ai' || cat === 'sync' || cat === 'about')) {
     settingsStore.settingsStore.activeCategory = cat
     settingsStore.openCategory = null
   }
@@ -256,6 +386,7 @@ const categories = computed(() => {
     { key: 'basic', label: t('settings.basic'), icon: Settings },
     { key: 'terminal', label: t('settings.terminal'), icon: Monitor },
     { key: 'ai', label: t('settings.ai'), icon: MessageCircleMore },
+    { key: 'sync', label: t('settings.sync'), icon: RefreshCw },
     { key: 'about', label: t('settings.about'), icon: Info },
   ]
 })
@@ -501,5 +632,35 @@ function getShellLabel(path: string): string {
   font-size: 12px;
   color: var(--text-muted);
   font-family: var(--font-mono);
+}
+
+.sync-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--el-color-warning-light-9);
+  border: 1px solid var(--el-color-warning-light-5);
+  border-radius: 6px;
+  margin-bottom: 20px;
+  color: var(--el-color-warning-dark-2);
+  font-size: 13px;
+}
+
+.sync-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.sync-result {
+  margin-top: 12px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.sync-time {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 </style>

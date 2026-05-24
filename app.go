@@ -20,6 +20,7 @@ import (
 	"github.com/ys-ll/uniterm/backend/log"
 	"github.com/ys-ll/uniterm/backend/session"
 	"github.com/ys-ll/uniterm/backend/store"
+	"github.com/ys-ll/uniterm/backend/sync"
 )
 
 type App struct {
@@ -29,6 +30,7 @@ type App struct {
 	aiConfigStore    *store.AIConfigStore
 	aiSessionStore   *store.AISessionStore
 	settingsStore    *store.SettingsStore
+	syncService      *sync.SyncService
 	mainHwnd        uintptr
 	originalWndProc uintptr
 	wndProcCb       uintptr // keep alive to prevent GC
@@ -80,6 +82,31 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	a.settingsStore = ss
+
+	syncSvc, err := sync.NewSyncService()
+	if err != nil {
+		log.Writef("Failed to create sync service: %v", err)
+	} else {
+		a.syncService = syncSvc
+		// Wire keychain into connection store for password migration
+		if a.connectionStore != nil {
+			a.connectionStore.SetPasswordStore(syncSvc.Keychain())
+		}
+		// Auto-sync on startup if enabled
+		if syncSvc.IsAutoSyncEnabled() {
+			go func() {
+				result, err := syncSvc.Sync()
+				if err != nil {
+					log.Writef("Auto-sync on startup failed: %v", err)
+				} else if result.Direction == sync.SyncConflict {
+					runtime.EventsEmit(a.ctx, "sync:conflict", map[string]interface{}{
+						"localTime":  result.Conflict.LocalTime.Format(time.RFC3339),
+						"remoteTime": result.Conflict.RemoteTime.Format(time.RFC3339),
+					})
+				}
+			}()
+		}
+	}
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -98,6 +125,7 @@ func (a *App) SaveConnections(data session.ConnectionStoreData) error {
 	err := a.connectionStore.Save(data)
 	if err == nil {
 		runtime.EventsEmit(a.ctx, "store:connections:changed", data)
+		a.triggerAutoSync()
 	}
 	return err
 }
@@ -115,7 +143,95 @@ func (a *App) SaveAIConfig(config store.AIConfig) error {
 	if a.aiConfigStore == nil {
 		return fmt.Errorf("AI config store not initialized")
 	}
-	return a.aiConfigStore.Save(config)
+	err := a.aiConfigStore.Save(config)
+	if err == nil {
+		a.triggerAutoSync()
+	}
+	return err
+}
+
+func (a *App) triggerAutoSync() {
+	if a.syncService == nil || !a.syncService.IsAutoSyncEnabled() {
+		return
+	}
+	go func() {
+		result, err := a.syncService.Sync()
+		if err != nil {
+			log.Writef("Auto-sync failed: %v", err)
+		} else if result.Direction == sync.SyncConflict {
+			runtime.EventsEmit(a.ctx, "sync:conflict", map[string]interface{}{
+				"localTime":  result.Conflict.LocalTime.Format(time.RFC3339),
+				"remoteTime": result.Conflict.RemoteTime.Format(time.RFC3339),
+			})
+		}
+	}()
+}
+
+// SyncGetConfig returns the sync configuration.
+func (a *App) SyncGetConfig() (sync.SyncConfig, error) {
+	if a.syncService == nil {
+		return sync.SyncConfig{}, fmt.Errorf("sync service not initialized")
+	}
+	return a.syncService.GetConfig()
+}
+
+// SyncSaveConfig saves the sync configuration.
+func (a *App) SyncSaveConfig(config sync.SyncConfig, token string) error {
+	if a.syncService == nil {
+		return fmt.Errorf("sync service not initialized")
+	}
+	return a.syncService.SaveConfig(config, token)
+}
+
+// SyncNow runs an immediate sync.
+func (a *App) SyncNow() (*sync.SyncResult, error) {
+	if a.syncService == nil {
+		return nil, fmt.Errorf("sync service not initialized")
+	}
+	result, err := a.syncService.Sync()
+	if err != nil {
+		return nil, err
+	}
+	if result.Direction == sync.SyncConflict {
+		runtime.EventsEmit(a.ctx, "sync:conflict", map[string]interface{}{
+			"localTime":  result.Conflict.LocalTime.Format(time.RFC3339),
+			"remoteTime": result.Conflict.RemoteTime.Format(time.RFC3339),
+		})
+	}
+	return result, nil
+}
+
+// SyncResolveConflict resolves a sync conflict.
+func (a *App) SyncResolveConflict(useLocal bool) (*sync.SyncResult, error) {
+	if a.syncService == nil {
+		return nil, fmt.Errorf("sync service not initialized")
+	}
+	result, err := a.syncService.ResolveConflict(useLocal)
+	if err != nil {
+		return nil, err
+	}
+	if result.Direction == sync.SyncPull {
+		if data, err := a.connectionStore.Load(); err == nil {
+			runtime.EventsEmit(a.ctx, "store:connections:changed", data)
+		}
+	}
+	return result, nil
+}
+
+// SyncTestConnection tests the repository connection.
+func (a *App) SyncTestConnection() error {
+	if a.syncService == nil {
+		return fmt.Errorf("sync service not initialized")
+	}
+	return a.syncService.TestConnection()
+}
+
+// SyncGetLastSyncTime returns the last sync time string.
+func (a *App) SyncGetLastSyncTime() string {
+	if a.syncService == nil {
+		return "从未同步"
+	}
+	return a.syncService.GetLastSyncTime()
 }
 
 func (a *App) LoadAIConfig() (store.AIConfig, error) {

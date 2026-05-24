@@ -30,6 +30,7 @@ Autonomous AI Agent that works like Claude Code — independently plans and exec
 
 ### Customization
 
+- **Cloud Sync** — Build your own private sync repository via GitHub, GitLab, or Gitee. All configurations (connections, AI model keys, app settings) are encrypted with AES-256-GCM before syncing. Supports automatic sync, conflict resolution, master password changes, and repository management.
 - **Internationalization** — Simplified Chinese and English UI, built with a clean i18n architecture ready for more languages.
 - **Themes** — Dark, Deep Blue, and Light themes with automatic system theme detection.
 - **Cross-Platform** — Built on Wails v2, runs natively on Windows, macOS, and Linux.

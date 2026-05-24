@@ -20,7 +20,7 @@
       @click.stop
     />
     <span v-if="hasAILockedPanel" class="tab-ai-lock locked" title="AI locked to a panel in this workspace">
-      <svg class="ai-lock-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="none"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16v-6a2 2 0 1 1 4 0v6m-4-3h4m4-5v8"/></svg>
+      <Sparkles :size="14" />
     </span>
     <button
       v-if="isActive || showClose"
@@ -50,6 +50,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { Sparkles } from '@lucide/vue'
 import { useTabStore } from '../stores/tabStore'
 import { useI18n } from '../i18n'
 import type { WorkspaceTab } from '../types/workspace'

@@ -24,7 +24,7 @@
           @click.stop="emit('toggleAiLock', panel.id)"
           :title="isAILocked ? t('terminal.aiLockedToPanel') : t('terminal.lockAIToPanel')"
         >
-          <svg class="ai-lock-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="none"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16v-6a2 2 0 1 1 4 0v6m-4-3h4m4-5v8"/></svg>
+          <Sparkles :size="14" />
         </button>
         <button class="panel-close" @click.stop="emit('close', panel.id)">×</button>
       </div>
@@ -43,7 +43,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
-import { Radio } from '@lucide/vue'
+import { Radio, Sparkles } from '@lucide/vue'
 import BaseTerminal from './BaseTerminal.vue'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'

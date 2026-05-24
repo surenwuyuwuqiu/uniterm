@@ -1,5 +1,9 @@
 # 更新日志
 
+## v2026.05.24-alpha
+
+- **new** 云端配置同步。基于 GitHub、GitLab、Gitee 私有仓库构建专属私人云同步仓库，所有配置（连接信息、AI 模型密钥、应用设置）经 AES-256-GCM 加密后保存至远端，支持自动同步、冲突解决、主密码修改和仓库绑定管理。
+
 ## v2026.05.23-alpha
 
 - **new** VNC 远程桌面。支持通过 noVNC 连接 VNC 服务器（TigerVNC、TightVNC、QEMU 等），内置 WebSocket↔TCP 代理桥接；标签页切换时 DOM 保活实现零延迟恢复画面，支持自动缩放开关、剪贴板双向共享（Ctrl+Shift+V 粘贴本地剪贴板）。

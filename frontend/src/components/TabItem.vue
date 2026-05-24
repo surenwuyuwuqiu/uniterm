@@ -30,7 +30,7 @@
       @click.stop="$emit('toggleAiLock', tab.panelId)"
       :title="isAILocked ? t('terminal.aiLocked') : t('terminal.lockAI')"
     >
-      <svg class="ai-lock-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="none"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16v-6a2 2 0 1 1 4 0v6m-4-3h4m4-5v8"/></svg>
+      <Sparkles :size="14" />
     </button>
     <button
       v-if="isActive || showClose"
@@ -65,7 +65,7 @@ import { usePanelStore } from '../stores/panelStore'
 import { useI18n } from '../i18n'
 import { CreateSession } from '../../wailsjs/go/main/App'
 import type { TerminalTab, SettingsTab, SFTPTab, RDPTab, VNCTab } from '../types/workspace'
-import { SquareTerminal, Laptop, FolderUp, Monitor, MonitorCloud, Settings } from '@lucide/vue'
+import { SquareTerminal, Laptop, FolderUp, Monitor, MonitorCloud, Settings, Sparkles } from '@lucide/vue'
 
 const props = defineProps<{
   tab: TerminalTab | SettingsTab | SFTPTab | RDPTab | VNCTab

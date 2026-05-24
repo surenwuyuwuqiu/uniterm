@@ -10,8 +10,17 @@ import (
 
 const storeFileName = "connections.json"
 
+// PasswordStore is the interface for reading/writing connection passwords.
+// Implementations store passwords externally (e.g. OS keychain).
+type PasswordStore interface {
+	GetPassword(connID string) (string, error)
+	SetPassword(connID, password string) error
+	DeletePassword(connID string) error
+}
+
 type ConnectionStore struct {
-	configDir string
+	configDir     string
+	passwordStore PasswordStore // nil = passwords kept in JSON (backward compat)
 }
 
 func NewConnectionStore() (*ConnectionStore, error) {
@@ -26,11 +35,29 @@ func NewConnectionStore() (*ConnectionStore, error) {
 	return &ConnectionStore{configDir: appDir}, nil
 }
 
+// SetPasswordStore sets the external password store. Once set, passwords
+// are written to the store and cleared from the JSON file on save.
+func (s *ConnectionStore) SetPasswordStore(ps PasswordStore) {
+	s.passwordStore = ps
+}
+
 func (s *ConnectionStore) filePath() string {
 	return filepath.Join(s.configDir, storeFileName)
 }
 
 func (s *ConnectionStore) Save(data session.ConnectionStoreData) error {
+	// Extract passwords to external store before writing JSON
+	for i := range data.Connections {
+		conn := &data.Connections[i]
+		if conn.AuthType != "password" || conn.Password == "" {
+			continue
+		}
+		if s.passwordStore != nil {
+			_ = s.passwordStore.SetPassword(conn.ID, conn.Password)
+		}
+		conn.Password = ""
+	}
+
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err
@@ -59,6 +86,7 @@ func (s *ConnectionStore) Load() (session.ConnectionStoreData, error) {
 		if data.Connections == nil {
 			data.Connections = []session.ConnectionConfig{}
 		}
+		s.populatePasswords(&data)
 		return data, nil
 	}
 
@@ -67,8 +95,43 @@ func (s *ConnectionStore) Load() (session.ConnectionStoreData, error) {
 	if err := json.Unmarshal(fileData, &connections); err != nil {
 		return session.ConnectionStoreData{}, err
 	}
-	return session.ConnectionStoreData{
+	data = session.ConnectionStoreData{
 		Groups:      []session.ConnectionGroup{},
 		Connections: connections,
-	}, nil
+	}
+	s.populatePasswords(&data)
+	return data, nil
+}
+
+func (s *ConnectionStore) populatePasswords(data *session.ConnectionStoreData) {
+	needsSave := false
+	for i := range data.Connections {
+		conn := &data.Connections[i]
+		if conn.AuthType != "password" {
+			continue
+		}
+
+		if s.passwordStore != nil {
+			// Migration: if JSON still has plaintext password, move to keychain
+			if conn.Password != "" {
+				_ = s.passwordStore.SetPassword(conn.ID, conn.Password)
+				conn.Password = ""
+				needsSave = true
+			}
+
+			// Load password from external store
+			if pw, err := s.passwordStore.GetPassword(conn.ID); err == nil && pw != "" {
+				conn.Password = pw
+			}
+		}
+	}
+
+	if needsSave {
+		// Save cleaned JSON (passwords migrated out)
+		jsonData, err := json.MarshalIndent(data, "", "  ")
+		if err != nil {
+			return
+		}
+		_ = os.WriteFile(s.filePath(), jsonData, 0600)
+	}
 }

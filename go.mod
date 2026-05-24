@@ -1,6 +1,6 @@
 module github.com/ys-ll/uniterm
 
-go 1.23.0
+go 1.25.0
 
 require (
 	github.com/UserExistsError/conpty v0.1.4
@@ -10,14 +10,14 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/pkg/sftp v1.13.10
 	github.com/wailsapp/wails/v2 v2.12.0
-	golang.org/x/crypto v0.41.0
-	golang.org/x/sys v0.35.0
+	golang.org/x/crypto v0.50.0
+	golang.org/x/sys v0.43.0
 )
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
-	github.com/godbus/dbus/v5 v5.1.0 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/labstack/echo/v4 v4.13.3 // indirect
@@ -32,11 +32,12 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/samber/lo v1.49.1 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
-	golang.org/x/net v0.42.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 )

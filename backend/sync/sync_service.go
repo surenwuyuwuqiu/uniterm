@@ -49,12 +49,23 @@ func (s *SyncService) GetConfig() (SyncConfig, error) {
 }
 
 // SaveConfig persists sync configuration and stores the token if provided.
+// If the repo URL changed, the old local sync repo is removed so CloneOrOpen
+// will clone from the new URL on the next sync.
 func (s *SyncService) SaveConfig(config SyncConfig, token string) error {
 	if config.AuthType == AuthTypeToken && token != "" {
 		if err := s.keychain.SetGitToken(token); err != nil {
 			return fmt.Errorf("store token: %w", err)
 		}
 	}
+
+	oldConfig, _ := s.configStore.Load()
+	if oldConfig.RepoURL != "" && oldConfig.RepoURL != config.RepoURL {
+		// URL changed — purge old clone so we re-clone from new remote
+		if err := os.RemoveAll(s.repoPath); err != nil {
+			return fmt.Errorf("remove old sync repo: %w", err)
+		}
+	}
+
 	return s.configStore.Save(config)
 }
 

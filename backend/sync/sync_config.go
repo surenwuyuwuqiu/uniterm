@@ -9,19 +9,14 @@ import (
 
 const syncConfigFileName = "sync-config.json"
 
-type AuthType string
-
-const (
-	AuthTypeSSH   AuthType = "ssh"
-	AuthTypeToken AuthType = "token"
-)
-
 type SyncConfig struct {
-	RepoURL    string    `json:"repoUrl"`
-	Branch     string    `json:"branch"`
-	AuthType   AuthType  `json:"authType"`
-	AutoSync   bool      `json:"autoSync"`
-	LastSyncAt time.Time `json:"lastSyncAt"`
+	RepoURL        string    `json:"repoUrl"`
+	Branch         string    `json:"branch"`
+	Username       string    `json:"username"`
+	AutoSync       bool      `json:"autoSync"`
+	LastSyncAt     time.Time `json:"lastSyncAt"`
+	LastSyncStatus string    `json:"lastSyncStatus"`
+	LastSyncError  string    `json:"lastSyncError"`
 }
 
 type SyncConfigStore struct {
@@ -48,19 +43,16 @@ func (s *SyncConfigStore) Load() (SyncConfig, error) {
 	data, err := os.ReadFile(s.filePath())
 	if err != nil {
 		if os.IsNotExist(err) {
-			return SyncConfig{AuthType: AuthTypeSSH, Branch: "main"}, nil
+			return SyncConfig{Branch: "main"}, nil
 		}
 		return SyncConfig{}, err
 	}
 	var config SyncConfig
 	if err := json.Unmarshal(data, &config); err != nil {
-		return SyncConfig{AuthType: AuthTypeSSH, Branch: "main"}, nil
+		return SyncConfig{Branch: "main"}, nil
 	}
 	if config.Branch == "" {
 		config.Branch = "main"
-	}
-	if config.AuthType == "" {
-		config.AuthType = AuthTypeSSH
 	}
 	return config, nil
 }

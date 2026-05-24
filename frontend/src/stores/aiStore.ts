@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
 import type { AIMessage, AIConfig, ExecutionMode, AISession } from '../types/ai'
 import { SaveAIConfig, LoadAIConfig, SaveAISessions, LoadAISessions } from '../../wailsjs/go/main/App'
+import { EventsOn } from '../../wailsjs/runtime'
 import { t } from '../i18n'
 
 const SYSTEM_PROMPT = `You are an AI assistant inside uniTerm, a terminal emulator. You can execute shell commands in the user's active terminal to help them complete tasks.
@@ -443,6 +444,11 @@ export const useAIStore = defineStore('ai', () => {
   })
 
   const systemPrompt = computed(() => SYSTEM_PROMPT)
+
+  // Reload AI config when settings change via sync
+  EventsOn('store:settings:changed', () => {
+    initConfig()
+  })
 
   return {
     visible,

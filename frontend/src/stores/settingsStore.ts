@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import type { AppSettings, AIModelConfig } from '../types/settings'
 import { DEFAULT_SETTINGS } from '../types/settings'
 import { SaveSettings, LoadSettings, GetAvailableShells } from '../../wailsjs/go/main/App'
+import { EventsOn } from '../../wailsjs/runtime'
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<AppSettings>({ ...DEFAULT_SETTINGS })
@@ -112,6 +113,15 @@ export const useSettingsStore = defineStore('settings', () => {
   // Listen for system color scheme changes
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (settings.value.theme === 'system') {
+      applyTheme()
+    }
+  })
+
+  // Listen for settings changes from sync
+  EventsOn('store:settings:changed', (data: AppSettings) => {
+    if (data) {
+      settings.value = mergeSettings(data)
+      loaded.value = true
       applyTheme()
     }
   })

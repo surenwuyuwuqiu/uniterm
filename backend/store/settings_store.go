@@ -17,6 +17,14 @@ type TerminalSettings struct {
 	MaxHistoryLines   int    `json:"maxHistoryLines"`
 }
 
+// AIConfig is the legacy flat AI config type, kept for Wails binding compatibility.
+// New code should use AppSettings.AI (active model from AISettings).
+type AIConfig struct {
+	APIKey  string `json:"apiKey"`
+	BaseURL string `json:"baseURL"`
+	Model   string `json:"model"`
+}
+
 type AIModelConfig struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -39,7 +47,8 @@ type AppSettings struct {
 }
 
 type SettingsStore struct {
-	configDir string
+	configDir     string
+	passwordStore PasswordStore
 }
 
 func NewSettingsStore() (*SettingsStore, error) {
@@ -54,11 +63,24 @@ func NewSettingsStore() (*SettingsStore, error) {
 	return &SettingsStore{configDir: appDir}, nil
 }
 
+func (s *SettingsStore) SetPasswordStore(ps PasswordStore) {
+	s.passwordStore = ps
+}
+
 func (s *SettingsStore) filePath() string {
 	return filepath.Join(s.configDir, settingsFileName)
 }
 
 func (s *SettingsStore) Save(settings AppSettings) error {
+	// Extract model apiKeys to keychain before writing JSON
+	for i := range settings.AI.Models {
+		m := &settings.AI.Models[i]
+		if m.APIKey != "" && s.passwordStore != nil {
+			_ = s.passwordStore.SetModelAPIKey(m.ID, m.APIKey)
+		}
+		m.APIKey = ""
+	}
+
 	data, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return err
@@ -78,6 +100,29 @@ func (s *SettingsStore) Load() (AppSettings, error) {
 	if err := json.Unmarshal(data, &settings); err != nil {
 		return defaultSettings(), nil
 	}
+
+	// Backfill model apiKeys from keychain; migrate if still in JSON
+	needsSave := false
+	for i := range settings.AI.Models {
+		m := &settings.AI.Models[i]
+		if s.passwordStore != nil {
+			// Migration: if JSON still has plaintext apiKey, move to keychain
+			if m.APIKey != "" {
+				_ = s.passwordStore.SetModelAPIKey(m.ID, m.APIKey)
+				m.APIKey = ""
+				needsSave = true
+			}
+			// Backfill from keychain
+			if ak, err := s.passwordStore.GetModelAPIKey(m.ID); err == nil && ak != "" {
+				m.APIKey = ak
+			}
+		}
+	}
+	if needsSave {
+		jsonData, _ := json.MarshalIndent(settings, "", "  ")
+		_ = os.WriteFile(s.filePath(), jsonData, 0600)
+	}
+
 	return settings, nil
 }
 

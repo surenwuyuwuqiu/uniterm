@@ -153,102 +153,79 @@
 
       <!-- Sync settings -->
       <div v-if="settingsStore.activeCategory === 'sync'" class="settings-section sync-settings">
-        <div class="section-header">
-          <h2>{{ t('settings.sync') }}</h2>
-          <p class="section-desc">{{ t('settings.syncDesc') }}</p>
-        </div>
+        <h2 class="section-title">{{ t('settings.sync') }}</h2>
+        <p class="section-desc">{{ t('settings.syncDesc') }}</p>
 
-        <div class="sync-warning">
-          <AlertTriangle :size="16" />
-          <span>{{ t('settings.syncWarning') }}</span>
-        </div>
-
-        <div class="setting-item">
-          <div class="setting-label">
-            <label>{{ t('settings.syncRepoUrl') }}</label>
-            <p class="setting-desc">{{ t('settings.syncRepoUrlDesc') }}</p>
-          </div>
-          <div class="setting-control">
-            <el-input
-              v-model="syncStore.config.repoUrl"
-              :placeholder="t('settings.syncRepoUrlPlaceholder')"
-              size="default"
-              style="width: 400px"
-            />
+        <!-- Empty state: no repo configured -->
+        <div v-if="!syncStore.config.repoUrl" class="sync-card">
+          <div class="sync-card-header">{{ t('settings.syncRepoCard') }}</div>
+          <div class="sync-card-body empty-state">
+            <p class="empty-text">{{ t('settings.syncEmptyDesc') }}</p>
+            <el-button type="primary" @click="syncStore.showAddRepo = true">
+              {{ t('settings.syncAddRepo') }}
+            </el-button>
           </div>
         </div>
 
-        <div class="setting-item">
-          <div class="setting-label">
-            <label>{{ t('settings.syncAuthType') }}</label>
+        <!-- Configured state -->
+        <template v-else>
+          <!-- Repo config card -->
+          <div class="sync-card">
+            <div class="sync-card-header">
+              <span>{{ t('settings.syncRepoCard') }}</span>
+              <el-button size="small" text @click="openEditRepo">{{ t('settings.syncEdit') }}</el-button>
+            </div>
+            <div class="sync-card-body">
+              <div class="repo-info">
+                <div class="repo-info-row">
+                  <span class="repo-label">{{ t('settings.syncRepoUrl') }}</span>
+                  <span class="repo-value">{{ syncStore.config.repoUrl }}</span>
+                </div>
+                <div class="repo-info-row">
+                  <span class="repo-label">{{ t('settings.syncUsername') }}</span>
+                  <span class="repo-value">{{ syncStore.config.username }}</span>
+                </div>
+              </div>
+              <div class="repo-actions">
+                <el-button size="small" @click="syncStore.showChangePassword = true">{{ t('settings.syncChangePassword') }}</el-button>
+                <el-button size="small" @click="syncStore.showDeleteRepo = true">{{ t('settings.syncDeleteRepo') }}</el-button>
+              </div>
+            </div>
           </div>
-          <div class="setting-control">
-            <el-radio-group v-model="syncStore.config.authType">
-              <el-radio value="ssh">SSH Key</el-radio>
-              <el-radio value="token">Personal Access Token</el-radio>
-            </el-radio-group>
-          </div>
-        </div>
 
-        <div v-if="syncStore.config.authType === 'token'" class="setting-item">
-          <div class="setting-label">
-            <label>{{ t('settings.syncToken') }}</label>
-          </div>
-          <div class="setting-control">
-            <el-input
-              v-model="tokenInput"
-              :type="showToken ? 'text' : 'password'"
-              :placeholder="t('settings.syncTokenPlaceholder')"
-              size="default"
-              style="width: 300px"
-            >
-              <template #suffix>
-                <el-button link @click="showToken = !showToken">
-                  {{ showToken ? t('settings.syncHide') : t('settings.syncShow') }}
+          <!-- Sync card -->
+          <div class="sync-card">
+            <div class="sync-card-header">{{ t('settings.syncSyncCard') }}</div>
+            <div class="sync-card-body">
+              <div class="sync-status">
+                <div class="sync-status-row">
+                  <span class="sync-label">{{ t('settings.syncLastSync') }}</span>
+                  <span class="sync-value">{{ syncStore.formatSyncTime() }}</span>
+                  <span v-if="syncStore.config.lastSyncStatus === 'success'" class="sync-tag success">{{ t('settings.syncStatusSuccess') }}</span>
+                  <span v-else-if="syncStore.config.lastSyncStatus === 'failed'" class="sync-tag failed">{{ t('settings.syncStatusFailed') }}</span>
+                </div>
+                <div v-if="syncStore.config.lastSyncStatus === 'failed' && syncStore.config.lastSyncError" class="sync-status-row sync-error">
+                  <span class="sync-label">{{ t('settings.syncReason') }}</span>
+                  <span class="sync-value error-text">{{ syncStore.config.lastSyncError }}</span>
+                </div>
+              </div>
+              <div class="sync-actions-row">
+                <el-button
+                  type="primary"
+                  :loading="syncStore.syncing"
+                  @click="handleSyncNow"
+                >
+                  {{ t('settings.syncNow') }}
                 </el-button>
-              </template>
-            </el-input>
+              </div>
+              <div class="sync-auto-row">
+                <span class="sync-auto-label">{{ t('settings.syncAuto') }}</span>
+                <span class="sync-auto-desc">{{ t('settings.syncAutoDesc') }}</span>
+                <el-switch v-model="syncStore.config.autoSync" @change="handleAutoSyncToggle" />
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div class="setting-item">
-          <div class="setting-label">
-            <label>{{ t('settings.syncAuto') }}</label>
-            <p class="setting-desc">{{ t('settings.syncAutoDesc') }}</p>
-          </div>
-          <div class="setting-control">
-            <el-switch v-model="syncStore.config.autoSync" />
-          </div>
-        </div>
-
-        <div class="setting-item">
-          <div class="setting-label">
-            <label>{{ t('settings.syncLastTime') }}</label>
-          </div>
-          <div class="setting-control sync-time">
-            {{ syncStore.lastSyncTime }}
-          </div>
-        </div>
-
-        <div class="sync-actions">
-          <el-button
-            :loading="syncStore.testingConnection"
-            @click="handleTestConnection"
-          >
-            {{ t('settings.syncTestConnection') }}
-          </el-button>
-          <el-button
-            type="primary"
-            :loading="syncStore.syncing"
-            @click="handleSyncNow"
-          >
-            {{ t('settings.syncNow') }}
-          </el-button>
-        </div>
-
-        <div v-if="syncStore.lastResult" class="sync-result">
-          {{ syncStore.lastResult }}
-        </div>
+        </template>
       </div>
 
       <!-- 关于 -->
@@ -326,17 +303,28 @@
         <el-button type="primary" @click="saveModel">{{ t('settings.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- Sync dialogs -->
+    <AddRepoDialog />
+    <EditRepoDialog />
+    <ChangePasswordDialog />
+    <DeleteRepoDialog />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
-import { Settings, Monitor, MessageCircleMore, Info, RefreshCw, AlertTriangle, Pencil, Trash2 } from '@lucide/vue'
+import { Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2 } from '@lucide/vue'
+import { ElMessage } from 'element-plus'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSyncStore } from '../stores/syncStore'
 import { useI18n } from '../i18n'
 import { TERMINAL_THEMES, FONT_OPTIONS } from '../types/settings'
 import type { AIModelConfig } from '../types/settings'
+import AddRepoDialog from './AddRepoDialog.vue'
+import EditRepoDialog from './EditRepoDialog.vue'
+import ChangePasswordDialog from './ChangePasswordDialog.vue'
+import DeleteRepoDialog from './DeleteRepoDialog.vue'
 
 const settingsStore = useSettingsStore()
 const syncStore = useSyncStore()
@@ -344,21 +332,11 @@ const { t } = useI18n()
 
 const appVersion = import.meta.env.VITE_VERSION || 'dev'
 
-const tokenInput = ref('')
-const showToken = ref(false)
-
-async function handleTestConnection() {
-  await syncStore.saveConfig(tokenInput.value)
-  const err = await syncStore.testConnection()
-  if (err) {
-    ElMessage.error(t('settings.syncTestFailed', { error: err }))
-  } else {
-    ElMessage.success(t('settings.syncTestSuccess'))
-  }
+function openEditRepo() {
+  syncStore.showEditRepo = true
 }
 
 async function handleSyncNow() {
-  await syncStore.saveConfig(tokenInput.value)
   const result = await syncStore.doSync()
   if (!result) {
     ElMessage.error(syncStore.lastResult || t('settings.syncFailed'))
@@ -370,11 +348,19 @@ async function handleSyncNow() {
   ElMessage.success(result.message || t('settings.syncSuccess'))
 }
 
+async function handleAutoSyncToggle() {
+  try {
+    await syncStore.saveConfig()
+  } catch (e) {
+    console.error('Failed to save auto sync toggle:', e)
+  }
+}
+
 syncStore.loadConfig()
 
 watch(() => settingsStore.openCategory, (cat) => {
   if (cat && (cat === 'basic' || cat === 'terminal' || cat === 'ai' || cat === 'sync' || cat === 'about')) {
-    settingsStore.settingsStore.activeCategory = cat
+    settingsStore.activeCategory = cat
     settingsStore.openCategory = null
   }
 })
@@ -634,33 +620,175 @@ function getShellLabel(path: string): string {
   font-family: var(--font-mono);
 }
 
-.sync-warning {
+.section-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sync-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.sync-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  padding: 8px 12px 8px 18px;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sync-card-body {
+  padding: 16px 18px;
+}
+
+.sync-card-body.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 18px;
+}
+
+.empty-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* Repo config */
+.repo-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.repo-info-row {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.repo-label {
+  color: var(--text-muted);
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.repo-value {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+.repo-warning {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 10px 14px;
   background: var(--el-color-warning-light-9);
   border: 1px solid var(--el-color-warning-light-5);
   border-radius: 6px;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   color: var(--el-color-warning-dark-2);
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
-.sync-actions {
+.repo-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.sync-result {
-  margin-top: 12px;
-  color: var(--el-text-color-secondary);
+.repo-actions-left {
+  display: flex;
+  gap: 8px;
+}
+
+/* Sync status */
+.sync-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.sync-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
 }
 
-.sync-time {
-  color: var(--el-text-color-secondary);
+.sync-label {
+  color: var(--text-muted);
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.sync-value {
+  color: var(--text-primary);
+}
+
+.sync-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.sync-tag.success {
+  background: var(--el-color-success-light-9);
+  color: var(--el-color-success-dark-2);
+}
+
+.sync-tag.failed {
+  background: var(--el-color-danger-light-9);
+  color: var(--el-color-danger-dark-2);
+}
+
+.sync-error {
+  align-items: flex-start;
+}
+
+.error-text {
+  color: var(--el-color-danger);
+}
+
+.sync-actions-row {
+  margin-bottom: 14px;
+}
+
+.sync-auto-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sync-auto-label {
   font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.sync-auto-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
 }
 </style>

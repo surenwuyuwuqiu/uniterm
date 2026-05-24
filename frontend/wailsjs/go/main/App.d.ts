@@ -99,9 +99,13 @@ export function SftpRename(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SftpResumeTransfer(arg1:string,arg2:string):Promise<void>;
 
-export function SyncGetConfig():Promise<sync.SyncConfig>;
+export function SyncChangePassword(arg1:string,arg2:string):Promise<void>;
 
-export function SyncGetLastSyncTime():Promise<string>;
+export function SyncConfigureRepo(arg1:string,arg2:string,arg3:string,arg4:string):Promise<sync.SyncResult>;
+
+export function SyncDeleteRepo():Promise<void>;
+
+export function SyncGetConfig():Promise<sync.SyncConfig>;
 
 export function SyncNow():Promise<sync.SyncResult>;
 
@@ -110,5 +114,7 @@ export function SyncResolveConflict(arg1:boolean):Promise<sync.SyncResult>;
 export function SyncSaveConfig(arg1:sync.SyncConfig,arg2:string):Promise<void>;
 
 export function SyncTestConnection():Promise<void>;
+
+export function SyncVerifyPassword(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function WriteTempFile(arg1:string,arg2:string):Promise<string>;

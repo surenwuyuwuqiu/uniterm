@@ -190,6 +190,42 @@ export function SftpResumeTransfer(arg1, arg2) {
   return window['go']['main']['App']['SftpResumeTransfer'](arg1, arg2);
 }
 
+export function SyncChangePassword(arg1, arg2) {
+  return window['go']['main']['App']['SyncChangePassword'](arg1, arg2);
+}
+
+export function SyncConfigureRepo(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SyncConfigureRepo'](arg1, arg2, arg3, arg4);
+}
+
+export function SyncDeleteRepo() {
+  return window['go']['main']['App']['SyncDeleteRepo']();
+}
+
+export function SyncGetConfig() {
+  return window['go']['main']['App']['SyncGetConfig']();
+}
+
+export function SyncNow() {
+  return window['go']['main']['App']['SyncNow']();
+}
+
+export function SyncResolveConflict(arg1) {
+  return window['go']['main']['App']['SyncResolveConflict'](arg1);
+}
+
+export function SyncSaveConfig(arg1, arg2) {
+  return window['go']['main']['App']['SyncSaveConfig'](arg1, arg2);
+}
+
+export function SyncTestConnection() {
+  return window['go']['main']['App']['SyncTestConnection']();
+}
+
+export function SyncVerifyPassword(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SyncVerifyPassword'](arg1, arg2, arg3);
+}
+
 export function WriteTempFile(arg1, arg2) {
   return window['go']['main']['App']['WriteTempFile'](arg1, arg2);
 }

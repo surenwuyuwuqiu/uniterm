@@ -27,7 +27,6 @@ type App struct {
 	ctx              context.Context
 	sessionManager   *session.SessionManager
 	connectionStore  *store.ConnectionStore
-	aiConfigStore    *store.AIConfigStore
 	aiSessionStore   *store.AISessionStore
 	settingsStore    *store.SettingsStore
 	syncService      *sync.SyncService
@@ -62,13 +61,6 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.connectionStore = cs
 
-	acs, err := store.NewAIConfigStore()
-	if err != nil {
-		log.Writef("Failed to init AI config store: %v", err)
-		return
-	}
-	a.aiConfigStore = acs
-
 	ass, err := store.NewAISessionStore()
 	if err != nil {
 		log.Writef("Failed to init AI session store: %v", err)
@@ -88,9 +80,12 @@ func (a *App) startup(ctx context.Context) {
 		log.Writef("Failed to create sync service: %v", err)
 	} else {
 		a.syncService = syncSvc
-		// Wire keychain into connection store for password migration
+		// Wire keychain into stores for password/API key migration
 		if a.connectionStore != nil {
-			a.connectionStore.SetPasswordStore(syncSvc.Keychain())
+			a.connectionStore.SetPasswordStore(syncSvc.PasswordStore())
+		}
+		if a.settingsStore != nil {
+			a.settingsStore.SetPasswordStore(syncSvc.PasswordStore())
 		}
 		// Auto-sync on startup if enabled
 		if syncSvc.IsAutoSyncEnabled() {
@@ -140,14 +135,42 @@ func (a *App) LoadConnections() (session.ConnectionStoreData, error) {
 // AI Config Store methods
 
 func (a *App) SaveAIConfig(config store.AIConfig) error {
-	if a.aiConfigStore == nil {
-		return fmt.Errorf("AI config store not initialized")
+	if a.settingsStore == nil {
+		return fmt.Errorf("settings store not initialized")
 	}
-	err := a.aiConfigStore.Save(config)
-	if err == nil {
-		a.triggerAutoSync()
+	settings, err := a.settingsStore.Load()
+	if err != nil {
+		return fmt.Errorf("load settings: %w", err)
 	}
-	return err
+	// Update the active model's fields
+	for i := range settings.AI.Models {
+		if settings.AI.Models[i].ID == settings.AI.ActiveModelID {
+			settings.AI.Models[i].APIKey = config.APIKey
+			settings.AI.Models[i].BaseURL = config.BaseURL
+			settings.AI.Models[i].Model = config.Model
+			break
+		}
+	}
+	if err := a.settingsStore.Save(settings); err != nil {
+		return err
+	}
+	a.triggerAutoSync()
+	return nil
+}
+
+// reloadStoresAfterSync reloads connections and settings from disk and emits
+// events so the frontend refreshes after a sync pull.
+func (a *App) reloadStoresAfterSync() {
+	if a.connectionStore != nil {
+		if data, err := a.connectionStore.Load(); err == nil {
+			runtime.EventsEmit(a.ctx, "store:connections:changed", data)
+		}
+	}
+	if a.settingsStore != nil {
+		if settings, err := a.settingsStore.Load(); err == nil {
+			runtime.EventsEmit(a.ctx, "store:settings:changed", settings)
+		}
+	}
 }
 
 func (a *App) triggerAutoSync() {
@@ -164,10 +187,12 @@ func (a *App) triggerAutoSync() {
 				"remoteTime": result.Conflict.RemoteTime.Format(time.RFC3339),
 			})
 		}
+		if err == nil && result.Direction == sync.SyncPull {
+			a.reloadStoresAfterSync()
+		}
+		runtime.EventsEmit(a.ctx, "sync:completed")
 	}()
 }
-
-// SyncGetConfig returns the sync configuration.
 func (a *App) SyncGetConfig() (sync.SyncConfig, error) {
 	if a.syncService == nil {
 		return sync.SyncConfig{}, fmt.Errorf("sync service not initialized")
@@ -198,6 +223,10 @@ func (a *App) SyncNow() (*sync.SyncResult, error) {
 			"remoteTime": result.Conflict.RemoteTime.Format(time.RFC3339),
 		})
 	}
+	if result.Direction == sync.SyncPull {
+		a.reloadStoresAfterSync()
+	}
+	runtime.EventsEmit(a.ctx, "sync:completed")
 	return result, nil
 }
 
@@ -214,6 +243,9 @@ func (a *App) SyncResolveConflict(useLocal bool) (*sync.SyncResult, error) {
 		if data, err := a.connectionStore.Load(); err == nil {
 			runtime.EventsEmit(a.ctx, "store:connections:changed", data)
 		}
+		if settings, err := a.settingsStore.Load(); err == nil {
+			runtime.EventsEmit(a.ctx, "store:settings:changed", settings)
+		}
 	}
 	return result, nil
 }
@@ -226,19 +258,62 @@ func (a *App) SyncTestConnection() error {
 	return a.syncService.TestConnection()
 }
 
-// SyncGetLastSyncTime returns the last sync time string.
-func (a *App) SyncGetLastSyncTime() string {
+// SyncConfigureRepo sets up a new or existing sync repository.
+func (a *App) SyncConfigureRepo(repoURL, username, token, masterPassword string) (*sync.SyncResult, error) {
 	if a.syncService == nil {
-		return "从未同步"
+		return nil, fmt.Errorf("sync service not initialized")
 	}
-	return a.syncService.GetLastSyncTime()
+	result, err := a.syncService.ConfigureRepo(repoURL, username, token, masterPassword)
+	if err == nil {
+		a.reloadStoresAfterSync()
+		runtime.EventsEmit(a.ctx, "sync:completed")
+	}
+	return result, err
+}
+
+// SyncChangePassword re-encrypts synced files with a new master password.
+func (a *App) SyncChangePassword(oldPassword, newPassword string) error {
+	if a.syncService == nil {
+		return fmt.Errorf("sync service not initialized")
+	}
+	return a.syncService.ChangePassword(oldPassword, newPassword)
+}
+
+// SyncVerifyPassword verifies the given password can decrypt the repo config.
+func (a *App) SyncVerifyPassword(password, username, token string) error {
+	if a.syncService == nil {
+		return fmt.Errorf("sync service not initialized")
+	}
+	return a.syncService.VerifySyncPassword(password, username, token)
+}
+
+// SyncDeleteRepo removes the sync repository configuration.
+func (a *App) SyncDeleteRepo() error {
+	if a.syncService == nil {
+		return fmt.Errorf("sync service not initialized")
+	}
+	return a.syncService.DeleteRepo()
 }
 
 func (a *App) LoadAIConfig() (store.AIConfig, error) {
-	if a.aiConfigStore == nil {
-		return store.AIConfig{}, fmt.Errorf("AI config store not initialized")
+	if a.settingsStore == nil {
+		return store.AIConfig{}, fmt.Errorf("settings store not initialized")
 	}
-	return a.aiConfigStore.Load()
+	settings, err := a.settingsStore.Load()
+	if err != nil {
+		return store.AIConfig{}, err
+	}
+	// Return the active model's config
+	for _, m := range settings.AI.Models {
+		if m.ID == settings.AI.ActiveModelID {
+			return store.AIConfig{
+				APIKey:  m.APIKey,
+				BaseURL: m.BaseURL,
+				Model:   m.Model,
+			}, nil
+		}
+	}
+	return store.AIConfig{}, nil
 }
 
 // AI Session Store methods
@@ -263,7 +338,11 @@ func (a *App) SaveSettings(settings store.AppSettings) error {
 	if a.settingsStore == nil {
 		return fmt.Errorf("settings store not initialized")
 	}
-	return a.settingsStore.Save(settings)
+	err := a.settingsStore.Save(settings)
+	if err == nil {
+		a.triggerAutoSync()
+	}
+	return err
 }
 
 func (a *App) LoadSettings() (store.AppSettings, error) {

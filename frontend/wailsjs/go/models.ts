@@ -412,9 +412,9 @@ export namespace sync {
 	
 	export class ConflictInfo {
 	    // Go type: time
-	    LocalTime: any;
+	    localTime: any;
 	    // Go type: time
-	    RemoteTime: any;
+	    remoteTime: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConflictInfo(source);
@@ -422,8 +422,8 @@ export namespace sync {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.LocalTime = this.convertValues(source["LocalTime"], null);
-	        this.RemoteTime = this.convertValues(source["RemoteTime"], null);
+	        this.localTime = this.convertValues(source["localTime"], null);
+	        this.remoteTime = this.convertValues(source["remoteTime"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -447,10 +447,12 @@ export namespace sync {
 	export class SyncConfig {
 	    repoUrl: string;
 	    branch: string;
-	    authType: string;
+	    username: string;
 	    autoSync: boolean;
 	    // Go type: time
 	    lastSyncAt: any;
+	    lastSyncStatus: string;
+	    lastSyncError: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SyncConfig(source);
@@ -460,9 +462,11 @@ export namespace sync {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.repoUrl = source["repoUrl"];
 	        this.branch = source["branch"];
-	        this.authType = source["authType"];
+	        this.username = source["username"];
 	        this.autoSync = source["autoSync"];
 	        this.lastSyncAt = this.convertValues(source["lastSyncAt"], null);
+	        this.lastSyncStatus = source["lastSyncStatus"];
+	        this.lastSyncError = source["lastSyncError"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -484,9 +488,9 @@ export namespace sync {
 		}
 	}
 	export class SyncResult {
-	    Direction: number;
-	    Message: string;
-	    Conflict?: ConflictInfo;
+	    direction: number;
+	    message: string;
+	    conflict?: ConflictInfo;
 	
 	    static createFrom(source: any = {}) {
 	        return new SyncResult(source);
@@ -494,9 +498,9 @@ export namespace sync {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Direction = source["Direction"];
-	        this.Message = source["Message"];
-	        this.Conflict = this.convertValues(source["Conflict"], ConflictInfo);
+	        this.direction = source["direction"];
+	        this.message = source["message"];
+	        this.conflict = this.convertValues(source["conflict"], ConflictInfo);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

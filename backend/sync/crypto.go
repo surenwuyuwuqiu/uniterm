@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,10 +13,209 @@ import (
 	"path/filepath"
 )
 
-func EncryptField(plaintext string, key []byte) (string, error) {
-	if plaintext == "" {
-		return "", nil
+// EncryptConfigFiles encrypts entire config files from srcDir into destDir.
+// kc is used to backfill passwords from keychain before encryption.
+// Pass nil for kc to skip backfill.
+func EncryptConfigFiles(srcDir, destDir string, key []byte, kc *Keychain) error {
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return err
 	}
+
+	if err := encryptConnectionsFile(
+		filepath.Join(srcDir, "connections.json"),
+		filepath.Join(destDir, "connections.json"),
+		key, kc,
+	); err != nil {
+		return fmt.Errorf("encrypt connections: %w", err)
+	}
+
+	if err := encryptSettingsFile(
+		filepath.Join(srcDir, "settings.json"),
+		filepath.Join(destDir, "settings.json"),
+		key, kc,
+	); err != nil {
+		return fmt.Errorf("encrypt settings: %w", err)
+	}
+
+	return nil
+}
+
+func encryptConnectionsFile(src, dest string, key []byte, kc *Keychain) error {
+	data, err := readJSONFile(src)
+	if err != nil {
+		return err
+	}
+
+	if kc != nil {
+		var wrapper struct {
+			Groups      []map[string]interface{} `json:"groups"`
+			Connections []map[string]interface{} `json:"connections"`
+		}
+		if err := json.Unmarshal(data, &wrapper); err != nil {
+			return fmt.Errorf("parse connections: %w", err)
+		}
+		for _, cm := range wrapper.Connections {
+			if cm["authType"] != "password" {
+				continue
+			}
+			pw, _ := cm["password"].(string)
+			if pw == "" {
+				if id, ok := cm["id"].(string); ok {
+					if kcPw, err := kc.GetPassword(id); err == nil && kcPw != "" {
+						cm["password"] = kcPw
+					}
+				}
+			}
+		}
+		data, _ = json.MarshalIndent(wrapper, "", "  ")
+	}
+
+	encoded, err := encryptBytes(data, key)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dest, []byte(encoded), 0600)
+}
+
+func encryptSettingsFile(src, dest string, key []byte, kc *Keychain) error {
+	data, err := readJSONFile(src)
+	if err != nil {
+		return err
+	}
+
+	if kc != nil {
+		var obj map[string]interface{}
+		if err := json.Unmarshal(data, &obj); err == nil {
+			if ai, ok := obj["ai"].(map[string]interface{}); ok {
+				if models, ok := ai["models"].([]interface{}); ok {
+					for _, m := range models {
+						if mm, ok := m.(map[string]interface{}); ok {
+							ak, _ := mm["apiKey"].(string)
+							if ak == "" {
+								if id, ok := mm["id"].(string); ok {
+									if kcAk, err := kc.GetModelAPIKey(id); err == nil && kcAk != "" {
+										mm["apiKey"] = kcAk
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			data, _ = json.MarshalIndent(obj, "", "  ")
+		}
+	}
+
+	encoded, err := encryptBytes(data, key)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dest, []byte(encoded), 0600)
+}
+
+// DecryptConfigFiles decrypts config files from srcDir into destDir.
+// kc is used to write decrypted passwords to keychain and clear them from JSON.
+// Pass nil for kc to skip keychain (passwords stay in JSON).
+func DecryptConfigFiles(srcDir, destDir string, key []byte, kc *Keychain) error {
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return err
+	}
+
+	if err := decryptConnectionsFile(
+		filepath.Join(srcDir, "connections.json"),
+		filepath.Join(destDir, "connections.json"),
+		key, kc,
+	); err != nil {
+		return fmt.Errorf("decrypt connections: %w", err)
+	}
+
+	if err := decryptSettingsFile(
+		filepath.Join(srcDir, "settings.json"),
+		filepath.Join(destDir, "settings.json"),
+		key, kc,
+	); err != nil {
+		return fmt.Errorf("decrypt settings: %w", err)
+	}
+
+	return nil
+}
+
+func decryptConnectionsFile(src, dest string, key []byte, kc *Keychain) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return os.WriteFile(dest, []byte("{}"), 0600)
+		}
+		return err
+	}
+
+	plaintext, err := decryptBytes(string(data), key)
+	if err != nil {
+		return fmt.Errorf("decrypt connections: %w", err)
+	}
+
+	if kc != nil {
+		var wrapper struct {
+			Groups      []map[string]interface{} `json:"groups"`
+			Connections []map[string]interface{} `json:"connections"`
+		}
+		if err := json.Unmarshal(plaintext, &wrapper); err != nil {
+			return fmt.Errorf("parse connections: %w", err)
+		}
+		for _, cm := range wrapper.Connections {
+			if pw, ok := cm["password"].(string); ok && pw != "" {
+				if id, ok := cm["id"].(string); ok {
+					_ = kc.SetPassword(id, pw)
+				}
+				cm["password"] = ""
+			}
+		}
+		plaintext, _ = json.MarshalIndent(wrapper, "", "  ")
+	}
+
+	return os.WriteFile(dest, plaintext, 0600)
+}
+
+func decryptSettingsFile(src, dest string, key []byte, kc *Keychain) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return os.WriteFile(dest, []byte("{}"), 0600)
+		}
+		return err
+	}
+
+	plaintext, err := decryptBytes(string(data), key)
+	if err != nil {
+		return fmt.Errorf("decrypt settings: %w", err)
+	}
+
+	// Extract per-model apiKeys to keychain, clear from JSON
+	if kc != nil {
+		var obj map[string]interface{}
+		if err := json.Unmarshal(plaintext, &obj); err == nil {
+			if ai, ok := obj["ai"].(map[string]interface{}); ok {
+				if models, ok := ai["models"].([]interface{}); ok {
+					for _, m := range models {
+						if mm, ok := m.(map[string]interface{}); ok {
+							if ak, ok := mm["apiKey"].(string); ok && ak != "" {
+								if id, ok := mm["id"].(string); ok {
+									_ = kc.SetModelAPIKey(id, ak)
+								}
+								mm["apiKey"] = ""
+							}
+						}
+					}
+				}
+			}
+			plaintext, _ = json.MarshalIndent(obj, "", "  ")
+		}
+	}
+
+	return os.WriteFile(dest, plaintext, 0600)
+}
+
+func encryptBytes(plaintext []byte, key []byte) (string, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", fmt.Errorf("create cipher: %w", err)
@@ -28,172 +228,33 @@ func EncryptField(plaintext string, key []byte) (string, error) {
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", fmt.Errorf("generate nonce: %w", err)
 	}
-	ciphertext := aesGCM.Seal(nonce, nonce, []byte(plaintext), nil)
+	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
-func DecryptField(encoded string, key []byte) (string, error) {
-	if encoded == "" {
-		return "", nil
-	}
+func decryptBytes(encoded string, key []byte) ([]byte, error) {
 	ciphertext, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		return "", fmt.Errorf("decode base64: %w", err)
+		return nil, fmt.Errorf("decode base64: %w", err)
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", fmt.Errorf("create cipher: %w", err)
+		return nil, fmt.Errorf("create cipher: %w", err)
 	}
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", fmt.Errorf("create GCM: %w", err)
+		return nil, fmt.Errorf("create GCM: %w", err)
 	}
 	nonceSize := aesGCM.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return "", fmt.Errorf("ciphertext too short")
+		return nil, fmt.Errorf("ciphertext too short")
 	}
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return "", fmt.Errorf("decrypt: %w", err)
+		return nil, fmt.Errorf("decrypt: %w", err)
 	}
-	return string(plaintext), nil
-}
-
-func EncryptConfigFiles(srcDir, destDir string, key []byte) error {
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return err
-	}
-	if err := encryptConnectionsFile(
-		filepath.Join(srcDir, "connections.json"),
-		filepath.Join(destDir, "connections.json"),
-		key,
-	); err != nil {
-		return fmt.Errorf("encrypt connections: %w", err)
-	}
-	if err := encryptAIConfigFile(
-		filepath.Join(srcDir, "ai-config.json"),
-		filepath.Join(destDir, "ai-config.json"),
-		key,
-	); err != nil {
-		return fmt.Errorf("encrypt ai-config: %w", err)
-	}
-	return nil
-}
-
-func encryptConnectionsFile(src, dest string, key []byte) error {
-	data, err := readJSONFile(src)
-	if err != nil {
-		return err
-	}
-	var wrapper map[string]interface{}
-	if err := json.Unmarshal(data, &wrapper); err != nil {
-		return fmt.Errorf("parse connections: %w", err)
-	}
-	conns, _ := wrapper["connections"].([]interface{})
-	for _, c := range conns {
-		cm, ok := c.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if pw, ok := cm["password"].(string); ok && pw != "" {
-			enc, err := EncryptField(pw, key)
-			if err != nil {
-				return err
-			}
-			cm["password"] = enc
-		}
-	}
-	output, _ := json.MarshalIndent(wrapper, "", "  ")
-	return os.WriteFile(dest, output, 0600)
-}
-
-func encryptAIConfigFile(src, dest string, key []byte) error {
-	data, err := readJSONFile(src)
-	if err != nil {
-		return err
-	}
-	var config map[string]interface{}
-	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("parse ai-config: %w", err)
-	}
-	if apiKey, ok := config["apiKey"].(string); ok && apiKey != "" {
-		enc, err := EncryptField(apiKey, key)
-		if err != nil {
-			return err
-		}
-		config["apiKey"] = enc
-	}
-	output, _ := json.MarshalIndent(config, "", "  ")
-	return os.WriteFile(dest, output, 0600)
-}
-
-func DecryptConfigFiles(srcDir, destDir string, key []byte) error {
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return err
-	}
-	if err := decryptConnectionsFile(
-		filepath.Join(srcDir, "connections.json"),
-		filepath.Join(destDir, "connections.json"),
-		key,
-	); err != nil {
-		return fmt.Errorf("decrypt connections: %w", err)
-	}
-	if err := decryptAIConfigFile(
-		filepath.Join(srcDir, "ai-config.json"),
-		filepath.Join(destDir, "ai-config.json"),
-		key,
-	); err != nil {
-		return fmt.Errorf("decrypt ai-config: %w", err)
-	}
-	return nil
-}
-
-func decryptConnectionsFile(src, dest string, key []byte) error {
-	data, err := readJSONFile(src)
-	if err != nil {
-		return err
-	}
-	var wrapper map[string]interface{}
-	if err := json.Unmarshal(data, &wrapper); err != nil {
-		return fmt.Errorf("parse connections: %w", err)
-	}
-	conns, _ := wrapper["connections"].([]interface{})
-	for _, c := range conns {
-		cm, ok := c.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if enc, ok := cm["password"].(string); ok && enc != "" {
-			dec, err := DecryptField(enc, key)
-			if err != nil {
-				return err
-			}
-			cm["password"] = dec
-		}
-	}
-	output, _ := json.MarshalIndent(wrapper, "", "  ")
-	return os.WriteFile(dest, output, 0600)
-}
-
-func decryptAIConfigFile(src, dest string, key []byte) error {
-	data, err := readJSONFile(src)
-	if err != nil {
-		return err
-	}
-	var config map[string]interface{}
-	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("parse ai-config: %w", err)
-	}
-	if enc, ok := config["apiKey"].(string); ok && enc != "" {
-		dec, err := DecryptField(enc, key)
-		if err != nil {
-			return err
-		}
-		config["apiKey"] = dec
-	}
-	output, _ := json.MarshalIndent(config, "", "  ")
-	return os.WriteFile(dest, output, 0600)
+	return plaintext, nil
 }
 
 func readJSONFile(path string) ([]byte, error) {
@@ -205,4 +266,28 @@ func readJSONFile(path string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// ReadSaltFile reads the .sync-salt file from the repo directory.
+// Returns nil if the file doesn't exist (new repo).
+func ReadSaltFile(repoPath string) ([]byte, error) {
+	saltPath := filepath.Join(repoPath, ".sync-salt")
+	data, err := os.ReadFile(saltPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read salt file: %w", err)
+	}
+	salt, err := hex.DecodeString(string(data))
+	if err != nil {
+		return nil, fmt.Errorf("decode salt: %w", err)
+	}
+	return salt, nil
+}
+
+// WriteSaltFile writes the salt to .sync-salt in the repo directory.
+func WriteSaltFile(repoPath string, salt []byte) error {
+	saltPath := filepath.Join(repoPath, ".sync-salt")
+	return os.WriteFile(saltPath, []byte(hex.EncodeToString(salt)), 0600)
 }

@@ -10,12 +10,16 @@ import (
 
 const storeFileName = "connections.json"
 
-// PasswordStore is the interface for reading/writing connection passwords.
-// Implementations store passwords externally (e.g. OS keychain).
+// PasswordStore is the interface for reading/writing connection passwords and AI model API keys.
+// Implementations store secrets externally (e.g. OS keychain).
 type PasswordStore interface {
 	GetPassword(connID string) (string, error)
 	SetPassword(connID, password string) error
 	DeletePassword(connID string) error
+
+	GetModelAPIKey(modelID string) (string, error)
+	SetModelAPIKey(modelID, apiKey string) error
+	DeleteModelAPIKey(modelID string) error
 }
 
 type ConnectionStore struct {

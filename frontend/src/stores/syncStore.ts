@@ -6,7 +6,9 @@ import {
   SyncNow,
   SyncResolveConflict,
   SyncTestConnection,
-  SyncGetLastSyncTime,
+  SyncConfigureRepo,
+  SyncChangePassword,
+  SyncDeleteRepo,
 } from '../../wailsjs/go/main/App'
 import { sync } from '../../wailsjs/go/models'
 import { EventsOn } from '../../wailsjs/runtime'
@@ -14,9 +16,11 @@ import { EventsOn } from '../../wailsjs/runtime'
 export interface SyncConfig {
   repoUrl: string
   branch: string
-  authType: 'ssh' | 'token'
+  username: string
   autoSync: boolean
   lastSyncAt: string
+  lastSyncStatus: string
+  lastSyncError: string
 }
 
 export interface SyncResult {
@@ -34,15 +38,22 @@ export const useSyncStore = defineStore('sync', () => {
   const config = ref<SyncConfig>({
     repoUrl: '',
     branch: 'main',
-    authType: 'ssh',
+    username: '',
     autoSync: false,
     lastSyncAt: '',
+    lastSyncStatus: '',
+    lastSyncError: '',
   })
-  const lastSyncTime = ref('从未同步')
   const syncing = ref(false)
   const testingConnection = ref(false)
   const conflict = ref<SyncConflict | null>(null)
   const lastResult = ref('')
+
+  // Dialog visibility
+  const showAddRepo = ref(false)
+  const showEditRepo = ref(false)
+  const showChangePassword = ref(false)
+  const showDeleteRepo = ref(false)
 
   async function loadConfig() {
     try {
@@ -50,16 +61,15 @@ export const useSyncStore = defineStore('sync', () => {
       config.value = {
         repoUrl: cfg.repoUrl || '',
         branch: cfg.branch || 'main',
-        authType: (cfg.authType as 'ssh' | 'token') || 'ssh',
+        username: cfg.username || '',
         autoSync: cfg.autoSync || false,
         lastSyncAt: cfg.lastSyncAt || '',
+        lastSyncStatus: cfg.lastSyncStatus || '',
+        lastSyncError: cfg.lastSyncError || '',
       }
     } catch (e) {
       console.error('Load sync config failed:', e)
     }
-    try {
-      lastSyncTime.value = await SyncGetLastSyncTime()
-    } catch (_) {}
   }
 
   async function saveConfig(token: string = '') {
@@ -67,10 +77,13 @@ export const useSyncStore = defineStore('sync', () => {
       const cfg = new sync.SyncConfig()
       cfg.repoUrl = config.value.repoUrl
       cfg.branch = config.value.branch
-      cfg.authType = config.value.authType
+      cfg.username = config.value.username
       cfg.autoSync = config.value.autoSync
       cfg.lastSyncAt = config.value.lastSyncAt
+      cfg.lastSyncStatus = config.value.lastSyncStatus
+      cfg.lastSyncError = config.value.lastSyncError
       await SyncSaveConfig(cfg, token)
+      await loadConfig()
     } catch (e) {
       console.error('Save sync config failed:', e)
       throw e
@@ -81,25 +94,27 @@ export const useSyncStore = defineStore('sync', () => {
     syncing.value = true
     try {
       const result = await SyncNow()
-      // Wails returns Go struct with PascalCase fields (no json tags on SyncResult)
-      if (result.Direction === 3) {
-        conflict.value = result.Conflict
-          ? { localTime: result.Conflict.LocalTime, remoteTime: result.Conflict.RemoteTime }
-          : null
+      const direction = result.direction ?? (result as any).Direction ?? 0
+      if (direction === 3) {
+        conflict.value = result.conflict
+          ? { localTime: result.conflict.localTime ?? (result.conflict as any).LocalTime ?? '',
+              remoteTime: result.conflict.remoteTime ?? (result.conflict as any).RemoteTime ?? '' }
+          : (result as any).Conflict
+            ? { localTime: (result as any).Conflict.LocalTime ?? '', remoteTime: (result as any).Conflict.RemoteTime ?? '' }
+            : null
       } else {
         conflict.value = null
       }
-      lastResult.value = result.Message || ''
-      await updateLastSyncTime()
+      lastResult.value = result.message ?? (result as any).Message ?? ''
+      await loadConfig()
       return {
-        direction: result.Direction,
-        message: result.Message || '',
-        conflict: result.Conflict
-          ? { localTime: result.Conflict.LocalTime, remoteTime: result.Conflict.RemoteTime }
-          : undefined,
+        direction,
+        message: result.message ?? (result as any).Message ?? '',
+        conflict: conflict.value ?? undefined,
       }
     } catch (e: any) {
       lastResult.value = e?.message || String(e)
+      await loadConfig()
       return null
     } finally {
       syncing.value = false
@@ -111,11 +126,11 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       const result = await SyncResolveConflict(useLocal)
       conflict.value = null
-      lastResult.value = result.Message || ''
-      await updateLastSyncTime()
+      lastResult.value = result.message ?? (result as any).Message ?? ''
+      await loadConfig()
       return {
-        direction: result.Direction,
-        message: result.Message || '',
+        direction: result.direction ?? (result as any).Direction ?? 0,
+        message: result.message ?? (result as any).Message ?? '',
       }
     } catch (e: any) {
       lastResult.value = e?.message || String(e)
@@ -137,28 +152,89 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  async function updateLastSyncTime() {
+  async function configureRepo(repoUrl: string, username: string, token: string, masterPassword: string): Promise<SyncResult | null> {
+    syncing.value = true
     try {
-      lastSyncTime.value = await SyncGetLastSyncTime()
-    } catch (_) {}
+      const result = await SyncConfigureRepo(repoUrl, username, token, masterPassword)
+      await loadConfig()
+      const direction = result.direction ?? (result as any).Direction ?? 0
+      if (direction === 3) {
+        conflict.value = result.conflict
+          ? { localTime: result.conflict.localTime ?? (result.conflict as any).LocalTime ?? '',
+              remoteTime: result.conflict.remoteTime ?? (result.conflict as any).RemoteTime ?? '' }
+          : (result as any).Conflict
+            ? { localTime: (result as any).Conflict.LocalTime ?? '', remoteTime: (result as any).Conflict.RemoteTime ?? '' }
+            : { localTime: '', remoteTime: '' }
+      }
+      return {
+        direction,
+        message: result.message ?? (result as any).Message ?? '',
+      }
+    } catch (e: any) {
+      throw e
+    } finally {
+      syncing.value = false
+    }
+  }
+
+  async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    try {
+      await SyncChangePassword(oldPassword, newPassword)
+    } catch (e: any) {
+      throw e
+    }
+  }
+
+  async function deleteRepo(): Promise<void> {
+    try {
+      await SyncDeleteRepo()
+      await loadConfig()
+    } catch (e: any) {
+      throw e
+    }
+  }
+
+  function formatSyncTime(): string {
+    if (!config.value.lastSyncAt) return '从未同步'
+    try {
+      const d = new Date(config.value.lastSyncAt)
+      return d.toLocaleString()
+    } catch {
+      return config.value.lastSyncAt
+    }
   }
 
   // Listen for conflict events from auto-sync
   EventsOn('sync:conflict', (data: SyncConflict) => {
-    conflict.value = data
+    conflict.value = {
+      localTime: data.localTime ?? (data as any).LocalTime ?? '',
+      remoteTime: data.remoteTime ?? (data as any).RemoteTime ?? '',
+    }
+  })
+
+  // Reload config when auto-sync completes
+  EventsOn('sync:completed', () => {
+    loadConfig()
   })
 
   return {
     config,
-    lastSyncTime,
     syncing,
     testingConnection,
     conflict,
     lastResult,
+    showAddRepo,
+    showEditRepo,
+    showChangePassword,
+    showDeleteRepo,
     loadConfig,
     saveConfig,
     doSync,
     resolveConflict,
     testConnection,
+    configureRepo,
+    changePassword,
+    deleteRepo,
+    formatSyncTime,
   }
 })

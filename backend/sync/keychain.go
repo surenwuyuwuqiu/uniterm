@@ -2,13 +2,22 @@ package sync
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+
+	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/zalando/go-keyring"
 )
 
 const keychainService = "uniTerm"
+
+const (
+	pbkdf2Iterations = 600000
+	keyLength        = 32
+	saltLength       = 16
+)
 
 type Keychain struct{}
 
@@ -26,20 +35,19 @@ func (k *Keychain) Delete(key string) error {
 	return keyring.Delete(keychainService, key)
 }
 
-func (k *Keychain) GetOrCreateEncryptionKey() ([]byte, error) {
+// GetEncryptionKey retrieves the derived encryption key from OS keychain.
+func (k *Keychain) GetEncryptionKey() ([]byte, error) {
 	const keyName = "encryption-key"
 	hexKey, err := k.Get(keyName)
-	if err == nil {
-		return hex.DecodeString(hexKey)
+	if err != nil {
+		return nil, fmt.Errorf("encryption key not found: %w", err)
 	}
-	key := make([]byte, 32)
-	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("generate random key: %w", err)
-	}
-	if err := k.Set(keyName, hex.EncodeToString(key)); err != nil {
-		return nil, fmt.Errorf("store encryption key: %w", err)
-	}
-	return key, nil
+	return hex.DecodeString(hexKey)
+}
+
+// StoreEncryptionKey stores the derived encryption key in OS keychain.
+func (k *Keychain) StoreEncryptionKey(key []byte) error {
+	return k.Set("encryption-key", hex.EncodeToString(key))
 }
 
 func (k *Keychain) GetGitToken() (string, error) {
@@ -55,6 +63,24 @@ func (k *Keychain) SetGitToken(token string) error {
 		return k.Delete("git-token")
 	}
 	return k.Set("git-token", token)
+}
+func (k *Keychain) GetModelAPIKey(modelID string) (string, error) {
+	apiKey, err := k.Get("ai-model/" + modelID)
+	if err != nil {
+		return "", nil
+	}
+	return apiKey, nil
+}
+
+func (k *Keychain) SetModelAPIKey(modelID, apiKey string) error {
+	if apiKey == "" {
+		return k.Delete("ai-model/" + modelID)
+	}
+	return k.Set("ai-model/"+modelID, apiKey)
+}
+
+func (k *Keychain) DeleteModelAPIKey(modelID string) error {
+	return k.Delete("ai-model/" + modelID)
 }
 
 func (k *Keychain) GetPassword(connID string) (string, error) {
@@ -74,4 +100,18 @@ func (k *Keychain) SetPassword(connID, password string) error {
 
 func (k *Keychain) DeletePassword(connID string) error {
 	return k.Delete("conn/" + connID)
+}
+
+// DeriveKey derives a 32-byte AES-256 key from a password and salt using PBKDF2-SHA256.
+func DeriveKey(password string, salt []byte) []byte {
+	return pbkdf2.Key([]byte(password), salt, pbkdf2Iterations, keyLength, sha256.New)
+}
+
+// GenerateSalt generates a random 16-byte salt.
+func GenerateSalt() ([]byte, error) {
+	salt := make([]byte, saltLength)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, fmt.Errorf("generate salt: %w", err)
+	}
+	return salt, nil
 }

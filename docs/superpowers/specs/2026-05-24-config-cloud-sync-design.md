@@ -49,16 +49,11 @@
 - **SSH Key**：复用系统已有 SSH Key（`~/.ssh/`）
 - **HTTPS + Personal Access Token**：用户在设置页填入 Token
 
-## 仓库可见性校验
+## 仓库可见性
 
-**只允许私有仓库同步。** 在"测试连接"和"立即同步"时校验仓库可见性：
+不做程序化检测，在 UI 中放置醒目的警告文字：
 
-- GitHub：`GET https://api.github.com/repos/<owner>/<repo>` → `private: true/false`
-- Gitee：`GET https://gitee.com/api/v5/repos/<owner>/<repo>` → `private: true/false`
-
-公有仓库返回错误提示："配置同步仅支持私有仓库，请使用私有仓库以确保数据安全。"
-
-首次配置仓库地址后未测试连接，直接在"立即同步"时检测到公有仓库也同样拒绝。
+> **请使用私有仓库。** 配置文件包含加密后的密码和 API Key，为保证安全，请勿使用公开仓库进行同步。
 
 ## Git 实现
 
@@ -145,6 +140,7 @@ PAT 通过 OS 密钥链存储（`uniTerm/git-token`），不在 sync-config.json
 
 设置页新增"配置同步"标签页：
 
+- **警告提示**：醒目文字 "请使用私有仓库。配置文件包含加密后的密码和 API Key，请勿使用公开仓库。"
 - **Git 仓库地址**：文本输入框，支持 HTTPS 和 SSH 格式
 - **认证方式**：Radio 切换 SSH Key / PAT
 - **Token**：密码输入框（仅 PAT 模式）

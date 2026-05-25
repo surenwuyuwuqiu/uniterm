@@ -18,6 +18,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"github.com/ys-ll/uniterm/backend/log"
+	"github.com/ys-ll/uniterm/backend/database"
 	"github.com/ys-ll/uniterm/backend/session"
 	"github.com/ys-ll/uniterm/backend/store"
 	"github.com/ys-ll/uniterm/backend/sync"
@@ -900,4 +901,101 @@ func (a *App) GetDefaultShell() string {
 		}
 		return "sh"
 	}
+}
+
+// ── Database methods ──
+
+func (a *App) dbSession(sessionID string) (*session.DatabaseSession, error) {
+	s, ok := a.sessionManager.Get(sessionID)
+	if !ok {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+	ds, ok := s.(*session.DatabaseSession)
+	if !ok {
+		return nil, fmt.Errorf("session is not a database session: %s", sessionID)
+	}
+	return ds, nil
+}
+
+func (a *App) GetDatabases(sessionID string) ([]string, error) {
+	ds, err := a.dbSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return database.GetDatabases(ds.Engine(), ds.DBType())
+}
+
+func (a *App) GetTables(sessionID string, dbName string) ([]database.TableInfo, error) {
+	ds, err := a.dbSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return database.GetTables(ds.Engine(), ds.DBType(), dbName)
+}
+
+func (a *App) GetTableSchema(sessionID string, dbName string, tableName string) (*database.SchemaResult, error) {
+	ds, err := a.dbSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return database.GetTableSchema(ds.Engine(), dbName, tableName)
+}
+
+func (a *App) ExecuteQuery(sessionID string, sql string) (*database.QueryResult, error) {
+	ds, err := a.dbSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+	qr, qErr := database.ExecuteQuery(ds.Engine(), sql)
+	elapsed := time.Since(start).Milliseconds()
+
+	entry := database.HistoryEntry{SQL: sql, Duration: elapsed}
+	if qErr != nil {
+		entry.Error = qErr.Error()
+	} else {
+		entry.RowCount = len(qr.Rows)
+	}
+	_ = database.SaveHistory(ds.ID(), entry)
+
+	return qr, qErr
+}
+
+func (a *App) ExecuteStatement(sessionID string, sql string) (*database.ExecResult, error) {
+	ds, err := a.dbSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+	er, sErr := database.ExecuteStatement(ds.Engine(), sql)
+	elapsed := time.Since(start).Milliseconds()
+
+	entry := database.HistoryEntry{SQL: sql, Duration: elapsed}
+	if sErr != nil {
+		entry.Error = sErr.Error()
+	} else {
+		entry.RowCount = int(er.Affected)
+	}
+	_ = database.SaveHistory(ds.ID(), entry)
+
+	return er, sErr
+}
+
+func (a *App) AlterTable(sessionID string, dbName string, tableName string, sql string) error {
+	ds, err := a.dbSession(sessionID)
+	if err != nil {
+		return err
+	}
+	_, err = ds.Engine().Exec(sql)
+	return err
+}
+
+func (a *App) GetQueryHistory(sessionID string) ([]database.HistoryEntry, error) {
+	return database.LoadHistory(sessionID)
+}
+
+func (a *App) ClearQueryHistory(sessionID string) error {
+	return database.ClearHistory(sessionID)
 }

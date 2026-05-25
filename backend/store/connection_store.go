@@ -50,9 +50,13 @@ func (s *ConnectionStore) filePath() string {
 }
 
 func (s *ConnectionStore) Save(data session.ConnectionStoreData) error {
+	// Deep-copy connections so we don't mutate the caller's backing array
+	connections := make([]session.ConnectionConfig, len(data.Connections))
+	copy(connections, data.Connections)
+
 	// Extract passwords to external store before writing JSON
-	for i := range data.Connections {
-		conn := &data.Connections[i]
+	for i := range connections {
+		conn := &connections[i]
 		if conn.AuthType != "password" || conn.Password == "" {
 			continue
 		}
@@ -62,7 +66,11 @@ func (s *ConnectionStore) Save(data session.ConnectionStoreData) error {
 		conn.Password = ""
 	}
 
-	jsonData, err := json.MarshalIndent(data, "", "  ")
+	saveData := session.ConnectionStoreData{
+		Groups:      data.Groups,
+		Connections: connections,
+	}
+	jsonData, err := json.MarshalIndent(saveData, "", "  ")
 	if err != nil {
 		return err
 	}

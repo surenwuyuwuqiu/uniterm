@@ -72,15 +72,20 @@ func (s *SettingsStore) filePath() string {
 }
 
 func (s *SettingsStore) Save(settings AppSettings) error {
+	// Deep-copy models so we don't mutate the caller's backing array
+	models := make([]AIModelConfig, len(settings.AI.Models))
+	copy(models, settings.AI.Models)
+
 	// Extract model apiKeys to keychain before writing JSON
-	for i := range settings.AI.Models {
-		m := &settings.AI.Models[i]
+	for i := range models {
+		m := &models[i]
 		if m.APIKey != "" && s.passwordStore != nil {
 			_ = s.passwordStore.SetModelAPIKey(m.ID, m.APIKey)
 		}
 		m.APIKey = ""
 	}
 
+	settings.AI.Models = models
 	data, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return err

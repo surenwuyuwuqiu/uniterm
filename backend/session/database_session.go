@@ -30,6 +30,11 @@ func (s *DatabaseSession) Connect(config ConnectionConfig) error {
 	defer s.mu.Unlock()
 
 	s.setStatus(StatusConnecting)
+
+	// Fall back to config.Type if DBType is not set (e.g., legacy connections)
+	if config.DBType == "" {
+		config.DBType = config.Type
+	}
 	s.dbType = config.DBType
 
 	if config.Name != "" {

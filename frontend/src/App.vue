@@ -490,6 +490,10 @@ async function onConnectVNC(config: ConnectionConfig) {
 
 async function onConnectDB(config: ConnectionConfig) {
   connectionStore.add(config)
+  // Ensure dbType is populated (the form sets type but dbType may be missing)
+  if (!config.dbType) {
+    config.dbType = config.type
+  }
   const displayTitle = config.name || `${config.dbType}:${config.user}@${config.host}`
 
   const panel = panelStore.createPanel(config, 'database')

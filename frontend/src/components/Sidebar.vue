@@ -716,7 +716,7 @@ function doConnectVNC() {
 }
 
 function isDatabaseType(c: ConnectionConfig): boolean {
-  return c.type === 'mysql' || c.type === 'postgres' || c.type === 'rqlite'
+  return c.type === 'database'
 }
 
 function doConnectDB() {

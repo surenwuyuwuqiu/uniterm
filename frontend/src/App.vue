@@ -367,7 +367,7 @@ function onSaveOnly(config: ConnectionConfig) {
 async function onConnect(config: ConnectionConfig) {
   if (config.type === 'rdp') return onConnectRDP(config)
   if (config.type === 'vnc') return onConnectVNC(config)
-  if (config.type === 'mysql' || config.type === 'postgres' || config.type === 'rqlite') return onConnectDB(config)
+  if (config.type === 'database') return onConnectDB(config)
   connectionStore.add(config)
   const panel = panelStore.createPanel(config, 'ssh')
   const displayTitle = config.name || `${config.user}@${config.host}`

@@ -364,6 +364,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'vnc.scaleOff': '关',
 
     // Database
+    'db.database': '数据库',
+    'db.dbType': '数据库类型',
     'db.databases': '数据库',
     'db.selectTableHint': '选择一张表查看结构',
     'db.tableStructure': '表结构',
@@ -753,6 +755,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'vnc.scaleOff': 'Off',
 
     // Database
+    'db.database': 'Database',
+    'db.dbType': 'Database Type',
     'db.databases': 'Databases',
     'db.selectTableHint': 'Select a table to view its structure',
     'db.tableStructure': 'Table Structure',

@@ -27,10 +27,15 @@
           <el-radio-button label="ssh">SSH</el-radio-button>
           <el-radio-button label="rdp" v-if="isWindows">RDP</el-radio-button>
           <el-radio-button label="vnc">VNC</el-radio-button>
-          <el-radio-button label="mysql">MySQL</el-radio-button>
-          <el-radio-button label="postgres">PostgreSQL</el-radio-button>
-          <el-radio-button label="rqlite">rqlite</el-radio-button>
+          <el-radio-button label="database">{{ t('db.database') }}</el-radio-button>
         </el-radio-group>
+      </el-form-item>
+      <el-form-item v-if="form.type === 'database'" :label="t('db.dbType')">
+        <el-select v-model="form.dbType" :placeholder="t('db.dbType')">
+          <el-option label="MySQL" value="mysql" />
+          <el-option label="PostgreSQL" value="postgres" />
+          <el-option label="rqlite" value="rqlite" />
+        </el-select>
       </el-form-item>
       <el-form-item :label="t('conn.host')" required>
         <el-input v-model="form.host" :placeholder="t('conn.hostPlaceholder')" />
@@ -138,7 +143,7 @@ watch(visible, (val) => {
 })
 
 const isEdit = computed(() => !!props.editConfig?.id)
-const isDatabaseType = computed(() => ['mysql', 'postgres', 'rqlite'].includes(form.type))
+const isDatabaseType = computed(() => form.type === 'database')
 
 const form = reactive<ConnectionConfig>({
   id: '',
@@ -154,6 +159,7 @@ const form = reactive<ConnectionConfig>({
   rdpFixedWidth: undefined,
   rdpFixedHeight: undefined,
   rdpSmartSizing: true,
+  dbType: '',
   dbName: '',
 })
 
@@ -178,9 +184,6 @@ const newGroupName = ref('')
 watch(() => props.editConfig, (config) => {
   if (config) {
     Object.assign(form, { ...config })
-    if (config.dbType) {
-      form.type = config.dbType as ConnectionConfig['type']
-    }
     selectedGroupId.value = config.groupId || undefined
     // Sync resolution dropdown to the config's fixed size
     const match = rdpResolutions.find(r => r.w === config.rdpFixedWidth && r.h === config.rdpFixedHeight)
@@ -207,10 +210,8 @@ watch(() => form.type, (newType) => {
   else if (newType === 'ssh' && form.port === 3389) form.port = 22
   else if (newType === 'vnc' && form.port === 22) form.port = 5900
   else if (newType === 'ssh' && form.port === 5900) form.port = 22
-  else if (newType === 'mysql') form.port = 3306
-  else if (newType === 'postgres') form.port = 5432
-  else if (newType === 'rqlite') form.port = 4001
-  if (newType === 'rdp' || newType === 'vnc' || ['mysql', 'postgres', 'rqlite'].includes(newType)) {
+  else if (newType === 'database') form.port = 3306
+  if (newType === 'rdp' || newType === 'vnc' || newType === 'database') {
     form.authType = 'password'
   }
 })
@@ -238,6 +239,7 @@ function resetForm() {
   form.rdpFixedWidth = undefined
   form.rdpFixedHeight = undefined
   form.rdpSmartSizing = true
+  form.dbType = ''
   form.dbName = ''
   rdpResolution.value = '1280 × 720 (HD)'
   selectedGroupId.value = undefined
@@ -286,9 +288,6 @@ function generateUniqueName(name: string): string {
 
 function normalizeForm(): ConnectionConfig {
   const normalized = { ...form }
-  if (['mysql', 'postgres', 'rqlite'].includes(normalized.type)) {
-    normalized.dbType = normalized.type
-  }
   if (!normalized.host.trim()) {
     throw new Error(t('conn.hostRequired'))
   }

@@ -234,7 +234,10 @@ type HistoryEntry struct {
 ### 阶段 3：SQL 编辑器 + 查询执行
 - [ ] `database/executor.go` — `engine.Query()` / `engine.Exec()` + 结果序列化
 - [ ] Wails 绑定：`ExecuteQuery`、`ExecuteStatement`
-- [ ] `DBQueryEditor.vue` — SQL 编辑器 + 结果表格
+- [ ] `DBQueryEditor.vue` — SQL 编辑器 + 结果表格 + 行内编辑
+  - 双击结果表格的单元格进入编辑模式
+  - 按 Enter 确认 → 自动生成 `UPDATE table SET col = value WHERE pk = pkValue` 并执行
+  - 需要前端解析 SQL 中的表名和主键列（从 GetTableSchema 获取）
 
 ### 阶段 4：表结构编辑
 - [ ] 通过 `engine.Exec("ALTER TABLE ...")` 实现 DDL
@@ -258,7 +261,6 @@ type HistoryEntry struct {
 - SSH 隧道连接数据库
 - SSL/TLS 证书配置
 - 一个连接内多个 SQL 编辑器标签页
-- 结果表格中直接编辑行数据
 - 数据导出（CSV、JSON）
 - 存储过程 / 函数 / 视图管理
 - 连接池配置

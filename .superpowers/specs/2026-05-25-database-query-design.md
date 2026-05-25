@@ -235,9 +235,10 @@ type HistoryEntry struct {
 - [ ] `database/executor.go` — `engine.Query()` / `engine.Exec()` + 结果序列化
 - [ ] Wails 绑定：`ExecuteQuery`、`ExecuteStatement`
 - [ ] `DBQueryEditor.vue` — SQL 编辑器 + 结果表格 + 行内编辑
-  - 双击结果表格的单元格进入编辑模式
-  - 按 Enter 确认 → 自动生成 `UPDATE table SET col = value WHERE pk = pkValue` 并执行
-  - 需要前端解析 SQL 中的表名和主键列（从 GetTableSchema 获取）
+  - 双击单元格 → 编辑模式 → Enter 确认 → 自动生成 UPDATE 并执行
+  - 右键行 → 删除 → 自动生成 `DELETE FROM table WHERE pk = pkValue` 并执行
+  - 表格底部「新增行」按钮 → 空白编辑行 → 填写后 Enter → 自动生成 INSERT 并执行
+  - 需要表名和主键列（从左侧树选中的表获取）
 
 ### 阶段 4：表结构编辑
 - [ ] 通过 `engine.Exec("ALTER TABLE ...")` 实现 DDL

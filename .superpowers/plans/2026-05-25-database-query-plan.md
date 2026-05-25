@@ -1706,11 +1706,169 @@ Add the cell edit styles:
 }
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Add delete row functionality**
+
+Add a delete button per row and context menu. Update the result grid template — add an action column before the data columns:
+
+```vue
+<el-table-column :label="t('db.actions')" width="60" fixed="right">
+  <template #default="{ row, $index }">
+    <button class="action-btn danger" @click="onDeleteRow($index)">{{ t('db.delete') }}</button>
+  </template>
+</el-table-column>
+```
+
+Add `onDeleteRow` function in the script:
+
+```typescript
+async function onDeleteRow(rowIndex: number) {
+  if (!props.tableName || !props.primaryKeys || props.primaryKeys.length === 0) return
+
+  const row = queryResult.value!.rows[rowIndex]
+  const whereParts = props.primaryKeys.map(pk =>
+    `\`${pk}\` = '${String(row[pk] ?? '').replace(/'/g, "''")}'`
+  )
+  const whereClause = whereParts.join(' AND ')
+  const deleteSQL = `DELETE FROM \`${props.tableName}\` WHERE ${whereClause}`
+
+  try {
+    await ExecuteStatement(props.sessionId, deleteSQL)
+    queryResult.value!.rows.splice(rowIndex, 1)
+    error.value = ''
+    emit('cellUpdated')
+  } catch (e: any) {
+    error.value = e?.message || String(e)
+  }
+}
+```
+
+- [ ] **Step 4: Add insert row functionality**
+
+Add an "add row" button below the result grid and an empty editing row:
+
+Template addition after result grid:
+```vue
+<div v-if="queryResult && props.tableName && props.primaryKeys?.length" class="insert-row-bar">
+  <button class="exec-btn" @click="startInsertRow">{{ t('db.insertRow') }}</button>
+</div>
+
+<!-- Insert row editing area -->
+<div v-if="insertingRow" class="insert-row-form">
+  <div class="insert-row-fields">
+    <div v-for="col in insertColumns" :key="col" class="insert-field">
+      <label>{{ col }}</label>
+      <input v-model="insertValues[col]" class="insert-input" />
+    </div>
+  </div>
+  <div class="insert-actions">
+    <button class="exec-btn" @click="onInsertConfirm">{{ t('common.confirm') }}</button>
+    <button class="cancel-btn" @click="onInsertCancel">{{ t('common.cancel') }}</button>
+  </div>
+</div>
+```
+
+Add insert state and functions in the script:
+
+```typescript
+const insertingRow = ref(false)
+const insertValues = ref<Record<string, string>>({})
+const insertColumns = ref<string[]>([])
+
+function startInsertRow() {
+  // Only show non-PK columns (PK is auto-increment typically)
+  insertColumns.value = queryResult.value!.columns
+    .map(c => c.name)
+    .filter(c => !props.primaryKeys?.includes(c))
+  insertValues.value = {}
+  for (const col of insertColumns.value) {
+    insertValues.value[col] = ''
+  }
+  insertingRow.value = true
+}
+
+async function onInsertConfirm() {
+  if (!props.tableName) return
+
+  const cols = Object.keys(insertValues.value).map(c => `\`${c}\``).join(', ')
+  const vals = Object.values(insertValues.value).map(v =>
+    `'${(v ?? '').replace(/'/g, "''")}'`
+  ).join(', ')
+  const insertSQL = `INSERT INTO \`${props.tableName}\` (${cols}) VALUES (${vals})`
+
+  try {
+    await ExecuteStatement(props.sessionId, insertSQL)
+    // Append new row to results (without PK values — re-query would be better but costly)
+    const newRow: Record<string, any> = { ...insertValues.value }
+    for (const pk of (props.primaryKeys || [])) {
+      newRow[pk] = '(new)'
+    }
+    queryResult.value!.rows.push(newRow)
+    error.value = ''
+    insertingRow.value = false
+    emit('cellUpdated')
+  } catch (e: any) {
+    error.value = e?.message || String(e)
+  }
+}
+
+function onInsertCancel() {
+  insertingRow.value = false
+}
+```
+
+Add styles:
+```css
+.insert-row-bar {
+  padding: 4px 0;
+}
+.insert-row-form {
+  border: 1px solid var(--color-primary, #409eff);
+  border-radius: 4px;
+  padding: 8px;
+  margin-top: 4px;
+}
+.insert-row-fields {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.insert-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.insert-field label {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+.insert-input {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 3px;
+  font-size: 13px;
+  width: 140px;
+}
+.insert-actions {
+  display: flex;
+  gap: 8px;
+}
+.cancel-btn {
+  padding: 4px 16px;
+  background: var(--bg-secondary, #eee);
+  color: var(--text-primary, #333);
+  border: 1px solid var(--border-color, #444);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+```
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/DBQueryEditor.vue
-git commit -m "feat(frontend): add DBQueryEditor with SQL editor, result grid, and inline cell editing
+git commit -m "feat(frontend): add DBQueryEditor with SQL editor, result grid, inline edit, delete row, and insert row
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ```

@@ -168,7 +168,7 @@ function RDPShowForOverlay() {
 
 
 const showConnectionForm = ref(false)
-const sidebarVisible = ref(true)
+const sidebarVisible = ref(localStorage.getItem('sidebarVisible') !== 'false')
 
 // Input context menu state
 const inputMenuVisible = ref(false)
@@ -498,6 +498,7 @@ watch(showConnectionForm, (val) => {
 })
 
 watch(sidebarVisible, () => {
+  localStorage.setItem('sidebarVisible', String(sidebarVisible.value))
   RDPHideForOverlay()
   nextTick(() => RDPShowForOverlay())
 })

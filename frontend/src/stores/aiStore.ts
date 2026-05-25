@@ -74,7 +74,7 @@ async function loadSessionsFromBackend(): Promise<{ sessions: AISession[], curre
 }
 
 export const useAIStore = defineStore('ai', () => {
-  const visible = ref(true)
+  const visible = ref(localStorage.getItem('aiSidebarVisible') !== 'false')
   const messages = ref<AIMessage[]>([])
   const mode = ref<ExecutionMode>('confirm_dangerous')
   const config = ref<AIConfig>({ ...DEFAULT_CONFIG })
@@ -125,6 +125,7 @@ export const useAIStore = defineStore('ai', () => {
 
   function toggle() {
     visible.value = !visible.value
+    localStorage.setItem('aiSidebarVisible', String(visible.value))
   }
 
   function addMessage(msg: AIMessage): AIMessage {

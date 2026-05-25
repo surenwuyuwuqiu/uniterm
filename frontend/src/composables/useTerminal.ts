@@ -2,6 +2,7 @@ import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import type { Ref } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import { SessionWrite, SessionResize } from '../../wailsjs/go/main/App'
@@ -18,6 +19,7 @@ export interface UseTerminalReturn {
   terminalRef: Ref<HTMLDivElement | undefined>
   terminal: Terminal | null
   fitAddon: FitAddon | null
+  searchAddon: SearchAddon | null
   write: (data: string) => void
   resize: () => void
   getSelection: () => string
@@ -157,6 +159,7 @@ export function useTerminal(
   const terminalRef = ref<HTMLDivElement>()
   let terminal: Terminal | null = null
   let fitAddon: FitAddon | null = null
+  let searchAddon: SearchAddon | null = null
   let resizeObserver: ResizeObserver | null = null
   let intersectionObserver: IntersectionObserver | null = null
   let unsubscribe: (() => void) | null = null
@@ -323,6 +326,9 @@ export function useTerminal(
     )
     terminal.loadAddon(webLinksAddon)
 
+    searchAddon = new SearchAddon()
+    terminal.loadAddon(searchAddon)
+
     terminal.open(terminalRef.value)
     // Force synchronous layout so grid rows are sized before xterm measures
     void terminalRef.value.offsetHeight
@@ -469,6 +475,7 @@ export function useTerminal(
     terminalRef,
     terminal,
     fitAddon,
+    searchAddon,
     write,
     resize,
     getSelection,

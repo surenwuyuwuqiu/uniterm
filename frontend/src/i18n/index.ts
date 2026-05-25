@@ -89,6 +89,10 @@ const messages: Record<Locale, Record<string, string>> = {
     'terminal.aiLockedToPanel': 'AI 已锁定到此面板',
     'terminal.lockAIToPanel': '锁定 AI 到此面板',
     'terminal.broadcastInput': '广播输入到所有面板',
+    'terminal.searchPlaceholder': '搜索...',
+    'terminal.searchPrev': '上一个',
+    'terminal.searchNext': '下一个',
+    'terminal.searchClose': '关闭',
 
     // Input context menu
     'input.cut': '剪切',
@@ -448,6 +452,10 @@ const messages: Record<Locale, Record<string, string>> = {
     'terminal.aiLockedToPanel': 'AI locked to this panel',
     'terminal.lockAIToPanel': 'Lock AI to this panel',
     'terminal.broadcastInput': 'Broadcast input to all panels',
+    'terminal.searchPlaceholder': 'Search...',
+    'terminal.searchPrev': 'Previous',
+    'terminal.searchNext': 'Next',
+    'terminal.searchClose': 'Close',
 
     // Input context menu
     'input.cut': 'Cut',

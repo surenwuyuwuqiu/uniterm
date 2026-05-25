@@ -8,7 +8,10 @@
     @dragstart="onDragStart"
     @contextmenu="onContextMenu"
   >
-    <span v-if="!editing" class="tab-name" @dblclick.stop="startEdit">{{ tab.name }}</span>
+    <span v-if="!editing" class="tab-name" @dblclick.stop="startEdit">
+      <LayoutDashboard :size="15" class="tab-icon" />
+      {{ tab.name }}
+    </span>
     <input
       v-else
       ref="editInputRef"
@@ -50,7 +53,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { Sparkles } from '@lucide/vue'
+import { Sparkles, LayoutDashboard } from '@lucide/vue'
 import { useTabStore } from '../stores/tabStore'
 import { useI18n } from '../i18n'
 import type { WorkspaceTab } from '../types/workspace'
@@ -185,6 +188,15 @@ onUnmounted(() => {
 }
 .workspace-tab-item.ai-locked {
   box-shadow: inset 3px 0 0 var(--warning, #f59e0b);
+}
+.tab-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.workspace-tab-item.active .tab-icon {
+  color: var(--accent);
 }
 .tab-name {
   font-size: 13px;

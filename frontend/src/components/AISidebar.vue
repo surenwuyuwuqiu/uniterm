@@ -8,7 +8,7 @@
           <el-icon><Settings :size="14" /></el-icon>
         </button>
         <button class="ai-action-btn" @click="toggleMaximize" :title="isMaximized ? t('ai.restore') : t('ai.maximize')">
-          <el-icon><Expand :size="14" /></el-icon>
+          <el-icon><Shrink v-if="isMaximized" :size="14" /><Expand v-else :size="14" /></el-icon>
         </button>
         <button class="ai-action-btn" @click="onClose" :title="t('sidebar.collapse')">
           <el-icon><X :size="14" /></el-icon>
@@ -134,7 +134,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, computed, watch, onMounted, onUnmounted } from 'vue'
-import { Settings, X, ChevronDown, Plus, Trash2, Expand } from '@lucide/vue'
+import { Settings, X, ChevronDown, Plus, Trash2, Expand, Shrink } from '@lucide/vue'
 import { useAIStore } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useTabStore } from '../stores/tabStore'

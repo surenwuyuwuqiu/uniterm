@@ -169,9 +169,12 @@ html, body, #app {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  margin: 0;
 }
 
 body {
+  padding: 4px;
+  box-sizing: border-box;
   font-family: var(--font-ui);
   background: var(--bg-base);
   color: var(--text-primary);
@@ -200,8 +203,8 @@ body::before {
 
 /* Scrollbar - minimal */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;

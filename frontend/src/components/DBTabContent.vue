@@ -59,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { useI18n } from '../i18n'
 import { GetTableSchema } from '../../wailsjs/go/main/App'
 import DBTreePanel from './DBTreePanel.vue'
@@ -82,9 +82,12 @@ const historyRefresh = ref(0)
 const leftWidth = ref(220)
 let resizeStartX = 0
 let resizeStartWidth = 0
+let resizing = false
 
 function onSelectDatabase(dbName: string) {
   selectedDb.value = dbName
+  selectedTable.value = ''
+  primaryKeys.value = []
 }
 
 async function onSelectTable(dbName: string, tableName: string) {
@@ -110,6 +113,7 @@ function onReplay(sql: string) {
 function onResizeStart(e: MouseEvent) {
   resizeStartX = e.clientX
   resizeStartWidth = leftWidth.value
+  resizing = true
   document.addEventListener('mousemove', onResizeMove)
   document.addEventListener('mouseup', onResizeEnd)
 }
@@ -120,9 +124,17 @@ function onResizeMove(e: MouseEvent) {
 }
 
 function onResizeEnd() {
+  resizing = false
   document.removeEventListener('mousemove', onResizeMove)
   document.removeEventListener('mouseup', onResizeEnd)
 }
+
+onUnmounted(() => {
+  if (resizing) {
+    document.removeEventListener('mousemove', onResizeMove)
+    document.removeEventListener('mouseup', onResizeEnd)
+  }
+})
 </script>
 
 <style scoped>

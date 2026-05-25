@@ -170,8 +170,9 @@
       :style="menuStyle"
       @click.stop
     >
-      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc')" class="menu-item" @click="doConnect">{{ connectLabel }}</div>
-      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc')" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
+      <div v-if="selectedConn && isDatabaseType(selectedConn)" class="menu-item" @click="doConnectDB">{{ t('db.connectDB') }}</div>
+      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc' && !isDatabaseType(selectedConn))" class="menu-item" @click="doConnect">{{ connectLabel }}</div>
+      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc' && !isDatabaseType(selectedConn))" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'vnc'" class="menu-item" @click="doConnectVNC">{{ t('sidebar.connectVNC') }}</div>
       <div class="menu-divider" />
@@ -312,7 +313,7 @@ import type { ConnectionConfig, ConnectionGroup } from '../types/session'
 defineProps<{
   visible: boolean
 }>()
-const emit = defineEmits(['connect', 'connectSftp', 'connectRdp', 'connectVnc', 'toggle'])
+const emit = defineEmits(['connect', 'connectSftp', 'connectRdp', 'connectVnc', 'connectDB', 'toggle'])
 const connectionStore = useConnectionStore()
 const { t } = useI18n()
 const showForm = ref(false)
@@ -508,8 +509,12 @@ function onListKeydown(e: KeyboardEvent) {
       for (const id of ids) {
         const c = connectionStore.connections.find(c => c.id === id)
         if (c) {
-          if (c.type === 'rdp') {
+          if (isDatabaseType(c)) {
+            emit('connectDB', c)
+          } else if (c.type === 'rdp') {
             emit('connectRdp', c)
+          } else if (c.type === 'vnc') {
+            emit('connectVnc', c)
           } else {
             emit('connect', c)
           }
@@ -601,7 +606,9 @@ function onItemClick(e: MouseEvent, conn: ConnectionConfig) {
 
 function onItemDblClick(conn: ConnectionConfig) {
   selectedIds.value = new Set()
-  if (conn.type === 'rdp') {
+  if (isDatabaseType(conn)) {
+    emit('connectDB', conn)
+  } else if (conn.type === 'rdp') {
     emit('connectRdp', conn)
   } else if (conn.type === 'vnc') {
     emit('connectVnc', conn)
@@ -705,6 +712,20 @@ function doConnectVNC() {
   closeMenu()
   for (const c of conns) {
     emit('connectVnc', c)
+  }
+}
+
+function isDatabaseType(c: ConnectionConfig): boolean {
+  return c.type === 'mysql' || c.type === 'postgres' || c.type === 'rqlite'
+}
+
+function doConnectDB() {
+  const ids = getSelectedConnectionIds()
+  const conns = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
+  selectedIds.value = new Set()
+  closeMenu()
+  for (const c of conns) {
+    emit('connectDB', c)
   }
 }
 
@@ -974,8 +995,12 @@ function onConnectFromForm(config: ConnectionConfig) {
   }
   showForm.value = false
   editConfig.value = undefined
-  if (config.type === 'rdp') {
+  if (isDatabaseType(config)) {
+    emit('connectDB', config)
+  } else if (config.type === 'rdp') {
     emit('connectRdp', config)
+  } else if (config.type === 'vnc') {
+    emit('connectVnc', config)
   } else {
     emit('connect', config)
   }

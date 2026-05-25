@@ -9,7 +9,7 @@
       @open-settings="openSettings"
     />
     <div class="main-content">
-      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" />
+      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" @connect-d-b="onConnectDB" />
       <div class="tab-area">
         <TabBar />
         <template v-if="activeTab">
@@ -43,6 +43,11 @@
             :key="activeTab.id"
             :panel-id="activeTab.panelId"
             :config="getPanelConfig(activeTab.panelId)"
+            :session-id="getPanelSessionId(activeTab.panelId)"
+          />
+          <DBTabContent
+            v-else-if="activeTab.type === 'database'"
+            :key="activeTab.id"
             :session-id="getPanelSessionId(activeTab.panelId)"
           />
         </template>
@@ -79,6 +84,7 @@ import WorkspaceContent from './components/WorkspaceContent.vue'
 import SFTPTabContent from './components/SFTPTabContent.vue'
 import RDPTabContent from './components/RDPTabContent.vue'
 import VNCTabContent from './components/VNCTabContent.vue'
+import DBTabContent from './components/DBTabContent.vue'
 import ConnectionForm from './components/ConnectionForm.vue'
 import AISidebar from './components/AISidebar.vue'
 import SyncConflictDialog from './components/SyncConflictDialog.vue'
@@ -328,6 +334,13 @@ async function closeTab(tabId: string) {
     panelStore.disconnectVNCCache(tab.panelId)
     panelStore.removeVNCCache(tab.panelId)
   }
+  // Close database session
+  if (tab && tab.type === 'database') {
+    const p = panelStore.getPanel(tab.panelId)
+    if (p?.sessionId) {
+      try { await CloseSession(p.sessionId) } catch (_) {}
+    }
+  }
   // Local terminals must be explicitly closed to terminate the shell process
   if (tab && tab.type === 'terminal') {
     const p = panelStore.getPanel(tab.panelId)
@@ -354,6 +367,7 @@ function onSaveOnly(config: ConnectionConfig) {
 async function onConnect(config: ConnectionConfig) {
   if (config.type === 'rdp') return onConnectRDP(config)
   if (config.type === 'vnc') return onConnectVNC(config)
+  if (config.type === 'mysql' || config.type === 'postgres' || config.type === 'rqlite') return onConnectDB(config)
   connectionStore.add(config)
   const panel = panelStore.createPanel(config, 'ssh')
   const displayTitle = config.name || `${config.user}@${config.host}`
@@ -469,6 +483,26 @@ async function onConnectVNC(config: ConnectionConfig) {
     sessionStore.initSession(info.id)
   } catch (e) {
     console.error('Failed to create VNC session:', e)
+    tabStore.closeTab(tab.id)
+    panelStore.removePanel(panel.id)
+  }
+}
+
+async function onConnectDB(config: ConnectionConfig) {
+  connectionStore.add(config)
+  const displayTitle = config.name || `${config.dbType}:${config.user}@${config.host}`
+
+  const panel = panelStore.createPanel(config, 'database')
+  panel.title = displayTitle
+  const tab = tabStore.createDBTab(displayTitle, panel.id)
+  panelStore.movePanelToTab(panel.id, tab.id)
+
+  try {
+    const info = await CreateSession('database', config)
+    panelStore.bindSession(panel.id, info.id)
+    sessionStore.initSession(info.id)
+  } catch (e) {
+    console.error('Failed to create database session:', e)
     tabStore.closeTab(tab.id)
     panelStore.removePanel(panel.id)
   }

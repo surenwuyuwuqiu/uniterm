@@ -69,10 +69,15 @@ export const useSessionStore = defineStore('session', () => {
     const s = sessionState.sessions.get(id)
     if (!s) return ''
     const raw = s.data.join('')
-    // Strip leading partial line that may contain broken escape sequences
-    // from buffer trimming. The first \n is a safe anchor; escape sequences
-    // don't span line breaks in normal terminal output.
+    // When the buffer is trimmed (2000→1000 chunks), the joined string may
+    // start mid-escape-sequence (e.g. DA2, OSC color queries). Those broken
+    // fragments lack the \x1b prefix and xterm.js renders them as garbled text.
+    // Find the first \n or \x1b to locate a safe restart boundary.
     const nl = raw.indexOf('\n')
+    const esc = raw.indexOf('\x1b')
+    if (esc >= 0 && esc < 4096 && (nl < 0 || esc < nl)) {
+      return raw.slice(esc)
+    }
     if (nl > 0 && nl < 4096) {
       return raw.slice(nl + 1)
     }

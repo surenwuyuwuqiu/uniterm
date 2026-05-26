@@ -450,26 +450,34 @@ func (a *App) CreateSession(sessionType string, config session.ConnectionConfig)
 		runtime.EventsEmit(a.ctx, "session:status", payload)
 	})
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Writef("session %s connect panic: %v\n%s", s.ID(), r, string(debug.Stack()))
+	// Database sessions connect synchronously so errors are returned to the frontend.
+	if sessionType == "database" {
+		if err := s.Connect(config); err != nil {
+			_ = a.sessionManager.Close(s.ID())
+			return nil, fmt.Errorf("database connect failed: %w", err)
+		}
+	} else {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Writef("session %s connect panic: %v\n%s", s.ID(), r, string(debug.Stack()))
+				}
+			}()
+			if err := s.Connect(config); err != nil {
+				if a.ctx != nil {
+					runtime.EventsEmit(a.ctx, "session:data", map[string]interface{}{
+						"id":   s.ID(),
+						"data": fmt.Sprintf("\r\n\x1b[31m[Connection failed: %v]\x1b[0m\r\nPress Enter to retry...\r\n", err),
+					})
+				}
+				log.Writef("session %s connect error: %v", s.ID(), err)
+				// Remove failed session from manager to avoid leaking stale entries
+				if a.sessionManager != nil {
+					_ = a.sessionManager.Close(s.ID())
+				}
 			}
 		}()
-		if err := s.Connect(config); err != nil {
-			if a.ctx != nil {
-				runtime.EventsEmit(a.ctx, "session:data", map[string]interface{}{
-					"id":   s.ID(),
-					"data": fmt.Sprintf("\r\n\x1b[31m[Connection failed: %v]\x1b[0m\r\nPress Enter to retry...\r\n", err),
-				})
-			}
-			log.Writef("session %s connect error: %v", s.ID(), err)
-			// Remove failed session from manager to avoid leaking stale entries
-			if a.sessionManager != nil {
-				_ = a.sessionManager.Close(s.ID())
-			}
-		}
-	}()
+	}
 
 	info := &session.SessionInfo{
 		ID:     s.ID(),

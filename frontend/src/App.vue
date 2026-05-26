@@ -367,7 +367,7 @@ function onSaveOnly(config: ConnectionConfig) {
 async function onConnect(config: ConnectionConfig) {
   if (config.type === 'rdp') return onConnectRDP(config)
   if (config.type === 'vnc') return onConnectVNC(config)
-  if (config.type === 'database') return onConnectDB(config)
+  if (config.type === 'database' || config.type === 'mysql' || config.type === 'postgres' || config.type === 'rqlite') return onConnectDB(config)
   connectionStore.add(config)
   const panel = panelStore.createPanel(config, 'ssh')
   const displayTitle = config.name || `${config.user}@${config.host}`
@@ -490,7 +490,12 @@ async function onConnectVNC(config: ConnectionConfig) {
 
 async function onConnectDB(config: ConnectionConfig) {
   connectionStore.add(config)
-  // Ensure dbType is populated (the form sets type but dbType may be missing)
+  // Normalize legacy configs: convert direct db type strings to 'database' + dbType
+  if (config.type === 'mysql' || config.type === 'postgres' || config.type === 'rqlite') {
+    config.dbType = config.dbType || config.type
+    config.type = 'database'
+  }
+  // Ensure dbType is populated
   if (!config.dbType) {
     config.dbType = config.type
   }

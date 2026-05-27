@@ -9,42 +9,52 @@
       @open-settings="openSettings"
     />
     <div class="main-content">
-      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" />
+      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" @connect-d-b="onConnectDB" />
       <div class="tab-area">
         <TabBar />
         <template v-if="activeTab">
-          <TerminalTabContent
-            v-if="activeTab.type === 'terminal'"
-            :key="activeTab.id"
-            :tab="activeTab"
-            @close="closeTab"
-          />
-          <SettingsTabContent
-            v-else-if="activeTab.type === 'settings'"
-          />
-          <WorkspaceContent
-            v-else-if="activeTab.type === 'workspace'"
-            :tab="activeTab"
-          />
-          <SFTPTabContent
-            v-else-if="activeTab.type === 'sftp'"
-            :key="activeTab.id"
-            :panel-id="activeTab.panelId"
-          />
-          <RDPTabContent
-            v-else-if="activeTab.type === 'rdp'"
-            :key="activeTab.id"
-            :panel-id="activeTab.panelId"
-            :config="getPanelConfig(activeTab.panelId)"
-            :session-id="getPanelSessionId(activeTab.panelId)"
-          />
-          <VNCTabContent
-            v-else-if="activeTab.type === 'vnc'"
-            :key="activeTab.id"
-            :panel-id="activeTab.panelId"
-            :config="getPanelConfig(activeTab.panelId)"
-            :session-id="getPanelSessionId(activeTab.panelId)"
-          />
+          <KeepAlive :include="['DBTabContent']">
+            <TerminalTabContent
+              v-if="activeTab.type === 'terminal'"
+              :key="activeTab.id"
+              :tab="activeTab"
+              @close="closeTab"
+            />
+            <SettingsTabContent
+              v-else-if="activeTab.type === 'settings'"
+            />
+            <WorkspaceContent
+              v-else-if="activeTab.type === 'workspace'"
+              :tab="activeTab"
+            />
+            <SFTPTabContent
+              v-else-if="activeTab.type === 'sftp'"
+              :key="activeTab.id"
+              :panel-id="activeTab.panelId"
+            />
+            <RDPTabContent
+              v-else-if="activeTab.type === 'rdp'"
+              :key="activeTab.id"
+              :panel-id="activeTab.panelId"
+              :config="getPanelConfig(activeTab.panelId)"
+              :session-id="getPanelSessionId(activeTab.panelId)"
+            />
+            <VNCTabContent
+              v-else-if="activeTab.type === 'vnc'"
+              :key="activeTab.id"
+              :panel-id="activeTab.panelId"
+              :config="getPanelConfig(activeTab.panelId)"
+              :session-id="getPanelSessionId(activeTab.panelId)"
+            />
+            <DBTabContent
+              v-else-if="activeTab.type === 'database'"
+              :key="activeTab.id"
+              :session-id="getPanelSessionId(activeTab.panelId)"
+              :host-name="getPanelConfig(activeTab.panelId)?.host || ''"
+              :default-db-name="getPanelConfig(activeTab.panelId)?.dbName || ''"
+              :db-type="getPanelConfig(activeTab.panelId)?.dbType || 'mysql'"
+            />
+          </KeepAlive>
         </template>
       </div>
       <AISidebar />
@@ -79,6 +89,7 @@ import WorkspaceContent from './components/WorkspaceContent.vue'
 import SFTPTabContent from './components/SFTPTabContent.vue'
 import RDPTabContent from './components/RDPTabContent.vue'
 import VNCTabContent from './components/VNCTabContent.vue'
+import DBTabContent from './components/DBTabContent.vue'
 import ConnectionForm from './components/ConnectionForm.vue'
 import AISidebar from './components/AISidebar.vue'
 import SyncConflictDialog from './components/SyncConflictDialog.vue'
@@ -91,6 +102,7 @@ import { useSettingsStore } from './stores/settingsStore'
 import { useI18n } from './i18n'
 import { CreateSession, CloseSession, RDPHide, RDPShow, RDPSetPosition, RDPSetFocus } from '../wailsjs/go/main/App'
 import { EventsOn } from '../wailsjs/runtime'
+import { ElMessage } from 'element-plus'
 import type { ConnectionConfig } from './types/session'
 
 const connectionStore = useConnectionStore()
@@ -328,6 +340,13 @@ async function closeTab(tabId: string) {
     panelStore.disconnectVNCCache(tab.panelId)
     panelStore.removeVNCCache(tab.panelId)
   }
+  // Close database session
+  if (tab && tab.type === 'database') {
+    const p = panelStore.getPanel(tab.panelId)
+    if (p?.sessionId) {
+      try { await CloseSession(p.sessionId) } catch (_) {}
+    }
+  }
   // Local terminals must be explicitly closed to terminate the shell process
   if (tab && tab.type === 'terminal') {
     const p = panelStore.getPanel(tab.panelId)
@@ -354,6 +373,7 @@ function onSaveOnly(config: ConnectionConfig) {
 async function onConnect(config: ConnectionConfig) {
   if (config.type === 'rdp') return onConnectRDP(config)
   if (config.type === 'vnc') return onConnectVNC(config)
+  if (config.type === 'database') return onConnectDB(config)
   connectionStore.add(config)
   const panel = panelStore.createPanel(config, 'ssh')
   const displayTitle = config.name || `${config.user}@${config.host}`
@@ -471,6 +491,31 @@ async function onConnectVNC(config: ConnectionConfig) {
     console.error('Failed to create VNC session:', e)
     tabStore.closeTab(tab.id)
     panelStore.removePanel(panel.id)
+  }
+}
+
+async function onConnectDB(config: ConnectionConfig) {
+  connectionStore.add(config)
+  if (!config.dbType) {
+    config.dbType = 'mysql'
+  }
+  const displayTitle = config.name || `${config.dbType}:${config.user}@${config.host}`
+
+  const panel = panelStore.createPanel(config, 'database')
+  panel.title = displayTitle
+  const tab = tabStore.createDBTab(displayTitle, panel.id)
+  panelStore.movePanelToTab(panel.id, tab.id)
+
+  try {
+    const info = await CreateSession('database', config)
+    panelStore.bindSession(panel.id, info.id)
+    sessionStore.initSession(info.id)
+  } catch (e: any) {
+    const msg = e?.message || String(e)
+    console.error('Failed to create database session:', msg)
+    tabStore.closeTab(tab.id)
+    panelStore.removePanel(panel.id)
+    ElMessage.error(`${t('db.connectFailed')}: ${msg}`)
   }
 }
 

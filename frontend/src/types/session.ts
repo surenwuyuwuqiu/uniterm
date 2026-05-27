@@ -8,7 +8,7 @@ export interface ConnectionGroup {
 export interface ConnectionConfig {
   id: string
   name: string
-  type: 'ssh' | 'rdp' | 'vnc'
+  type: 'ssh' | 'rdp' | 'vnc' | 'database'
   host: string
   port: number
   user: string
@@ -22,6 +22,8 @@ export interface ConnectionConfig {
   rdpSmartSizing?: boolean
   // Local terminal shell path
   shellPath?: string
+  dbType?: string   // "mysql", "postgres", "rqlite"
+  dbName?: string   // default database name
 }
 
 export interface SessionInfo {

@@ -27,7 +27,15 @@
           <el-radio-button label="ssh">SSH</el-radio-button>
           <el-radio-button label="rdp" v-if="isWindows">RDP</el-radio-button>
           <el-radio-button label="vnc">VNC</el-radio-button>
+          <el-radio-button label="database">{{ t('db.database') }}</el-radio-button>
         </el-radio-group>
+      </el-form-item>
+      <el-form-item v-if="form.type === 'database'" :label="t('db.dbType')">
+        <el-select v-model="form.dbType" :placeholder="t('db.dbType')">
+          <el-option label="MySQL" value="mysql" />
+          <el-option label="PostgreSQL" value="postgres" />
+          <el-option label="rqlite" value="rqlite" />
+        </el-select>
       </el-form-item>
       <el-form-item :label="t('conn.host')" required>
         <el-input v-model="form.host" :placeholder="t('conn.hostPlaceholder')" />
@@ -35,19 +43,19 @@
       <el-form-item :label="t('conn.port')">
         <el-input-number v-model="form.port" :min="1" :max="65535" />
       </el-form-item>
-      <el-form-item v-if="form.type !== 'vnc'" :label="t('conn.user')">
+      <el-form-item v-if="form.type !== 'vnc' && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.user')">
         <el-input v-model="form.user" :placeholder="t('conn.userPlaceholder')" />
       </el-form-item>
-      <el-form-item v-if="form.type !== 'rdp' && form.type !== 'vnc'" :label="t('conn.authType')">
+      <el-form-item v-if="form.type === 'ssh'" :label="t('conn.authType')">
         <el-radio-group v-model="form.authType">
           <el-radio-button label="password">{{ t('conn.password') }}</el-radio-button>
           <el-radio-button label="key">{{ t('conn.keyPath') }}</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      <el-form-item v-if="form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc'" :label="t('conn.password')">
+      <el-form-item v-if="(form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc' || form.type === 'database') && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.password')">
         <el-input v-model="form.password" type="password" show-password :key="passwordInputKey" />
       </el-form-item>
-      <el-form-item v-if="form.authType === 'key' && form.type !== 'rdp'" :label="t('conn.keyPath')">
+      <el-form-item v-if="form.authType === 'key' && form.type === 'ssh'" :label="t('conn.keyPath')">
         <el-input v-model="form.keyPath" :placeholder="t('conn.keyPathPlaceholder')" />
       </el-form-item>
       <template v-if="form.type === 'rdp'">
@@ -65,6 +73,9 @@
           <el-switch v-model="form.rdpSmartSizing" />
         </el-form-item>
       </template>
+      <el-form-item v-if="form.type === 'database' && form.dbType !== 'rqlite'" :label="t('db.databases')">
+        <el-input v-model="form.dbName" :placeholder="t('db.databases')" />
+      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="visible = false">{{ t('conn.cancel') }}</el-button>
@@ -146,7 +157,9 @@ const form = reactive<ConnectionConfig>({
   groupId: undefined,
   rdpFixedWidth: undefined,
   rdpFixedHeight: undefined,
-  rdpSmartSizing: true
+  rdpSmartSizing: true,
+  dbType: '',
+  dbName: '',
 })
 
 const rdpResolutions = [
@@ -196,9 +209,17 @@ watch(() => form.type, (newType) => {
   else if (newType === 'ssh' && form.port === 3389) form.port = 22
   else if (newType === 'vnc' && form.port === 22) form.port = 5900
   else if (newType === 'ssh' && form.port === 5900) form.port = 22
-  if (newType === 'rdp' || newType === 'vnc') {
+  else if (newType === 'database') form.port = 3306
+  if (newType === 'rdp' || newType === 'vnc' || newType === 'database') {
     form.authType = 'password'
   }
+})
+
+// Auto-switch default port when changing database type
+watch(() => form.dbType, (newType) => {
+  if (newType === 'mysql') form.port = 3306
+  else if (newType === 'postgres') form.port = 5432
+  else if (newType === 'rqlite') form.port = 4001
 })
 
 // Sync resolution picker to form fields
@@ -224,6 +245,8 @@ function resetForm() {
   form.rdpFixedWidth = undefined
   form.rdpFixedHeight = undefined
   form.rdpSmartSizing = true
+  form.dbType = ''
+  form.dbName = ''
   rdpResolution.value = '1280 × 720 (HD)'
   selectedGroupId.value = undefined
 }

@@ -34,6 +34,9 @@ type ConnectionConfig struct {
 	RdpSmartSizing bool `json:"rdpSmartSizing"`
 	// Local terminal shell path
 	ShellPath string `json:"shellPath,omitempty"`
+	// Database-specific fields
+	DBType string `json:"dbType,omitempty"` // "mysql", "postgres", "rqlite"
+	DBName string `json:"dbName,omitempty"` // default database name
 }
 
 // ConnectionStoreData is the top-level structure persisted to connections.json.

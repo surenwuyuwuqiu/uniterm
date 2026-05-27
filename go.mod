@@ -7,9 +7,12 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/go-git/go-git/v5 v5.13.2
 	github.com/go-ole/go-ole v1.3.0
+	github.com/go-sql-driver/mysql v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
+	github.com/lib/pq v1.12.3
 	github.com/pkg/sftp v1.13.10
+	github.com/rqlite/gorqlite v0.0.0-20260504155303-50d445fd0ab9
 	github.com/wailsapp/wails/v2 v2.12.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.50.0
@@ -18,6 +21,7 @@ require (
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
+	filippo.io/edwards25519 v1.2.0 // indirect
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v1.1.5 // indirect

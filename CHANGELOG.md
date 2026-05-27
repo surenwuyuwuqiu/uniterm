@@ -1,93 +1,93 @@
-# 更新日志
+# Changelog
 
 ## v2026.05.27-alpha
 
-- **new** 数据库连接与查询。支持 MySQL、PostgreSQL、rqlite 三种数据库，提供 SQL 查询执行、表结构浏览、数据行增删改查、数据库/表树形导航等功能。
-- **new** 终端搜索栏。Ctrl+F 打开搜索栏，基于 @xterm/addon-search 实现匹配高亮和结果计数。
-- **new** 连接侧边栏和 AI 侧边栏显示状态持久化到 localStorage，重启后保持上次的展开/收起状态。
-- **improve** 滚动条宽度从 5px 增加到 8px，更容易抓取操作。
-- **improve** AI 侧边栏最大化按钮在展开时显示缩回图标（Shrink），更直观。
-- **improve** 窗口边缘增加透明内边距，终端填充边缘时仍可拖拽调整窗口大小。
-- **improve** 工作区标签页增加 LayoutDashboard 图标。
-- **bugfix** 修复标签页切换时终端出现乱码的问题。会话数据缓冲区裁剪点可能落在转义序列中间（DA2、OSC 颜色查询等），残缺片段缺少 \x1b 前缀被 xterm.js 渲染为乱码。修复方案：在第一个 \n 前扫描 \x1b 确定安全重启边界。
+- **new** Database connection and query. Supports MySQL, PostgreSQL, and rqlite. Provides SQL query execution, table schema browsing, CRUD on data rows, and tree navigation of databases/tables.
+- **new** Terminal search bar. Press Ctrl+F to open the search bar; highlights matches and counts results using @xterm/addon-search.
+- **new** Connection sidebar and AI sidebar visibility states are now persisted to localStorage, restoring expand/collapse state after restart.
+- **improve** Scrollbar width increased from 5px to 8px for easier grabbing.
+- **improve** AI sidebar maximize button now shows a shrink icon when expanded for clearer indication.
+- **improve** Added transparent padding around window edges so the terminal can still be resized by dragging even when it fills the edge.
+- **improve** Workspace tabs now display the LayoutDashboard icon.
+- **bugfix** Fixed garbled text appearing when switching tabs. Session buffer truncation could fall in the middle of escape sequences (DA2, OSC color queries, etc.), leaving fragments without the \x1b prefix that xterm.js rendered as garbage. Fix: scan for \x1b before the first \n to determine a safe restart boundary.
 
 ## v2026.05.25-alpha
 
-- **bugfix** 编辑连接保存后，其他连接的密码信息丢失。修复 Go 后端 Save 方法底层数组共享导致的密码/APIKey 被意外清空的问题。
+- **bugfix** Editing and saving a connection caused passwords for other connections to be lost. Fixed an issue in the Go backend Save method where underlying array sharing inadvertently cleared passwords/APIKeys.
 
 ## v2026.05.24-alpha
 
-- **new** 云端配置同步。基于 GitHub、GitLab、Gitee 私有仓库构建专属私人云同步仓库，所有配置（连接信息、AI 模型密钥、应用设置）经 AES-256-GCM 加密后保存至远端，支持自动同步、冲突解决、主密码修改和仓库绑定管理。
+- **new** Cloud config sync. Build a private cloud sync repository based on GitHub, GitLab, or Gitee private repos. All configurations (connections, AI model keys, app settings) are encrypted with AES-256-GCM before being saved remotely. Supports auto-sync, conflict resolution, master password change, and repo binding management.
 
 ## v2026.05.23-alpha
 
-- **new** VNC 远程桌面。支持通过 noVNC 连接 VNC 服务器（TigerVNC、TightVNC、QEMU 等），内置 WebSocket↔TCP 代理桥接；标签页切换时 DOM 保活实现零延迟恢复画面，支持自动缩放开关、剪贴板双向共享（Ctrl+Shift+V 粘贴本地剪贴板）。
-- **new** 本地终端支持。可直接打开本地 shell（Windows PowerShell/CMD、macOS/Linux bash/zsh），无需 SSH 连接。
-- **new** AI Shell 感知。AI 可以感知当前终端的 shell 类型，生成更准确的命令。
-- **improve** 连接列表显示端口。Sidebar 中连接条目从 `user@host` 改为 `user@host:port`，用户名为空时仅显示 `host:port`。
-- **improve** VNC 新建连接时隐藏用户名字段（VNC 认证只需要密码）。
-- **improve** 图标统一。
-- **bugfix** RDP 窗口在弹出菜单、对话框、窗口拖拽时正确隐藏/显示，避免遮挡。
-- **bugfix** 设置页状态持久化问题修复。
-- **bugfix** 密码输入框可见性切换修复。
-- **bugfix** Windows 11 安全对话框抑制修复。
+- **new** VNC remote desktop. Connect to VNC servers (TigerVNC, TightVNC, QEMU, etc.) via noVNC with a built-in WebSocket↔TCP proxy bridge. DOM remains alive across tab switches for zero-latency screen recovery. Supports auto-resize toggle and bidirectional clipboard sharing (Ctrl+Shift+V to paste local clipboard).
+- **new** Local terminal support. Open a local shell directly (Windows PowerShell/CMD, macOS/Linux bash/zsh) without an SSH connection.
+- **new** AI Shell awareness. AI can detect the current terminal's shell type to generate more accurate commands.
+- **improve** Connection list now shows ports. Sidebar entries changed from `user@host` to `user@host:port`, displaying `host:port` when the username is empty.
+- **improve** Username field is hidden when creating a new VNC connection (VNC authentication only requires a password).
+- **improve** Icon unification.
+- **bugfix** RDP windows now correctly hide/show when menus, dialogs, or window dragging occur, avoiding obstruction.
+- **bugfix** Settings page state persistence issue fixed.
+- **bugfix** Password input visibility toggle fixed.
+- **bugfix** Windows 11 security dialog suppression fixed.
 
 ## v2026.05.22-alpha
 
-- **new** RDP 远程桌面。支持通过 Microsoft RDP ActiveX 控件连接 Windows 远程桌面，原生安全对话框已完全抑制，RDP 窗口无缝嵌入 uniTerm 标签页，窗口拖拽和缩放时平滑跟随。
-- **new** AI 边栏最大化按钮。可将 AI 助理窗口最大化至整个主区域，再次点击恢复原始宽度。
-- **new** AI 消息复制功能。工具调用 IN/OUT 展开框旁增加复制按钮，点击后显示对勾反馈；消息右上角增加"复制为 Markdown"按钮，hover 后展开显示文字。
-- **new** 广播输入功能。工作区面板标题栏增加广播按钮，可将键盘输入同时发送到工作区内所有终端。
-- **new** 设置页关于栏目，显示应用版本号。
-- **new** AI 命令执行确认模式新增"写操作确认"级别。原有三级（关闭/仅危险/全部）基础上增加"危险+写操作"选项，对 rm、mv 等写操作命令也需确认，填补危险与全部之间的安全粒度空缺。
-- **new** 连接分组右键菜单增加"新建连接"，新建时自动预选该分组。
-- **improve** 侧边栏选中状态统一。将 `selectedId` 与 `multiSelectedIds` 合并为单一 `selectedIds` 集合，选中高亮逻辑一致，修复右键选中时之前选中未清除的问题。
-- **improve** 右键单击连接时，若该连接未在选中集合中，自动取消其他选中并仅选中当前连接。
-- **improve** 标签栏优化：支持鼠标滚轮横向滚动，下拉菜单选中后自动滚动到可见位置。
-- **improve** 系统提示消息角色从 `assistant` 改为 `tool`，避免污染 LLM 对话上下文。
-- **improve** AI 会话存储从 localStorage 迁移至 Go 后端文件存储。
-- **improve** README 重新设计：新增中文版本、介绍网站首页、功能分类展示和截图轮播。
-- **bugfix** 修复标签页切换时终端出现乱码的问题（剥离不完整的转义序列）。
-- **bugfix** 修复工作区中面板激活状态未同步终端焦点的问题。
-- **bugfix** 修复选中单个连接时编辑按钮错误置灰的问题。
-- **bugfix** 修复搜索无匹配结果时未自动选中"新建连接..."虚拟条目。
-- **bugfix** 修复标签标题显示带主机后缀的问题（应仅显示连接名称）。
+- **new** RDP remote desktop. Connect to Windows Remote Desktop via the Microsoft RDP ActiveX control. Native security dialogs are fully suppressed; the RDP window is seamlessly embedded into uniTerm tabs and smoothly follows window dragging and resizing.
+- **new** AI sidebar maximize button. Expands the AI assistant panel to fill the entire main area; click again to restore original width.
+- **new** AI message copy functionality. Added copy buttons next to tool-call IN/OUT expand boxes with a checkmark feedback on click. Added a "Copy as Markdown" button in the top-right corner of messages that expands on hover.
+- **new** Broadcast input. Added a broadcast button to the workspace panel header to send keyboard input to all terminals in the workspace simultaneously.
+- **new** About section in Settings page showing the app version.
+- **new** Added "Write-operation confirmation" level to AI command execution confirmation. On top of the existing three levels (Off / Dangerous only / All), added a "Dangerous + Write" option that also requires confirmation for write operations like rm and mv, filling the granularity gap between Dangerous and All.
+- **new** Added "New Connection" to the connection group context menu; the group is automatically preselected when creating.
+- **improve** Unified sidebar selection state. Merged `selectedId` and `multiSelectedIds` into a single `selectedIds` set for consistent highlight logic; fixed the issue where previous selection was not cleared on right-click.
+- **improve** Right-clicking a connection now automatically deselects others and selects only the current one if it wasn't already in the selection.
+- **improve** Tab bar improvements: supports horizontal scrolling with mouse wheel, and dropdown selections auto-scroll into view.
+- **improve** System prompt message role changed from `assistant` to `tool` to avoid polluting the LLM conversation context.
+- **improve** AI session storage migrated from localStorage to Go backend file storage.
+- **improve** README redesign: added Chinese version, landing page, categorized feature showcase, and screenshot carousel.
+- **bugfix** Fixed garbled text when switching tabs (strip incomplete escape sequences).
+- **bugfix** Fixed panel active state not syncing terminal focus in workspaces.
+- **bugfix** Fixed edit button incorrectly grayed out when a single connection is selected.
+- **bugfix** Fixed "New Connection..." virtual item not auto-selected when search yields no matches.
+- **bugfix** Fixed tab title displaying with host suffix (should show connection name only).
 
 ## v2026.05.17-alpha
 
-- **new** 连接分组功能。支持创建、重命名、删除连接分组，连接可按分组折叠展示，支持拖拽调整连接所属分组，无分组连接自动归入"(无分组)"虚拟分组。
-- **new** 连接批量选择与操作。支持 Ctrl+点击多选、Shift+点击范围选择，右键菜单可批量连接、批量连接 SFTP、批量复制、批量删除选中的连接，回车键同样支持批量打开。
-- **new** 搜索栏输入时列表底部显示"新建连接..."虚拟条目，双击或回车可将搜索内容预填到主机字段并打开新建连接窗口。
-- **new** 删除连接前弹出确认提示，显示待删除数量。
-- **change** 浅色主题重新设计为 Windows 风格中性灰色调，使用蓝色强调色替代原来的暖黄色。
-- **improve** AI 会话名称、工作区名称、AI 锁定按钮提示等支持中英文国际化。
-- **bugfix** 修复 AI 助理设置按钮跳转到基础设置而非 AI 设置的问题。
-- **bugfix** 修复 SFTP 文件列表中".."返回上级目录行弹出右键菜单的问题。
-- **bugfix** 修复多选连接时选中数量总是少一个的问题。
+- **new** Connection grouping. Supports creating, renaming, and deleting connection groups. Connections can be collapsed by group; drag-and-drop to change group assignment; ungrouped connections are automatically placed in a "(No Group)" virtual group.
+- **new** Batch connection selection and actions. Supports Ctrl+click multi-select and Shift+click range select. Context menu supports batch connect, batch SFTP connect, batch copy, and batch delete. Enter key also supports batch open.
+- **new** A "New Connection..." virtual item appears at the bottom of the list while typing in the search bar. Double-click or press Enter to prefill the host field and open the new connection dialog.
+- **new** Confirmation prompt before deleting connections, showing the number of items to be deleted.
+- **change** Light theme redesigned with a Windows-style neutral gray palette, using blue accent color instead of the previous warm yellow.
+- **improve** AI session names, workspace names, AI lock button tooltips, and more now support Chinese/English internationalization.
+- **bugfix** Fixed AI assistant settings button navigating to General Settings instead of AI Settings.
+- **bugfix** Fixed right-click menu appearing on the ".." parent directory row in the SFTP file list.
+- **bugfix** Fixed selected count being one less than actual when multi-selecting connections.
 
 ## v2026.05.16-alpha
 
-- **new** SFTP 文件管理器，支持双栏浏览本地与远程文件，可进行文件上传、下载、重命名、删除、权限修改等操作，传输任务按标签页独立跟踪。
+- **new** SFTP file manager with dual-pane browsing of local and remote files. Supports upload, download, rename, delete, and permission changes. Transfer tasks are tracked independently per tab.
 
 ## v2026.05.15-alpha
 
-- **new** 工作区面板系统。支持将多个终端标签页合并为工作区，在同一个窗口内左右或上下分屏显示，拖拽面板标题栏可自由调整面板位置和大小，拖拽标签页到面板边缘自动创建新的分屏。
-- **new** 自定义窗口标题栏，适配 Windows 和 macOS 平台窗口控制按钮。
-- **new** 终端内 http/https 链接自动识别并显示下划线，鼠标悬停提示，Ctrl+点击在默认浏览器中打开。
-- **new** Windows 安装包增加运行中进程检测，安装前提示关闭正在运行的程序。
-- **improve** 暗色主题对比度提升，默认和深蓝两套配色背景层次更分明，文字更易读。
-- **bugfix** 选中文字自动复制到剪贴板现在即使鼠标在终端外松开也能生效。
-- **bugfix** 修复 AI 多轮对话中 tool 响应丢失导致的错误。
-- **bugfix** 修复面板分屏时子面板出现空白区域、分割条无法拖动的问题。
-- **bugfix** 修复窗口或面板尺寸变化时终端内容显示异常。
-- **bugfix** 修复 Ctrl+滚轮导致整个窗口意外缩放的问题。
+- **new** Workspace panel system. Merge multiple terminal tabs into a workspace, displayed side-by-side or stacked within the same window. Drag panel headers to freely adjust panel position and size; drag tabs to panel edges to auto-create new splits.
+- **new** Custom window title bar adapted for Windows and macOS platform window controls.
+- **new** Terminal http/https links are auto-detected and underlined. Hover to see tooltip; Ctrl+click to open in default browser.
+- **new** Windows installer now detects running processes and prompts to close the running application before installation.
+- **improve** Dark theme contrast improved; both Default and Deep Blue color schemes have clearer background layers and more readable text.
+- **bugfix** Selected text auto-copy to clipboard now works even if the mouse is released outside the terminal.
+- **bugfix** Fixed errors caused by missing tool responses in AI multi-turn conversations.
+- **bugfix** Fixed blank areas in child panels and unmovable split bars when panel splitting occurs.
+- **bugfix** Fixed abnormal terminal content display when window or panel size changes.
+- **bugfix** Fixed Ctrl+scroll wheel causing unexpected full-window zoom.
 
 ## v2026.05.13-alpha
 
-- **new** 支持自由分屏功能。窗口可以左右或上下拆分，同时打开多个终端，拖拽边界调整面板大小，标签页也可跨面板拖拽。
-- **new** 支持AI窗口锁定按钮。每个终端标签页上的 "AI" 按钮可将 AI 锁定到该终端，锁定后 AI 执行命令只针对该终端，切换其他标签也不会跑错位置。
-- **improve** 增加 AI 单次对话最多连续交互 20 轮（原来是 10 轮），达到上限后会出现 "继续" 按钮，点击可接着之前的话题继续聊；增加控制历史消息长度，防止上下文过长导致卡顿。
-- **new** 左侧连接列表可用上下箭头切换选中项，按回车直接连接，不用鼠标双击。
-- **change** Windows 只提供安装包（.exe），不再额外提供压缩包。macOS 只提供 DMG 镜像，不再额外提供压缩包。
-- **improve** 终端默认保留的历史行数从 5000 行降到 2500 行，减少内存占用。
-- **bugfix** 修复窗口或面板缩小时终端内容不跟随调整的问题。
+- **new** Free panel splitting. Split windows left/right or top/bottom to open multiple terminals simultaneously. Drag borders to resize panels; tabs can also be dragged across panels.
+- **new** AI window lock button. The "AI" button on each terminal tab locks AI to that terminal. After locking, AI command execution targets only that terminal; switching to other tabs won't send commands to the wrong place.
+- **improve** Increased AI max consecutive interactions per conversation from 10 to 20. A "Continue" button appears when the limit is reached to continue the conversation; added history message length control to prevent sluggishness from overly long context.
+- **new** Connection list supports up/down arrow key navigation; press Enter to connect directly without double-clicking.
+- **change** Windows releases now provide installer (.exe) only, no additional zip archives. macOS releases now provide DMG only, no additional zip archives.
+- **improve** Terminal default scrollback lines reduced from 5000 to 2500 to reduce memory usage.
+- **bugfix** Fixed terminal content not resizing when the window or panel shrinks.

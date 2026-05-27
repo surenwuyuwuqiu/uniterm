@@ -23,16 +23,18 @@ Autonomous AI Agent that works like Claude Code — independently plans and exec
 
 - **SSH Client** — Connect via password or private key authentication. Multi-tab management with 5 color schemes, 6 monospace fonts, adjustable font size and scrollback, configurable selection behavior and right-click actions.
 - **SFTP File Manager** — Dual-pane browser for local and remote files. Upload, download, drag-and-drop, delete, rename, and more. Transfers tracked per tab with pause, resume, and cancel support.
-- **Workspace & Split Panes** — Merge terminal tabs into a workspace with horizontal or vertical splits. Drag panel edges or title bars to resize and rearrange freely.
-- **Connection Manager** — Save, search, edit, group, and duplicate server connections. Drag-and-drop organization, multi-select or range-select for batch connect, batch delete, and more.
 - **Local Terminal** — Full-featured local terminal supporting PowerShell, CMD, Git Bash, and other shells with the same font, color, and behavior settings as SSH sessions.
-- **RDP / VNC** — Remote desktop and VNC connections, making uniTerm a unified gateway for all remote access.
+- **RDP** — Support Windows Remote Desktop connections.
+- **VNC** — Support VNC connections.
+- **Database Client** — Connect to MySQL, PostgreSQL, and rqlite databases. Execute SQL queries, browse table structures, and edit data rows inline — all from a unified interface.
 
 ### Customization
 
+- **Connection Manager** — Save, search, edit, group, and duplicate server connections. Drag-and-drop organization, multi-select or range-select for batch connect, batch delete, and more.
+- **Workspace & Split Panes** — Merge terminal tabs into a workspace with horizontal or vertical splits. Drag panel edges or title bars to resize and rearrange freely.
 - **Cloud Sync** — Build your own private sync repository via GitHub, GitLab, or Gitee. All configurations (connections, AI model keys, app settings) are encrypted with AES-256-GCM before syncing. Supports automatic sync, conflict resolution, master password changes, and repository management.
-- **Internationalization** — Simplified Chinese and English UI, built with a clean i18n architecture ready for more languages.
 - **Themes** — Dark, Deep Blue, and Light themes with automatic system theme detection.
+- **Internationalization** — Simplified Chinese and English UI, built with a clean i18n architecture ready for more languages.
 - **Cross-Platform** — Built on Wails v2, runs natively on Windows, macOS, and Linux.
 
 ## Quick Workflows
@@ -94,7 +96,8 @@ uniTerm/
 ├── main.go                       # Entry point
 ├── app.go                        # Wails bindings, LLM API proxy, SFTP API
 ├── backend/
-│   ├── session/                  # SSH/SFTP session management
+│   ├── session/                  # SSH/SFTP/database session management
+│   ├── database/                 # SQL execution, schema introspection, DSN builders
 │   ├── store/                    # Persistent config (connections, AI, settings)
 │   └── log/                      # File-based logging
 ├── frontend/

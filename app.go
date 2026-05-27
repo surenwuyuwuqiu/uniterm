@@ -410,10 +410,14 @@ func (a *App) CreateSession(sessionType string, config session.ConnectionConfig)
 	if a.sessionManager == nil {
 		return nil, fmt.Errorf("session manager not initialized")
 	}
+	log.Writef("[CreateSession] type=%s, dbType=%s, host=%s, port=%d, user=%s, dbName=%s, name=%s",
+		sessionType, config.DBType, config.Host, config.Port, config.User, config.DBName, config.Name)
 	s, err := a.sessionManager.Create(sessionType, config)
 	if err != nil {
+		log.Writef("[CreateSession] manager.Create failed: %v", err)
 		return nil, err
 	}
+	log.Writef("[CreateSession] session created, id=%s", s.ID())
 
 	// Set parent HWND for RDP sessions
 	if rdp, ok := s.(*session.RDPSession); ok {
@@ -452,10 +456,13 @@ func (a *App) CreateSession(sessionType string, config session.ConnectionConfig)
 
 	// Database sessions connect synchronously so errors are returned to the frontend.
 	if sessionType == "database" {
+		log.Writef("[CreateSession] connecting database session synchronously...")
 		if err := s.Connect(config); err != nil {
+			log.Writef("[CreateSession] database connect failed: %v", err)
 			_ = a.sessionManager.Close(s.ID())
 			return nil, fmt.Errorf("database connect failed: %w", err)
 		}
+		log.Writef("[CreateSession] database session connected successfully, id=%s", s.ID())
 	} else {
 		go func() {
 			defer func() {
@@ -916,47 +923,120 @@ func (a *App) GetDefaultShell() string {
 func (a *App) dbSession(sessionID string) (*session.DatabaseSession, error) {
 	s, ok := a.sessionManager.Get(sessionID)
 	if !ok {
+		log.Writef("[dbSession] session not found: %s", sessionID)
 		return nil, fmt.Errorf("session not found: %s", sessionID)
 	}
 	ds, ok := s.(*session.DatabaseSession)
 	if !ok {
+		log.Writef("[dbSession] session is not a database session: %s (type=%s)", sessionID, s.Type())
 		return nil, fmt.Errorf("session is not a database session: %s", sessionID)
 	}
 	return ds, nil
 }
 
-func (a *App) GetDatabases(sessionID string) ([]string, error) {
+func (a *App) dbProvider(sessionID string) (*session.DatabaseSession, database.Provider, error) {
 	ds, err := a.dbSession(sessionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	p, err := database.NewProvider(ds.DBType())
+	if err != nil {
+		return nil, nil, err
+	}
+	return ds, p, nil
+}
+
+func (a *App) GetDatabases(sessionID string) ([]string, error) {
+	log.Writef("[GetDatabases] sessionID=%s", sessionID)
+	ds, p, err := a.dbProvider(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	return database.GetDatabases(ds.Engine(), ds.DBType())
+	log.Writef("[GetDatabases] dbType=%s, fetching databases...", ds.DBType())
+	dbs, err := p.GetDatabases(ds.DB())
+	if err != nil {
+		log.Writef("[GetDatabases] failed: %v", err)
+	} else {
+		log.Writef("[GetDatabases] got %d databases: %v", len(dbs), dbs)
+	}
+	return dbs, err
 }
 
 func (a *App) GetTables(sessionID string, dbName string) ([]database.TableInfo, error) {
-	ds, err := a.dbSession(sessionID)
+	log.Writef("[GetTables] sessionID=%s, dbName=%s", sessionID, dbName)
+	ds, p, err := a.dbProvider(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	return database.GetTables(ds.Engine(), ds.DBType(), dbName)
+	tables, err := p.GetTables(ds.DB(), dbName)
+	if err != nil {
+		log.Writef("[GetTables] failed: %v", err)
+	} else {
+		names := make([]string, len(tables))
+		for i, t := range tables {
+			names[i] = t.Name
+		}
+		log.Writef("[GetTables] got %d tables: %v", len(tables), names)
+	}
+	return tables, err
 }
 
 func (a *App) GetTableSchema(sessionID string, dbName string, tableName string) (*database.SchemaResult, error) {
-	ds, err := a.dbSession(sessionID)
+	ds, p, err := a.dbProvider(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	return database.GetTableSchema(ds.Engine(), dbName, tableName)
+	return p.GetTableSchema(ds.DB(), dbName, tableName)
 }
 
-func (a *App) ExecuteQuery(sessionID string, sql string) (*database.QueryResult, error) {
-	ds, err := a.dbSession(sessionID)
+func (a *App) CreateDatabase(sessionID string, dbName string) error {
+	ds, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.CreateDatabase(ds.DB(), dbName)
+}
+
+func (a *App) DropDatabase(sessionID string, dbName string) error {
+	ds, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.DropDatabase(ds.DB(), dbName)
+}
+
+func (a *App) CreateTable(sessionID string, dbName string, tableName string) error {
+	ds, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.CreateTable(ds.DB(), dbName, tableName)
+}
+
+func (a *App) DropTable(sessionID string, dbName string, tableName string) error {
+	ds, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.DropTable(ds.DB(), dbName, tableName)
+}
+
+func (a *App) TruncateTable(sessionID string, dbName string, tableName string) error {
+	ds, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.TruncateTable(ds.DB(), dbName, tableName)
+}
+
+func (a *App) ExecuteQuery(sessionID string, dbName string, sql string) (*database.QueryResult, error) {
+	ds, p, err := a.dbProvider(sessionID)
 	if err != nil {
 		return nil, err
 	}
 
 	start := time.Now()
-	qr, qErr := database.ExecuteQuery(ds.Engine(), sql)
+	qr, qErr := database.ExecuteQuery(p, ds.DB(), dbName, sql)
 	elapsed := time.Since(start).Milliseconds()
 
 	entry := database.HistoryEntry{SQL: sql, Duration: elapsed}
@@ -970,14 +1050,14 @@ func (a *App) ExecuteQuery(sessionID string, sql string) (*database.QueryResult,
 	return qr, qErr
 }
 
-func (a *App) ExecuteStatement(sessionID string, sql string) (*database.ExecResult, error) {
-	ds, err := a.dbSession(sessionID)
+func (a *App) ExecuteStatement(sessionID string, dbName string, sql string) (*database.ExecResult, error) {
+	ds, p, err := a.dbProvider(sessionID)
 	if err != nil {
 		return nil, err
 	}
 
 	start := time.Now()
-	er, sErr := database.ExecuteStatement(ds.Engine(), sql)
+	er, sErr := database.ExecuteStatement(p, ds.DB(), dbName, sql)
 	elapsed := time.Since(start).Milliseconds()
 
 	entry := database.HistoryEntry{SQL: sql, Duration: elapsed}
@@ -991,13 +1071,53 @@ func (a *App) ExecuteStatement(sessionID string, sql string) (*database.ExecResu
 	return er, sErr
 }
 
-func (a *App) AlterTable(sessionID string, dbName string, tableName string, sql string) error {
-	ds, err := a.dbSession(sessionID)
+func (a *App) AddColumn(sessionID string, dbName string, tableName string, col database.ColumnDef) error {
+	ds, p, err := a.dbProvider(sessionID)
 	if err != nil {
 		return err
 	}
-	_, err = ds.Engine().Exec(sql)
-	return err
+	return p.AddColumn(ds.DB(), dbName, tableName, col)
+}
+
+func (a *App) ModifyColumn(sessionID string, dbName string, tableName string, col database.ColumnDef) error {
+	ds, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.ModifyColumn(ds.DB(), dbName, tableName, col)
+}
+
+func (a *App) DropColumn(sessionID string, dbName string, tableName string, colName string) error {
+	ds, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.DropColumn(ds.DB(), dbName, tableName, colName)
+}
+
+func (a *App) AddIndex(sessionID string, dbName string, tableName string, idx database.IndexDef) error {
+	ds, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.AddIndex(ds.DB(), dbName, tableName, idx)
+}
+
+func (a *App) DropIndexOp(sessionID string, dbName string, tableName string, idxName string, isPrimary bool, autoIncCols []string) error {
+	ds, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.DropIndex(ds.DB(), dbName, tableName, idxName, isPrimary, autoIncCols)
+}
+
+func (a *App) GetDBCapabilities(sessionID string) (*database.DBCapabilities, error) {
+	_, p, err := a.dbProvider(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	caps := p.GetCapabilities()
+	return &caps, nil
 }
 
 func (a *App) GetQueryHistory(sessionID string) ([]database.HistoryEntry, error) {

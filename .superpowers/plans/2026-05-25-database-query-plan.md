@@ -2406,7 +2406,7 @@ In the type selector section, add database options after the VNC radio button:
 After the port field, add:
 
 ```vue
-<el-form-item v-if="isDatabaseType" :label="t('db.databases')">
+<el-form-item v-if="form.type === 'database'" :label="t('db.databases')">
   <el-input v-model="form.dbName" :placeholder="t('db.databases')" />
 </el-form-item>
 ```
@@ -2416,7 +2416,7 @@ After the port field, add:
 In the `<script>` section, add a computed property:
 
 ```typescript
-const isDatabaseType = computed(() => ['mysql', 'postgres', 'rqlite'].includes(form.type))
+// form.type === 'database' 直接内联判断，无需单独 computed
 ```
 
 Update the form data initialization to include `dbType` and `dbName`:

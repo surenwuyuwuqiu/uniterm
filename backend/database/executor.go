@@ -1,9 +1,8 @@
 package database
 
 import (
+	"database/sql"
 	"encoding/json"
-
-	"xorm.io/xorm"
 )
 
 type QueryResultColumn struct {
@@ -21,38 +20,34 @@ type ExecResult struct {
 	LastInsertID int64 `json:"lastInsertId"`
 }
 
-func ExecuteQuery(engine *xorm.Engine, sql string) (*QueryResult, error) {
-	rows, err := engine.QueryString(sql)
+func ExecuteQuery(p Provider, db *sql.DB, dbName, sqlStr string) (*QueryResult, error) {
+	if err := p.PrepareExec(db, dbName); err != nil {
+		return nil, err
+	}
+
+	rows, cols, err := queryAny(db, sqlStr)
 	if err != nil {
 		return nil, err
 	}
 
+	columns := make([]QueryResultColumn, 0, len(cols))
+	for _, c := range cols {
+		columns = append(columns, QueryResultColumn{Name: c, Type: ""})
+	}
+
 	if len(rows) == 0 {
-		return &QueryResult{Columns: []QueryResultColumn{}, Rows: []map[string]any{}}, nil
+		return &QueryResult{Columns: columns, Rows: []map[string]any{}}, nil
 	}
 
-	// Extract column names from the first row
-	firstRow := rows[0]
-	columns := make([]QueryResultColumn, 0, len(firstRow))
-	for key := range firstRow {
-		columns = append(columns, QueryResultColumn{Name: key, Type: ""})
-	}
-
-	// Convert []map[string]string to []map[string]any for JSON serialization
-	resultRows := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		m := make(map[string]any, len(row))
-		for k, v := range row {
-			m[k] = v
-		}
-		resultRows = append(resultRows, m)
-	}
-
-	return &QueryResult{Columns: columns, Rows: resultRows}, nil
+	return &QueryResult{Columns: columns, Rows: rows}, nil
 }
 
-func ExecuteStatement(engine *xorm.Engine, sql string) (*ExecResult, error) {
-	result, err := engine.Exec(sql)
+func ExecuteStatement(p Provider, db *sql.DB, dbName, sqlStr string) (*ExecResult, error) {
+	if err := p.PrepareExec(db, dbName); err != nil {
+		return nil, err
+	}
+
+	result, err := db.Exec(sqlStr)
 	if err != nil {
 		return nil, err
 	}

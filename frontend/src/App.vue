@@ -13,43 +13,48 @@
       <div class="tab-area">
         <TabBar />
         <template v-if="activeTab">
-          <TerminalTabContent
-            v-if="activeTab.type === 'terminal'"
-            :key="activeTab.id"
-            :tab="activeTab"
-            @close="closeTab"
-          />
-          <SettingsTabContent
-            v-else-if="activeTab.type === 'settings'"
-          />
-          <WorkspaceContent
-            v-else-if="activeTab.type === 'workspace'"
-            :tab="activeTab"
-          />
-          <SFTPTabContent
-            v-else-if="activeTab.type === 'sftp'"
-            :key="activeTab.id"
-            :panel-id="activeTab.panelId"
-          />
-          <RDPTabContent
-            v-else-if="activeTab.type === 'rdp'"
-            :key="activeTab.id"
-            :panel-id="activeTab.panelId"
-            :config="getPanelConfig(activeTab.panelId)"
-            :session-id="getPanelSessionId(activeTab.panelId)"
-          />
-          <VNCTabContent
-            v-else-if="activeTab.type === 'vnc'"
-            :key="activeTab.id"
-            :panel-id="activeTab.panelId"
-            :config="getPanelConfig(activeTab.panelId)"
-            :session-id="getPanelSessionId(activeTab.panelId)"
-          />
-          <DBTabContent
-            v-else-if="activeTab.type === 'database'"
-            :key="activeTab.id"
-            :session-id="getPanelSessionId(activeTab.panelId)"
-          />
+          <KeepAlive :include="['DBTabContent']">
+            <TerminalTabContent
+              v-if="activeTab.type === 'terminal'"
+              :key="activeTab.id"
+              :tab="activeTab"
+              @close="closeTab"
+            />
+            <SettingsTabContent
+              v-else-if="activeTab.type === 'settings'"
+            />
+            <WorkspaceContent
+              v-else-if="activeTab.type === 'workspace'"
+              :tab="activeTab"
+            />
+            <SFTPTabContent
+              v-else-if="activeTab.type === 'sftp'"
+              :key="activeTab.id"
+              :panel-id="activeTab.panelId"
+            />
+            <RDPTabContent
+              v-else-if="activeTab.type === 'rdp'"
+              :key="activeTab.id"
+              :panel-id="activeTab.panelId"
+              :config="getPanelConfig(activeTab.panelId)"
+              :session-id="getPanelSessionId(activeTab.panelId)"
+            />
+            <VNCTabContent
+              v-else-if="activeTab.type === 'vnc'"
+              :key="activeTab.id"
+              :panel-id="activeTab.panelId"
+              :config="getPanelConfig(activeTab.panelId)"
+              :session-id="getPanelSessionId(activeTab.panelId)"
+            />
+            <DBTabContent
+              v-else-if="activeTab.type === 'database'"
+              :key="activeTab.id"
+              :session-id="getPanelSessionId(activeTab.panelId)"
+              :host-name="getPanelConfig(activeTab.panelId)?.host || ''"
+              :default-db-name="getPanelConfig(activeTab.panelId)?.dbName || ''"
+              :db-type="getPanelConfig(activeTab.panelId)?.dbType || 'mysql'"
+            />
+          </KeepAlive>
         </template>
       </div>
       <AISidebar />
@@ -368,7 +373,7 @@ function onSaveOnly(config: ConnectionConfig) {
 async function onConnect(config: ConnectionConfig) {
   if (config.type === 'rdp') return onConnectRDP(config)
   if (config.type === 'vnc') return onConnectVNC(config)
-  if (config.type === 'database' || config.type === 'mysql' || config.type === 'postgres' || config.type === 'rqlite') return onConnectDB(config)
+  if (config.type === 'database') return onConnectDB(config)
   connectionStore.add(config)
   const panel = panelStore.createPanel(config, 'ssh')
   const displayTitle = config.name || `${config.user}@${config.host}`
@@ -491,14 +496,8 @@ async function onConnectVNC(config: ConnectionConfig) {
 
 async function onConnectDB(config: ConnectionConfig) {
   connectionStore.add(config)
-  // Normalize legacy configs: convert direct db type strings to 'database' + dbType
-  if (config.type === 'mysql' || config.type === 'postgres' || config.type === 'rqlite') {
-    config.dbType = config.dbType || config.type
-    config.type = 'database'
-  }
-  // Ensure dbType is populated
   if (!config.dbType) {
-    config.dbType = config.type
+    config.dbType = 'mysql'
   }
   const displayTitle = config.name || `${config.dbType}:${config.user}@${config.host}`
 

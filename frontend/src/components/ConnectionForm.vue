@@ -43,22 +43,19 @@
       <el-form-item :label="t('conn.port')">
         <el-input-number v-model="form.port" :min="1" :max="65535" />
       </el-form-item>
-      <el-form-item v-if="isDatabaseType" :label="t('db.databases')">
-        <el-input v-model="form.dbName" :placeholder="t('db.databases')" />
-      </el-form-item>
-      <el-form-item v-if="form.type !== 'vnc'" :label="t('conn.user')">
+      <el-form-item v-if="form.type !== 'vnc' && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.user')">
         <el-input v-model="form.user" :placeholder="t('conn.userPlaceholder')" />
       </el-form-item>
-      <el-form-item v-if="form.type !== 'rdp' && form.type !== 'vnc' && !isDatabaseType" :label="t('conn.authType')">
+      <el-form-item v-if="form.type === 'ssh'" :label="t('conn.authType')">
         <el-radio-group v-model="form.authType">
           <el-radio-button label="password">{{ t('conn.password') }}</el-radio-button>
           <el-radio-button label="key">{{ t('conn.keyPath') }}</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      <el-form-item v-if="form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc' || isDatabaseType" :label="t('conn.password')">
+      <el-form-item v-if="(form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc' || form.type === 'database') && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.password')">
         <el-input v-model="form.password" type="password" show-password :key="passwordInputKey" />
       </el-form-item>
-      <el-form-item v-if="form.authType === 'key' && form.type !== 'rdp' && !isDatabaseType" :label="t('conn.keyPath')">
+      <el-form-item v-if="form.authType === 'key' && form.type === 'ssh'" :label="t('conn.keyPath')">
         <el-input v-model="form.keyPath" :placeholder="t('conn.keyPathPlaceholder')" />
       </el-form-item>
       <template v-if="form.type === 'rdp'">
@@ -76,6 +73,9 @@
           <el-switch v-model="form.rdpSmartSizing" />
         </el-form-item>
       </template>
+      <el-form-item v-if="form.type === 'database' && form.dbType !== 'rqlite'" :label="t('db.databases')">
+        <el-input v-model="form.dbName" :placeholder="t('db.databases')" />
+      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="visible = false">{{ t('conn.cancel') }}</el-button>
@@ -143,7 +143,6 @@ watch(visible, (val) => {
 })
 
 const isEdit = computed(() => !!props.editConfig?.id)
-const isDatabaseType = computed(() => form.type === 'database')
 
 const form = reactive<ConnectionConfig>({
   id: '',
@@ -214,6 +213,13 @@ watch(() => form.type, (newType) => {
   if (newType === 'rdp' || newType === 'vnc' || newType === 'database') {
     form.authType = 'password'
   }
+})
+
+// Auto-switch default port when changing database type
+watch(() => form.dbType, (newType) => {
+  if (newType === 'mysql') form.port = 3306
+  else if (newType === 'postgres') form.port = 5432
+  else if (newType === 'rqlite') form.port = 4001
 })
 
 // Sync resolution picker to form fields

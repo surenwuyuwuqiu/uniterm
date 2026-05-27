@@ -1,16 +1,17 @@
 package session
 
 import (
+	"database/sql"
 	"fmt"
-
-	"xorm.io/xorm"
+	"time"
 
 	"github.com/ys-ll/uniterm/backend/database"
+	"github.com/ys-ll/uniterm/backend/log"
 )
 
 type DatabaseSession struct {
 	baseSession
-	engine *xorm.Engine
+	db     *sql.DB
 	dbType string
 	closed bool
 }
@@ -26,15 +27,11 @@ func NewDatabaseSession(id string) *DatabaseSession {
 }
 
 func (s *DatabaseSession) Connect(config ConnectionConfig) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	log.Writef("[DatabaseSession.Connect] id=%s, dbType=%s, host=%s, port=%d, user=%s, dbName=%s",
+		s.id, config.DBType, config.Host, config.Port, config.User, config.DBName)
 
 	s.setStatus(StatusConnecting)
 
-	// Fall back to config.Type if DBType is not set (e.g., legacy connections)
-	if config.DBType == "" {
-		config.DBType = config.Type
-	}
 	s.dbType = config.DBType
 
 	if config.Name != "" {
@@ -45,37 +42,49 @@ func (s *DatabaseSession) Connect(config ConnectionConfig) error {
 
 	dsn, err := database.BuildDSN(config.DBType, config.Host, config.User, config.Password, config.DBName, config.Port)
 	if err != nil {
+		log.Writef("[DatabaseSession.Connect] BuildDSN failed: %v", err)
 		s.setStatus(StatusError)
 		return err
 	}
+	log.Writef("[DatabaseSession.Connect] DSN built, opening database...")
 
-	engine, err := database.NewEngine(config.DBType, dsn)
+	db, err := database.NewDB(config.DBType, dsn)
 	if err != nil {
+		log.Writef("[DatabaseSession.Connect] NewDB failed: %v", err)
 		s.setStatus(StatusError)
 		return err
 	}
 
-	if err := engine.Ping(); err != nil {
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	log.Writef("[DatabaseSession.Connect] db opened, pinging...")
+
+	if err := db.Ping(); err != nil {
+		log.Writef("[DatabaseSession.Connect] Ping failed: %v", err)
+		db.Close()
 		s.setStatus(StatusError)
 		return fmt.Errorf("ping %s: %w", config.DBType, err)
 	}
 
-	s.engine = engine
+	log.Writef("[DatabaseSession.Connect] ping OK, connected successfully")
+	s.db = db
 	s.setStatus(StatusConnected)
 	return nil
 }
 
 func (s *DatabaseSession) Disconnect() error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.closed {
+		s.mu.Unlock()
 		return nil
 	}
 	s.closed = true
+	s.mu.Unlock()
 
-	if s.engine != nil {
-		s.engine.Close()
+	if s.db != nil {
+		s.db.Close()
 	}
 	s.setStatus(StatusDisconnected)
 	return nil
@@ -84,7 +93,7 @@ func (s *DatabaseSession) Disconnect() error {
 func (s *DatabaseSession) IsConnected() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.status == StatusConnected && s.engine != nil
+	return s.status == StatusConnected && s.db != nil
 }
 
 func (s *DatabaseSession) Write(data []byte) error {
@@ -95,11 +104,11 @@ func (s *DatabaseSession) Resize(cols, rows int) error {
 	return nil
 }
 
-// Engine returns the underlying xorm engine (used by Wails bindings).
-func (s *DatabaseSession) Engine() *xorm.Engine {
+// DB returns the underlying database/sql connection (used by Wails bindings).
+func (s *DatabaseSession) DB() *sql.DB {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.engine
+	return s.db
 }
 
 // DBType returns the database type string.

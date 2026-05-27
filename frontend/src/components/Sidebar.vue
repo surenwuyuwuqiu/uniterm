@@ -63,7 +63,7 @@
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
               <span class="conn-meta">
-                <span class="host">{{ conn.type }} {{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
+                <span class="host">{{ conn.type === 'database' ? (conn.dbType || conn.type) : conn.type }} {{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
               </span>
             </div>
           </div>
@@ -105,7 +105,7 @@
             <div class="conn-details">
               <span class="name">{{ conn.name }}</span>
               <span class="conn-meta">
-                <span class="host">{{ conn.type }} {{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
+                <span class="host">{{ conn.type === 'database' ? (conn.dbType || conn.type) : conn.type }} {{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
               </span>
             </div>
           </div>
@@ -131,7 +131,7 @@
           <div class="conn-details">
             <span class="name">{{ conn.name }}</span>
             <span class="conn-meta">
-              <span class="conn-type">{{ conn.type.toUpperCase() }}</span>
+              <span class="conn-type">{{ conn.type === 'database' ? (conn.dbType || conn.type).toUpperCase() : conn.type.toUpperCase() }}</span>
               <span class="host">{{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
             </span>
           </div>
@@ -170,11 +170,11 @@
       :style="menuStyle"
       @click.stop
     >
-      <div v-if="selectedConn && isDatabaseType(selectedConn)" class="menu-item" @click="doConnectDB">{{ t('db.connectDB') }}</div>
-      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc' && !isDatabaseType(selectedConn))" class="menu-item" @click="doConnect">{{ connectLabel }}</div>
-      <div v-if="!selectedConn || (selectedConn.type !== 'rdp' && selectedConn.type !== 'vnc' && !isDatabaseType(selectedConn))" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
+      <div v-if="selectedConn && selectedConn.type === 'ssh'" class="menu-item" @click="doConnect">{{ connectLabel }}</div>
+      <div v-if="selectedConn && selectedConn.type === 'ssh'" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'vnc'" class="menu-item" @click="doConnectVNC">{{ t('sidebar.connectVNC') }}</div>
+      <div v-if="selectedConn && selectedConn.type === 'database'" class="menu-item" @click="doConnectDB">{{ t('db.connectDB') }}</div>
       <div class="menu-divider" />
       <div class="menu-item" :class="{ disabled: selectedIds.size > 1 }" @click="selectedIds.size <= 1 && doEdit()">{{ t('sidebar.edit') }}</div>
       <div class="menu-item" @click="doDuplicate">{{ t('sidebar.duplicate') }}</div>
@@ -509,7 +509,7 @@ function onListKeydown(e: KeyboardEvent) {
       for (const id of ids) {
         const c = connectionStore.connections.find(c => c.id === id)
         if (c) {
-          if (isDatabaseType(c)) {
+          if (c.type === 'database') {
             emit('connectDB', c)
           } else if (c.type === 'rdp') {
             emit('connectRdp', c)
@@ -606,7 +606,7 @@ function onItemClick(e: MouseEvent, conn: ConnectionConfig) {
 
 function onItemDblClick(conn: ConnectionConfig) {
   selectedIds.value = new Set()
-  if (isDatabaseType(conn)) {
+  if (conn.type === 'database') {
     emit('connectDB', conn)
   } else if (conn.type === 'rdp') {
     emit('connectRdp', conn)
@@ -713,10 +713,6 @@ function doConnectVNC() {
   for (const c of conns) {
     emit('connectVnc', c)
   }
-}
-
-function isDatabaseType(c: ConnectionConfig): boolean {
-  return c.type === 'database' || c.type === 'mysql' || c.type === 'postgres' || c.type === 'rqlite'
 }
 
 function doConnectDB() {
@@ -995,7 +991,7 @@ function onConnectFromForm(config: ConnectionConfig) {
   }
   showForm.value = false
   editConfig.value = undefined
-  if (isDatabaseType(config)) {
+  if (config.type === 'database') {
     emit('connectDB', config)
   } else if (config.type === 'rdp') {
     emit('connectRdp', config)

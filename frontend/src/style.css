@@ -347,6 +347,40 @@ body::before {
   color: var(--text-primary) !important;
 }
 
+.el-table {
+  --el-table-text-color: var(--text-primary);
+  --el-table-header-text-color: var(--text-primary);
+  --el-table-header-bg-color: var(--bg-elevated);
+  --el-table-tr-bg-color: var(--bg-base);
+  --el-table-bg-color: var(--bg-base);
+  --el-table-border-color: var(--border-subtle);
+  --el-table-row-hover-bg-color: var(--bg-hover);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+.el-table__body,
+.el-table__footer,
+.el-table__header {
+  color: var(--text-primary);
+}
+.el-table th.el-table__cell {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.el-table td.el-table__cell {
+  color: var(--text-primary);
+}
+.el-table .el-table__empty-text {
+  color: var(--text-muted);
+}
+.el-table__expand-icon {
+  color: var(--text-secondary);
+}
+.el-table__expand-icon:hover {
+  color: var(--text-primary);
+}
+
 /* Remove white border/outline from dropdown popper wrappers */
 .el-popper {
   border: none !important;

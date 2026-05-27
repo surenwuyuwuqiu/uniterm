@@ -1,5 +1,6 @@
 export interface TableInfo {
   name: string
+  type?: string  // "table" or "view"
 }
 
 export interface ColumnInfo {
@@ -7,13 +8,18 @@ export interface ColumnInfo {
   type: string
   nullable: boolean
   defaultVal: string
+  defaultType: string  // "none" | "null" | "value" | "auto"
   isPrimary: boolean
+  comment: string
+  collation: string
+  onUpdate: boolean
 }
 
 export interface IndexInfo {
   name: string
   columns: string[]
   unique: boolean
+  isPrimary: boolean
 }
 
 export interface SchemaResult {
@@ -43,4 +49,22 @@ export interface HistoryEntry {
   durationMs: number
   error?: string
   rowCount?: number
+}
+
+export interface ColumnDef {
+  name: string
+  type: string
+  nullable: boolean
+  defaultVal: string
+  defaultType: string  // "none" | "null" | "value" | "auto"
+  comment: string
+  collation: string
+  onUpdate: boolean
+}
+
+export interface IndexDef {
+  name: string
+  columns: string[]
+  unique: boolean
+  isPrimary: boolean
 }

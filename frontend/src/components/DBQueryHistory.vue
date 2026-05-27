@@ -86,12 +86,12 @@ function formatTime(ts: string): string {
 .section-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 .clear-btn {
   border: none;
   background: none;
-  color: var(--color-danger, #f56c6c);
+  color: var(--error);
   cursor: pointer;
   font-size: 12px;
 }
@@ -102,13 +102,13 @@ function formatTime(ts: string): string {
 .history-item {
   padding: 6px 12px;
   cursor: pointer;
-  border-bottom: 1px solid var(--border-color, #eee);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .history-item:hover {
-  background: var(--bg-hover, #f5f5f5);
+  background: var(--bg-hover);
 }
 .history-item.error {
-  border-left: 3px solid var(--color-danger, #f56c6c);
+  border-left: 3px solid var(--error);
 }
 .history-sql {
   font-family: monospace;
@@ -121,15 +121,15 @@ function formatTime(ts: string): string {
   display: flex;
   gap: 12px;
   font-size: 11px;
-  color: var(--text-secondary, #999);
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 .history-error {
-  color: var(--color-danger, #f56c6c);
+  color: var(--error);
 }
 .empty {
   padding: 12px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   font-size: 12px;
   text-align: center;
 }

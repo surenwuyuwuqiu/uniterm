@@ -1,11 +1,41 @@
 export namespace database {
 	
+	export class ColumnDef {
+	    name: string;
+	    type: string;
+	    nullable: boolean;
+	    defaultVal: string;
+	    defaultType: string;
+	    comment: string;
+	    collation: string;
+	    onUpdate: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ColumnDef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.nullable = source["nullable"];
+	        this.defaultVal = source["defaultVal"];
+	        this.defaultType = source["defaultType"];
+	        this.comment = source["comment"];
+	        this.collation = source["collation"];
+	        this.onUpdate = source["onUpdate"];
+	    }
+	}
 	export class ColumnInfo {
 	    name: string;
 	    type: string;
 	    nullable: boolean;
 	    defaultVal: string;
+	    defaultType: string;
 	    isPrimary: boolean;
+	    comment: string;
+	    collation: string;
+	    onUpdate: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ColumnInfo(source);
@@ -17,7 +47,39 @@ export namespace database {
 	        this.type = source["type"];
 	        this.nullable = source["nullable"];
 	        this.defaultVal = source["defaultVal"];
+	        this.defaultType = source["defaultType"];
 	        this.isPrimary = source["isPrimary"];
+	        this.comment = source["comment"];
+	        this.collation = source["collation"];
+	        this.onUpdate = source["onUpdate"];
+	    }
+	}
+	export class DBCapabilities {
+	    supportsAutoIncrement: boolean;
+	    supportsOnUpdate: boolean;
+	    supportsCollation: boolean;
+	    supportsComment: boolean;
+	    supportsModifyColumn: boolean;
+	    supportsPrimaryKey: boolean;
+	    autoIncrementForcesNotNull: boolean;
+	    columnTypes: string[];
+	    intTypes: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DBCapabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportsAutoIncrement = source["supportsAutoIncrement"];
+	        this.supportsOnUpdate = source["supportsOnUpdate"];
+	        this.supportsCollation = source["supportsCollation"];
+	        this.supportsComment = source["supportsComment"];
+	        this.supportsModifyColumn = source["supportsModifyColumn"];
+	        this.supportsPrimaryKey = source["supportsPrimaryKey"];
+	        this.autoIncrementForcesNotNull = source["autoIncrementForcesNotNull"];
+	        this.columnTypes = source["columnTypes"];
+	        this.intTypes = source["intTypes"];
 	    }
 	}
 	export class ExecResult {
@@ -75,10 +137,29 @@ export namespace database {
 		    return a;
 		}
 	}
+	export class IndexDef {
+	    name: string;
+	    columns: string[];
+	    unique: boolean;
+	    isPrimary: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new IndexDef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.columns = source["columns"];
+	        this.unique = source["unique"];
+	        this.isPrimary = source["isPrimary"];
+	    }
+	}
 	export class IndexInfo {
 	    name: string;
 	    columns: string[];
 	    unique: boolean;
+	    isPrimary: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new IndexInfo(source);
@@ -89,6 +170,7 @@ export namespace database {
 	        this.name = source["name"];
 	        this.columns = source["columns"];
 	        this.unique = source["unique"];
+	        this.isPrimary = source["isPrimary"];
 	    }
 	}
 	export class QueryResultColumn {
@@ -172,6 +254,7 @@ export namespace database {
 	}
 	export class TableInfo {
 	    name: string;
+	    type: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new TableInfo(source);
@@ -180,6 +263,7 @@ export namespace database {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.type = source["type"];
 	    }
 	}
 

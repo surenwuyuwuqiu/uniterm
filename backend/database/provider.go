@@ -1,9 +1,15 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 )
+
+// execer is the common interface for sql.DB, sql.Conn, and sql.Tx.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
 
 // Provider encapsulates all database-type-specific behavior.
 type Provider interface {
@@ -43,7 +49,7 @@ type Provider interface {
 	GetCapabilities() DBCapabilities
 
 	// PrepareExec executes any per-database setup before running user SQL.
-	PrepareExec(db *sql.DB, dbName string) error
+	PrepareExec(db execer, dbName string) error
 }
 
 var providers = map[string]Provider{}

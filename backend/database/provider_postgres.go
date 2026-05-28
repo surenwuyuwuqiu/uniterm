@@ -30,21 +30,18 @@ func (p *postgresProvider) Quote(name string) string {
 	return `"` + name + `"`
 }
 
-func (p *postgresProvider) PrepareExec(db *sql.DB, dbName string) error {
+func (p *postgresProvider) PrepareExec(db execer, dbName string) error {
 	return nil
 }
 
 func (p *postgresProvider) GetCapabilities() DBCapabilities {
 	return DBCapabilities{
-		SupportsAutoIncrement:     false,
-		SupportsOnUpdate:          false,
-		SupportsCollation:         false,
-		SupportsComment:           true,
-		SupportsModifyColumn:      true,
-		SupportsPrimaryKey:        true,
-		AutoIncrementForcesNotNull: false,
-		ColumnTypes:               postgresTypes,
-		IntTypes:                  postgresIntTypes,
+		"supportsAutoIncrement":      false,
+		"supportsOnUpdate":           false,
+		"supportsCollation":          false,
+		"autoIncrementForcesNotNull": false,
+		"columnTypes":                postgresTypes,
+		"intTypes":                   postgresIntTypes,
 	}
 }
 

@@ -53,14 +53,32 @@ type IndexDef struct {
 }
 
 // DBCapabilities describes the features supported by a database type.
-type DBCapabilities struct {
-	SupportsAutoIncrement      bool     `json:"supportsAutoIncrement"`
-	SupportsOnUpdate           bool     `json:"supportsOnUpdate"`
-	SupportsCollation          bool     `json:"supportsCollation"`
-	SupportsComment            bool     `json:"supportsComment"`
-	SupportsModifyColumn       bool     `json:"supportsModifyColumn"`
-	SupportsPrimaryKey         bool     `json:"supportsPrimaryKey"`
-	AutoIncrementForcesNotNull bool     `json:"autoIncrementForcesNotNull"`
-	ColumnTypes                []string `json:"columnTypes"`
-	IntTypes                   []string `json:"intTypes"`
+// Providers return only the fields they override; unset fields use defaults.
+type DBCapabilities map[string]any
+
+// Default capability values, using MySQL as the baseline.
+// Providers only need to return fields that differ from MySQL.
+var defaultDBCapabilities = DBCapabilities{
+	"supportsAutoIncrement":      true,
+	"supportsOnUpdate":           true,
+	"supportsCollation":          true,
+	"supportsComment":            true,
+	"supportsModifyColumn":       true,
+	"supportsPrimaryKey":         true,
+	"supportsCreateDatabase":     true,
+	"autoIncrementForcesNotNull": true,
+	"columnTypes":                []string{},
+	"intTypes":                   []string{},
+}
+
+// MergeCapabilities merges provider overrides into the default config.
+func MergeCapabilities(overrides DBCapabilities) DBCapabilities {
+	merged := make(DBCapabilities, len(defaultDBCapabilities)+len(overrides))
+	for k, v := range defaultDBCapabilities {
+		merged[k] = v
+	}
+	for k, v := range overrides {
+		merged[k] = v
+	}
+	return merged
 }

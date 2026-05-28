@@ -52,7 +52,7 @@
       @click.stop
     >
       <template v-if="ctxTargetType === 'db'">
-        <div class="ctx-item" @click="onCtxNewDatabase">{{ t('db.newDatabase') }}</div>
+        <div v-if="canCreateDatabase" class="ctx-item" @click="onCtxNewDatabase">{{ t('db.newDatabase') }}</div>
         <div class="ctx-item" @click="onCtxNewTable">{{ t('db.newTable') }}</div>
         <div class="ctx-item danger" @click="onCtxDropDatabase">{{ t('db.dropDatabase') }}</div>
         <div class="ctx-sep" />
@@ -68,7 +68,7 @@
         <div class="ctx-item danger" @click="onCtxDropTable">{{ t('db.dropTable') }}</div>
       </template>
       <template v-else-if="ctxTargetType === 'blank'">
-        <div class="ctx-item" @click="onCtxNewDatabase">{{ t('db.newDatabase') }}</div>
+        <div v-if="canCreateDatabase" class="ctx-item" @click="onCtxNewDatabase">{{ t('db.newDatabase') }}</div>
         <div class="ctx-item" @click="onCtxRefreshDatabases">{{ t('db.refreshDatabases') }}</div>
       </template>
     </div>
@@ -128,7 +128,7 @@
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { Database, Table2, Eye, ChevronRight, ChevronDown } from '@lucide/vue'
 import { useI18n } from '../i18n'
-import { GetDatabases, GetTables, CreateDatabase, DropDatabase, CreateTable, DropTable, TruncateTable } from '../../wailsjs/go/main/App'
+import { GetDatabases, GetTables, CreateDatabase, DropDatabase, CreateTable, DropTable, TruncateTable, GetDBCapabilities } from '../../wailsjs/go/main/App'
 import type { TableInfo } from '../types/database'
 
 const { t } = useI18n()
@@ -143,6 +143,21 @@ const props = defineProps<{
   sessionId: string
   defaultDbName?: string
 }>()
+
+const caps = ref<Record<string, any> | null>(null)
+const canCreateDatabase = computed(() => caps.value?.['supportsCreateDatabase'] ?? true)
+
+async function loadCapabilities() {
+  try {
+    caps.value = await GetDBCapabilities(props.sessionId)
+  } catch (e) {
+    console.error('Failed to load capabilities:', e)
+  }
+}
+
+watch(() => props.sessionId, () => {
+  if (props.sessionId) loadCapabilities()
+}, { immediate: true })
 
 const emit = defineEmits<{
   selectTable: [dbName: string, tableName: string]
@@ -248,12 +263,31 @@ function closeContextMenu() {
   ctxVisible.value = false
 }
 
+function fitContextMenu(x: number, y: number, type: string) {
+  const heights: Record<string, number> = { db: 145, table: 180, blank: 60 }
+  const menuW = 160
+  const menuH = heights[type] || 150
+
+  let left = x
+  let top = y
+
+  if (left + menuW > window.innerWidth) left = x - menuW
+  if (left < 0) left = 4
+
+  if (top + menuH > window.innerHeight) top = y - menuH
+  if (top < 0) top = window.innerHeight - menuH - 4
+  if (top < 0) top = 4
+
+  return { left, top }
+}
+
 function onDbContextMenu(e: MouseEvent, dbName: string) {
   ctxTargetType.value = 'db'
   ctxDbName.value = dbName
   ctxTableName.value = ''
-  ctxX.value = e.clientX
-  ctxY.value = e.clientY
+  const pos = fitContextMenu(e.clientX, e.clientY, 'db')
+  ctxX.value = pos.left
+  ctxY.value = pos.top
   ctxVisible.value = true
 }
 
@@ -261,8 +295,9 @@ function onTableContextMenu(e: MouseEvent, dbName: string, table: TableInfo) {
   ctxTargetType.value = 'table'
   ctxDbName.value = dbName
   ctxTableName.value = table.name
-  ctxX.value = e.clientX
-  ctxY.value = e.clientY
+  const pos = fitContextMenu(e.clientX, e.clientY, 'table')
+  ctxX.value = pos.left
+  ctxY.value = pos.top
   ctxVisible.value = true
 }
 
@@ -272,8 +307,9 @@ function onTreeContextMenu(e: MouseEvent) {
   ctxTargetType.value = 'blank'
   ctxDbName.value = ''
   ctxTableName.value = ''
-  ctxX.value = e.clientX
-  ctxY.value = e.clientY
+  const pos = fitContextMenu(e.clientX, e.clientY, 'blank')
+  ctxX.value = pos.left
+  ctxY.value = pos.top
   ctxVisible.value = true
 }
 

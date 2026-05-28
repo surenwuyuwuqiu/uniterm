@@ -33,6 +33,7 @@
           border
           size="small"
           style="width:100%"
+          :empty-text="t('db.noData')"
           @cell-dblclick="onCellDblClick"
         >
           <el-table-column
@@ -86,7 +87,7 @@
             <div class="field-label-row">
               <label>{{ col }} <span class="col-type-hint">{{ getColumnType(col) }}</span></label>
               <label v-if="isColumnAuto(col)" class="null-toggle"><input type="checkbox" v-model="insertAutoIncrement[col]" /> 自增</label>
-              <label v-else-if="!isColumnPrimary(col)" class="null-toggle"><input type="checkbox" v-model="insertNulls[col]" :disabled="!getColumnNullable(col)" /> NULL</label>
+              <label v-else-if="!isColumnPrimary(col) && getColumnNullable(col)" class="null-toggle"><input type="checkbox" v-model="insertNulls[col]" /> NULL</label>
             </div>
             <input v-model="insertValues[col]" class="insert-input" :disabled="insertNulls[col] || insertAutoIncrement[col]" :placeholder="getColumnPlaceholder(col)" />
           </div>
@@ -102,7 +103,7 @@
           <div v-for="col in editRowColumns" :key="col" class="insert-field">
             <div class="field-label-row">
               <label>{{ col }} <span class="col-type-hint">{{ getColumnType(col) }}</span></label>
-              <label v-if="!isColumnPrimary(col)" class="null-toggle"><input type="checkbox" v-model="editNulls[col]" :disabled="!getColumnNullable(col)" /> NULL</label>
+              <label v-if="!isColumnPrimary(col) && getColumnNullable(col)" class="null-toggle"><input type="checkbox" v-model="editNulls[col]" /> NULL</label>
             </div>
             <input v-model="editRowValues[col]" class="insert-input" :disabled="editNulls[col]" />
           </div>
@@ -346,7 +347,8 @@ async function startInsertRow() {
     } else {
       const isNullDefault = col.defaultType === 'null' || (col.nullable && col.defaultType === 'none')
       insertNulls.value[col.name] = isNullDefault
-      insertValues.value[col.name] = col.defaultType === 'value' ? (col.defaultVal ?? '') : ''
+      const rawDefault = col.defaultType === 'value' ? (col.defaultVal ?? '') : ''
+      insertValues.value[col.name] = rawDefault === "''" ? '' : rawDefault
     }
   }
   editingRow.value = false
@@ -405,10 +407,8 @@ function getColumnNullable(colName: string): boolean {
 
 function getColumnPlaceholder(colName: string): string {
   const col = props.tableColumns?.find(c => c.name === colName)
-  if (!col) return ''
-  if (col.defaultVal) return `DEFAULT ${col.defaultVal}`
-  if (col.nullable) return 'NULL'
-  return ''
+  const val = col?.defaultVal ?? ''
+  return val === "''" ? '' : val
 }
 
 // ── Edit row ──
@@ -430,7 +430,7 @@ function startEditRow(rowIndex: number) {
       editRowValues.value[col] = ''
       editNulls.value[col] = true
     } else {
-      editRowValues.value[col] = row[col] ?? ''
+      editRowValues.value[col] = String(row[col] ?? '')
       editNulls.value[col] = false
     }
   }
@@ -635,6 +635,9 @@ function onEditRowCancel() {
   background: rgba(248, 113, 113, 0.1);
   border-radius: var(--radius-sm);
   margin-bottom: 8px;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
   font-family: var(--font-mono);
   font-size: 13px;
 }
@@ -723,6 +726,12 @@ function onEditRowCancel() {
   width: 140px;
   background: var(--bg-base);
   color: var(--text-primary);
+}
+.insert-input:disabled {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  cursor: not-allowed;
 }
 .col-type-hint {
   font-size: 10px;

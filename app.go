@@ -1115,13 +1115,12 @@ func (a *App) DropIndexOp(sessionID string, dbName string, tableName string, idx
 	return p.DropIndex(ds.DB(), dbName, tableName, idxName, isPrimary, autoIncCols)
 }
 
-func (a *App) GetDBCapabilities(sessionID string) (*database.DBCapabilities, error) {
+func (a *App) GetDBCapabilities(sessionID string) (database.DBCapabilities, error) {
 	_, p, err := a.dbProvider(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	caps := p.GetCapabilities()
-	return &caps, nil
+	return database.MergeCapabilities(p.GetCapabilities()), nil
 }
 
 func (a *App) GetQueryHistory(sessionID string) ([]database.HistoryEntry, error) {

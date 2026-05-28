@@ -54,34 +54,6 @@ export namespace database {
 	        this.onUpdate = source["onUpdate"];
 	    }
 	}
-	export class DBCapabilities {
-	    supportsAutoIncrement: boolean;
-	    supportsOnUpdate: boolean;
-	    supportsCollation: boolean;
-	    supportsComment: boolean;
-	    supportsModifyColumn: boolean;
-	    supportsPrimaryKey: boolean;
-	    autoIncrementForcesNotNull: boolean;
-	    columnTypes: string[];
-	    intTypes: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new DBCapabilities(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.supportsAutoIncrement = source["supportsAutoIncrement"];
-	        this.supportsOnUpdate = source["supportsOnUpdate"];
-	        this.supportsCollation = source["supportsCollation"];
-	        this.supportsComment = source["supportsComment"];
-	        this.supportsModifyColumn = source["supportsModifyColumn"];
-	        this.supportsPrimaryKey = source["supportsPrimaryKey"];
-	        this.autoIncrementForcesNotNull = source["autoIncrementForcesNotNull"];
-	        this.columnTypes = source["columnTypes"];
-	        this.intTypes = source["intTypes"];
-	    }
-	}
 	export class ExecResult {
 	    affected: number;
 	    lastInsertId: number;

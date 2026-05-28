@@ -35,7 +35,7 @@
           </el-table-column>
           <el-table-column :label="t('db.actions')" width="80">
             <template #default="{ row }">
-              <button v-if="caps?.supportsModifyColumn" class="action-icon-btn" title="Edit" @click="startEditColumn(row)"><Pencil :size="14" /></button>
+              <button v-if="caps?.['supportsModifyColumn']" class="action-icon-btn" title="Edit" @click="startEditColumn(row)"><Pencil :size="14" /></button>
               <button class="action-icon-btn danger" title="Delete" @click="onDropColumn(row.name)"><Trash2 :size="14" /></button>
             </template>
           </el-table-column>
@@ -86,7 +86,7 @@
             <div class="default-toggle-group">
               <button type="button" :class="['toggle-btn', { active: editDefaultType === 'none' }]" @click="editDefaultType = 'none'">{{ t('db.defaultNone') }}</button>
               <button type="button" :class="['toggle-btn', { active: editDefaultType === 'null' }]" @click="editDefaultType = 'null'">{{ t('db.defaultNull') }}</button>
-              <button type="button" v-if="caps?.supportsAutoIncrement" :class="['toggle-btn', { active: editDefaultType === 'auto' }]" :disabled="hasAutoIncrementCol && editingColumn?.defaultType !== 'auto'" @click="editDefaultType = 'auto'">{{ t('db.defaultAuto') }}</button>
+              <button type="button" v-if="caps?.['supportsAutoIncrement']" :class="['toggle-btn', { active: editDefaultType === 'auto' }]" :disabled="hasAutoIncrementCol && editingColumn?.defaultType !== 'auto'" @click="editDefaultType = 'auto'">{{ t('db.defaultAuto') }}</button>
               <button type="button" :class="['toggle-btn', { active: editDefaultType === 'value' }]" @click="editDefaultType = 'value'">{{ t('db.defaultValue') }}</button>
             </div>
           </el-form-item>
@@ -94,15 +94,15 @@
             <el-input v-model="editColumnDefault" />
           </el-form-item>
           <el-form-item :label="t('db.colNullable')">
-            <el-switch v-model="editColumnNullable" :disabled="editDefaultType === 'auto' && caps?.autoIncrementForcesNotNull" />
+            <el-switch v-model="editColumnNullable" :disabled="editDefaultType === 'auto' && caps?.['autoIncrementForcesNotNull']" />
           </el-form-item>
-          <el-form-item v-if="caps?.supportsOnUpdate" :label="t('db.colOnUpdate')">
+          <el-form-item v-if="caps?.['supportsOnUpdate']" :label="t('db.colOnUpdate')">
             <el-switch v-model="editColumnOnUpdate" />
           </el-form-item>
-          <el-form-item v-if="caps?.supportsComment" :label="t('db.colComment')">
+          <el-form-item v-if="caps?.['supportsComment']" :label="t('db.colComment')">
             <el-input v-model="editColumnComment" />
           </el-form-item>
-          <el-form-item v-if="caps?.supportsCollation" :label="t('db.colCollation')">
+          <el-form-item v-if="caps?.['supportsCollation']" :label="t('db.colCollation')">
             <el-autocomplete
               v-model="editColumnCollation"
               :fetch-suggestions="filterCollationSuggestions"
@@ -134,7 +134,7 @@
             <div class="default-toggle-group">
               <button type="button" :class="['toggle-btn', { active: addDefaultType === 'none' }]" @click="addDefaultType = 'none'">{{ t('db.defaultNone') }}</button>
               <button type="button" :class="['toggle-btn', { active: addDefaultType === 'null' }]" @click="addDefaultType = 'null'">{{ t('db.defaultNull') }}</button>
-              <button type="button" v-if="caps?.supportsAutoIncrement" :class="['toggle-btn', { active: addDefaultType === 'auto' }]" :disabled="hasAutoIncrementCol" @click="addDefaultType = 'auto'">{{ t('db.defaultAuto') }}</button>
+              <button type="button" v-if="caps?.['supportsAutoIncrement']" :class="['toggle-btn', { active: addDefaultType === 'auto' }]" :disabled="hasAutoIncrementCol" @click="addDefaultType = 'auto'">{{ t('db.defaultAuto') }}</button>
               <button type="button" :class="['toggle-btn', { active: addDefaultType === 'value' }]" @click="addDefaultType = 'value'">{{ t('db.defaultValue') }}</button>
             </div>
           </el-form-item>
@@ -142,15 +142,15 @@
             <el-input v-model="addColDefault" />
           </el-form-item>
           <el-form-item :label="t('db.colNullable')">
-            <el-switch v-model="addColNullable" :disabled="addDefaultType === 'auto' && caps?.autoIncrementForcesNotNull" />
+            <el-switch v-model="addColNullable" :disabled="addDefaultType === 'auto' && caps?.['autoIncrementForcesNotNull']" />
           </el-form-item>
-          <el-form-item v-if="caps?.supportsOnUpdate" :label="t('db.colOnUpdate')">
+          <el-form-item v-if="caps?.['supportsOnUpdate']" :label="t('db.colOnUpdate')">
             <el-switch v-model="addColOnUpdate" />
           </el-form-item>
-          <el-form-item v-if="caps?.supportsComment" :label="t('db.colComment')">
+          <el-form-item v-if="caps?.['supportsComment']" :label="t('db.colComment')">
             <el-input v-model="addColComment" />
           </el-form-item>
-          <el-form-item v-if="caps?.supportsCollation" :label="t('db.colCollation')">
+          <el-form-item v-if="caps?.['supportsCollation']" :label="t('db.colCollation')">
             <el-autocomplete
               v-model="addColCollation"
               :fetch-suggestions="filterCollationSuggestions"
@@ -188,7 +188,7 @@
           <el-form-item :label="t('db.idxUnique')">
             <el-switch v-model="addIdxUnique" :disabled="addIdxPrimary" />
           </el-form-item>
-          <el-form-item v-if="caps?.supportsPrimaryKey" :label="t('db.idxPrimary')">
+          <el-form-item v-if="caps?.['supportsPrimaryKey']" :label="t('db.idxPrimary')">
             <el-switch v-model="addIdxPrimary" :disabled="hasPrimaryKey" />
           </el-form-item>
         </el-form>
@@ -208,7 +208,6 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { useI18n } from '../i18n'
 import { GetTableSchema, AddColumn, ModifyColumn, DropColumn, AddIndex, DropIndexOp, GetDBCapabilities } from '../../wailsjs/go/main/App'
 import type { SchemaResult, ColumnInfo, IndexInfo } from '../types/database'
-import { database as dbModels } from '../../wailsjs/go/models'
 
 const { t } = useI18n()
 
@@ -225,7 +224,7 @@ const emit = defineEmits<{
   schemaLoaded: [pks: string[]]
 }>()
 
-const caps = ref<dbModels.DBCapabilities | null>(null)
+const caps = ref<Record<string, any> | null>(null)
 
 const schema = ref<SchemaResult | null>(null)
 const loading = ref(false)
@@ -283,7 +282,7 @@ async function onSaveColumnEdit() {
   if (!editingColumn.value) return
   if (editDefaultType.value === 'auto') {
     const upperType = (editColumnType.value || '').toUpperCase().trim()
-    if (!(caps.value?.intTypes || []).some(t => upperType.startsWith(t))) {
+    if (!((caps.value?.['intTypes'] as string[]) || []).some(t => upperType.startsWith(t))) {
       ElMessage.warning(t('db.autoIncrementTypeWarn'))
       return
     }
@@ -378,7 +377,7 @@ async function onAddColumn() {
   if (!addColName.value.trim()) return
   if (addDefaultType.value === 'auto') {
     const upperType = (addColType.value || '').toUpperCase().trim()
-    if (!(caps.value?.intTypes || []).some(t => upperType.startsWith(t))) {
+    if (!((caps.value?.['intTypes'] as string[]) || []).some(t => upperType.startsWith(t))) {
       ElMessage.warning(t('db.autoIncrementTypeWarn'))
       return
     }
@@ -439,7 +438,7 @@ watch(editDefaultType, (val) => {
 })
 
 function filterTypeSuggestions(queryString: string, cb: Function) {
-  const list = caps.value?.columnTypes || []
+  const list = (caps.value?.['columnTypes'] as string[]) || []
   const results = queryString
     ? list.filter(t => t.toLowerCase().includes(queryString.toLowerCase())).map(t => ({ value: t }))
     : list.map(t => ({ value: t }))

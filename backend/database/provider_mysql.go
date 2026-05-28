@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -31,25 +32,18 @@ func (p *mysqlProvider) Quote(name string) string {
 	return "`" + name + "`"
 }
 
-func (p *mysqlProvider) PrepareExec(db *sql.DB, dbName string) error {
+func (p *mysqlProvider) PrepareExec(db execer, dbName string) error {
 	if dbName == "" {
 		return nil
 	}
-	_, err := db.Exec(fmt.Sprintf("USE `%s`", dbName))
+	_, err := db.ExecContext(context.Background(), fmt.Sprintf("USE `%s`", dbName))
 	return err
 }
 
 func (p *mysqlProvider) GetCapabilities() DBCapabilities {
 	return DBCapabilities{
-		SupportsAutoIncrement:     true,
-		SupportsOnUpdate:          true,
-		SupportsCollation:         true,
-		SupportsComment:           true,
-		SupportsModifyColumn:      true,
-		SupportsPrimaryKey:        true,
-		AutoIncrementForcesNotNull: true,
-		ColumnTypes:               mysqlTypes,
-		IntTypes:                  mysqlIntTypes,
+		"columnTypes": mysqlTypes,
+		"intTypes":    mysqlIntTypes,
 	}
 }
 
@@ -68,10 +62,7 @@ func (p *mysqlProvider) GetDatabases(db *sql.DB) ([]string, error) {
 }
 
 func (p *mysqlProvider) GetTables(db *sql.DB, dbName string) ([]TableInfo, error) {
-	if _, err := db.Exec(fmt.Sprintf("USE `%s`", dbName)); err != nil {
-		return nil, fmt.Errorf("use database: %w", err)
-	}
-	results, err := queryStrings(db, "SHOW FULL TABLES")
+	results, err := queryStrings(db, fmt.Sprintf("SHOW FULL TABLES FROM `%s`", dbName))
 	if err != nil {
 		return nil, fmt.Errorf("get tables: %w", err)
 	}
@@ -96,11 +87,7 @@ func (p *mysqlProvider) GetTables(db *sql.DB, dbName string) ([]TableInfo, error
 }
 
 func (p *mysqlProvider) GetTableSchema(db *sql.DB, dbName, tableName string) (*SchemaResult, error) {
-	if _, err := db.Exec(fmt.Sprintf("USE `%s`", dbName)); err != nil {
-		return nil, fmt.Errorf("use database: %w", err)
-	}
-
-	colRows, err := queryStrings(db, fmt.Sprintf("SHOW FULL COLUMNS FROM `%s`", tableName))
+	colRows, err := queryStrings(db, fmt.Sprintf("SHOW FULL COLUMNS FROM `%s`.`%s`", dbName, tableName))
 	if err != nil {
 		return nil, fmt.Errorf("get columns: %w", err)
 	}

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 )
@@ -21,12 +22,45 @@ type ExecResult struct {
 }
 
 func ExecuteQuery(p Provider, db *sql.DB, dbName, sqlStr string) (*QueryResult, error) {
-	if err := p.PrepareExec(db, dbName); err != nil {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	if err := p.PrepareExec(conn, dbName); err != nil {
 		return nil, err
 	}
 
-	rows, cols, err := queryAny(db, sqlStr)
+	rows, err := conn.QueryContext(ctx, sqlStr)
 	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	var result []map[string]any
+	for rows.Next() {
+		values := make([]any, len(cols))
+		valuePtrs := make([]any, len(cols))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+		if err := rows.Scan(valuePtrs...); err != nil {
+			return nil, err
+		}
+		row := make(map[string]any, len(cols))
+		for i, col := range cols {
+			row[col] = scanToAny(values[i])
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -35,19 +69,25 @@ func ExecuteQuery(p Provider, db *sql.DB, dbName, sqlStr string) (*QueryResult, 
 		columns = append(columns, QueryResultColumn{Name: c, Type: ""})
 	}
 
-	if len(rows) == 0 {
+	if len(result) == 0 {
 		return &QueryResult{Columns: columns, Rows: []map[string]any{}}, nil
 	}
-
-	return &QueryResult{Columns: columns, Rows: rows}, nil
+	return &QueryResult{Columns: columns, Rows: result}, nil
 }
 
 func ExecuteStatement(p Provider, db *sql.DB, dbName, sqlStr string) (*ExecResult, error) {
-	if err := p.PrepareExec(db, dbName); err != nil {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	if err := p.PrepareExec(conn, dbName); err != nil {
 		return nil, err
 	}
 
-	result, err := db.Exec(sqlStr)
+	result, err := conn.ExecContext(ctx, sqlStr)
 	if err != nil {
 		return nil, err
 	}

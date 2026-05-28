@@ -390,7 +390,13 @@ body::before {
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
-  background: transparent !important;
+}
+/* Tooltip needs visible background */
+.el-popper.is-dark,
+.el-popper.is-light {
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 .el-popper__arrow {
   display: none !important;
@@ -427,6 +433,14 @@ body.drag-active .zone {
 .xterm-link {
   text-decoration: underline !important;
   cursor: pointer !important;
+}
+
+/* Allow text selection in Element Plus message toasts and message boxes */
+.el-message,
+.el-message__content,
+.el-message-box__message {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* Link hover tooltip */

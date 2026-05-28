@@ -33,21 +33,20 @@ func (p *rqliteProvider) Quote(name string) string {
 	return `"` + name + `"`
 }
 
-func (p *rqliteProvider) PrepareExec(db *sql.DB, dbName string) error {
+func (p *rqliteProvider) PrepareExec(db execer, dbName string) error {
 	return nil
 }
 
 func (p *rqliteProvider) GetCapabilities() DBCapabilities {
 	return DBCapabilities{
-		SupportsAutoIncrement:     true,
-		SupportsOnUpdate:          false,
-		SupportsCollation:         false,
-		SupportsComment:           false,
-		SupportsModifyColumn:      false,
-		SupportsPrimaryKey:        false,
-		AutoIncrementForcesNotNull: true,
-		ColumnTypes:               rqliteTypes,
-		IntTypes:                  rqliteIntTypes,
+		"supportsOnUpdate":       false,
+		"supportsCollation":      false,
+		"supportsComment":        false,
+		"supportsModifyColumn":   false,
+		"supportsPrimaryKey":     false,
+		"supportsCreateDatabase": false,
+		"columnTypes":            rqliteTypes,
+		"intTypes":               rqliteIntTypes,
 	}
 }
 

@@ -82,8 +82,24 @@ export function GetDesktopPath() {
   return window['go']['main']['App']['GetDesktopPath']();
 }
 
+export function GetDisks(arg1) {
+  return window['go']['main']['App']['GetDisks'](arg1);
+}
+
+export function GetNetworkCards(arg1) {
+  return window['go']['main']['App']['GetNetworkCards'](arg1);
+}
+
 export function GetPlatform() {
   return window['go']['main']['App']['GetPlatform']();
+}
+
+export function GetPorts(arg1) {
+  return window['go']['main']['App']['GetPorts'](arg1);
+}
+
+export function GetProcessDetail(arg1, arg2) {
+  return window['go']['main']['App']['GetProcessDetail'](arg1, arg2);
 }
 
 export function GetQueryHistory(arg1) {
@@ -96,6 +112,10 @@ export function GetTableSchema(arg1, arg2, arg3) {
 
 export function GetTables(arg1, arg2) {
   return window['go']['main']['App']['GetTables'](arg1, arg2);
+}
+
+export function KillProcess(arg1, arg2, arg3) {
+  return window['go']['main']['App']['KillProcess'](arg1, arg2, arg3);
 }
 
 export function ListSessions() {
@@ -184,6 +204,14 @@ export function SessionResize(arg1, arg2, arg3) {
 
 export function SessionWrite(arg1, arg2) {
   return window['go']['main']['App']['SessionWrite'](arg1, arg2);
+}
+
+export function SetMonitorActiveTab(arg1, arg2) {
+  return window['go']['main']['App']['SetMonitorActiveTab'](arg1, arg2);
+}
+
+export function SetMonitorPaused(arg1, arg2) {
+  return window['go']['main']['App']['SetMonitorPaused'](arg1, arg2);
 }
 
 export function SftpCancelTransfer(arg1, arg2) {

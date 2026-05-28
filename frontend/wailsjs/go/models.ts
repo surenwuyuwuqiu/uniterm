@@ -352,6 +352,34 @@ export namespace session {
 		    return a;
 		}
 	}
+	export class DiskInfo {
+	    name: string;
+	    type: string;
+	    size: string;
+	    model: string;
+	    mountPoint: string;
+	    used: string;
+	    total: string;
+	    usage: number;
+	    media: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiskInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.size = source["size"];
+	        this.model = source["model"];
+	        this.mountPoint = source["mountPoint"];
+	        this.used = source["used"];
+	        this.total = source["total"];
+	        this.usage = source["usage"];
+	        this.media = source["media"];
+	    }
+	}
 	export class FileItem {
 	    name: string;
 	    size: number;
@@ -407,6 +435,50 @@ export namespace session {
 		    }
 		    return a;
 		}
+	}
+	export class NetCardInfo {
+	    name: string;
+	    state: string;
+	    mac: string;
+	    speed: string;
+	    type: string;
+	    bondMaster: string;
+	    bondSlaves: string[];
+	    ipAddrs: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new NetCardInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.state = source["state"];
+	        this.mac = source["mac"];
+	        this.speed = source["speed"];
+	        this.type = source["type"];
+	        this.bondMaster = source["bondMaster"];
+	        this.bondSlaves = source["bondSlaves"];
+	        this.ipAddrs = source["ipAddrs"];
+	    }
+	}
+	export class PortInfo {
+	    protocol: string;
+	    localAddr: string;
+	    state: string;
+	    process: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PortInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.protocol = source["protocol"];
+	        this.localAddr = source["localAddr"];
+	        this.state = source["state"];
+	        this.process = source["process"];
+	    }
 	}
 	export class SessionInfo {
 	    id: string;

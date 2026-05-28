@@ -42,6 +42,9 @@ func (sm *SessionManager) Create(sessionType string, config ConnectionConfig) (S
 	case "database":
 		s = NewDatabaseSession(config.ID)
 
+	case "monitor":
+		s = NewMonitorSession(config.ID)
+
 	default:
 		return nil, fmt.Errorf("unsupported session type: %s", sessionType)
 	}

@@ -46,13 +46,23 @@ export function GetDefaultShell():Promise<string>;
 
 export function GetDesktopPath():Promise<string>;
 
+export function GetDisks(arg1:string):Promise<Array<session.DiskInfo>>;
+
+export function GetNetworkCards(arg1:string):Promise<Array<session.NetCardInfo>>;
+
 export function GetPlatform():Promise<string>;
+
+export function GetPorts(arg1:string):Promise<Array<session.PortInfo>>;
+
+export function GetProcessDetail(arg1:string,arg2:number):Promise<Record<string, any>>;
 
 export function GetQueryHistory(arg1:string):Promise<Array<database.HistoryEntry>>;
 
 export function GetTableSchema(arg1:string,arg2:string,arg3:string):Promise<database.SchemaResult>;
 
 export function GetTables(arg1:string,arg2:string):Promise<Array<database.TableInfo>>;
+
+export function KillProcess(arg1:string,arg2:number,arg3:string):Promise<void>;
 
 export function ListSessions():Promise<Array<session.SessionInfo>>;
 
@@ -97,6 +107,10 @@ export function SaveSettings(arg1:store.AppSettings):Promise<void>;
 export function SessionResize(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function SessionWrite(arg1:string,arg2:string):Promise<void>;
+
+export function SetMonitorActiveTab(arg1:string,arg2:string):Promise<void>;
+
+export function SetMonitorPaused(arg1:string,arg2:boolean):Promise<void>;
 
 export function SftpCancelTransfer(arg1:string,arg2:string):Promise<void>;
 

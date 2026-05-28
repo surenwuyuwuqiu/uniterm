@@ -596,6 +596,81 @@ func (a *App) RDPHide(sessionID string) error {
 	return nil
 }
 
+// MonitorSession methods
+
+func (a *App) getMonitorSession(sessionID string) (*session.MonitorSession, error) {
+	if a.sessionManager == nil {
+		return nil, fmt.Errorf("session manager not initialized")
+	}
+	s, ok := a.sessionManager.Get(sessionID)
+	if !ok {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+	ms, ok := s.(*session.MonitorSession)
+	if !ok {
+		return nil, fmt.Errorf("session is not a monitor session: %s", sessionID)
+	}
+	return ms, nil
+}
+
+func (a *App) SetMonitorActiveTab(sessionID string, tab string) error {
+	ms, err := a.getMonitorSession(sessionID)
+	if err != nil {
+		return err
+	}
+	ms.SetActiveTab(tab)
+	return nil
+}
+
+func (a *App) SetMonitorPaused(sessionID string, paused bool) error {
+	ms, err := a.getMonitorSession(sessionID)
+	if err != nil {
+		return err
+	}
+	ms.SetPaused(paused)
+	return nil
+}
+
+func (a *App) GetProcessDetail(sessionID string, pid int) (map[string]interface{}, error) {
+	ms, err := a.getMonitorSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return ms.GetProcessDetail(pid)
+}
+
+func (a *App) KillProcess(sessionID string, pid int, signal string) error {
+	ms, err := a.getMonitorSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return ms.KillProcess(pid, signal)
+}
+
+func (a *App) GetPorts(sessionID string) ([]session.PortInfo, error) {
+	ms, err := a.getMonitorSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return ms.GetPorts()
+}
+
+func (a *App) GetDisks(sessionID string) ([]session.DiskInfo, error) {
+	ms, err := a.getMonitorSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return ms.GetDisks()
+}
+
+func (a *App) GetNetworkCards(sessionID string) ([]session.NetCardInfo, error) {
+	ms, err := a.getMonitorSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return ms.GetNetworkCards()
+}
+
 type AppInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`

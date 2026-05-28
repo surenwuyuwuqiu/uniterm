@@ -45,6 +45,10 @@
   --radius-md: 8px;
   --radius-lg: 12px;
 
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+
   /* Element Plus theme overrides */
   --el-bg-color: #14171d;
   --el-bg-color-page: #14171d;
@@ -157,6 +161,10 @@
   --el-border-color: rgba(0, 0, 0, 0.12);
   --el-border-color-light: rgba(0, 0, 0, 0.08);
   --el-border-color-lighter: rgba(0, 0, 0, 0.06);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.22);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -210,21 +218,14 @@ body::before {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--scrollbar-thumb);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--scrollbar-thumb-hover);
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
-}
-
-[data-theme="light"] ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
-}
-[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.18);
 }
 
 /* Element Plus dark theme overrides */

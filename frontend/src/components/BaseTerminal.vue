@@ -641,14 +641,14 @@ defineExpose({
   width: 8px;
 }
 .terminal-area :deep(.xterm-viewport::-webkit-scrollbar-track) {
-  background: transparent;
+  background: var(--bg-elevated);
 }
 .terminal-area :deep(.xterm-viewport::-webkit-scrollbar-thumb) {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--scrollbar-thumb);
   border-radius: 10px;
 }
 .terminal-area :deep(.xterm-viewport::-webkit-scrollbar-thumb:hover) {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--scrollbar-thumb-hover);
 }
 
 .context-menu {

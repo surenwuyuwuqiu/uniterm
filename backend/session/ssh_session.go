@@ -3,11 +3,18 @@ package session
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+)
+
+const (
+	sshKeepAliveInterval = 30 * time.Second
+	sshKeepAliveTimeout  = 10 * time.Second
+	sshKeepAliveMaxFail  = 2
 )
 
 type SSHSession struct {
@@ -58,19 +65,31 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 		authMethods = append(authMethods, ssh.Password(config.Password))
 	}
 
+	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	clientConfig := &ssh.ClientConfig{
-		User:    config.User,
-		Auth:    authMethods,
-		Timeout: 30 * time.Second,
-		// TODO: Implement host key verification for production use
+		User:            config.User,
+		Auth:            authMethods,
+		Timeout:         30 * time.Second,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", config.Host, config.Port), clientConfig)
+	conn, err := net.DialTimeout("tcp", addr, clientConfig.Timeout)
 	if err != nil {
 		s.setStatus(StatusError)
-		return fmt.Errorf("ssh dial: %w", err)
+		return fmt.Errorf("tcp dial: %w", err)
 	}
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		tcpConn.SetKeepAlive(true)
+		tcpConn.SetKeepAlivePeriod(sshKeepAliveInterval)
+	}
+
+	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, clientConfig)
+	if err != nil {
+		conn.Close()
+		s.setStatus(StatusError)
+		return fmt.Errorf("ssh handshake: %w", err)
+	}
+	client := ssh.NewClient(sshConn, chans, reqs)
 
 	session, err := client.NewSession()
 	if err != nil {
@@ -142,6 +161,7 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 
 	go s.readLoop()
 	go s.readStderr()
+	go s.startKeepAlive()
 
 	return nil
 }
@@ -170,9 +190,57 @@ func (s *SSHSession) readLoop() {
 		}
 		if err != nil {
 			if err != io.EOF {
-				s.emitData([]byte(fmt.Sprintf("\r\n[read error: %v]\r\n", err)))
+				s.emitData([]byte(fmt.Sprintf("\r\n\x1b[31m[read error: %v]\x1b[0m\r\n", err)))
+			} else {
+				s.emitData([]byte("\r\n\x1b[31mConnection closed by remote host. Press Enter to reconnect.\x1b[0m\r\n"))
 			}
 			s.Disconnect()
+			return
+		}
+	}
+}
+
+func (s *SSHSession) startKeepAlive() {
+	ticker := time.NewTicker(sshKeepAliveInterval)
+	defer ticker.Stop()
+
+	failures := 0
+	for {
+		select {
+		case <-ticker.C:
+			if s.Status() != StatusConnected {
+				return
+			}
+
+			done := make(chan error, 1)
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						done <- fmt.Errorf("panic: %v", r)
+					}
+				}()
+				_, _, err := s.client.SendRequest("keepalive@openssh.com", true, nil)
+				done <- err
+			}()
+
+			select {
+			case err := <-done:
+				if err != nil {
+					failures++
+				} else {
+					failures = 0
+				}
+			case <-time.After(sshKeepAliveTimeout):
+				failures++
+			}
+
+			if failures >= sshKeepAliveMaxFail {
+				s.emitData([]byte("\r\n\x1b[31mConnection lost. Press Enter to reconnect.\x1b[0m\r\n"))
+				s.Disconnect()
+				return
+			}
+
+		case <-s.quit:
 			return
 		}
 	}

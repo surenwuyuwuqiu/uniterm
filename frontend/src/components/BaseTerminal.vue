@@ -372,6 +372,11 @@ onMounted(() => {
           props.onSessionStatus(payload.status)
         }
         terminal?.write('\r\n\x1b[31mConnection failed. Press Enter to retry.\x1b[0m\r\n')
+      } else if (payload.status === 'disconnected') {
+        retryOnEnter = true
+        if (props.onSessionStatus) {
+          props.onSessionStatus(payload.status)
+        }
       } else {
         if (props.onSessionStatus) {
           props.onSessionStatus(payload.status)

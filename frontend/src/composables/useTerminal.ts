@@ -399,6 +399,11 @@ export function useTerminal(
           options.onSessionStatus(payload.status)
         }
         terminal?.write('\r\n\x1b[31mConnection failed. Press Enter to retry.\x1b[0m\r\n')
+      } else if (payload.status === 'disconnected') {
+        retryOnEnter = true
+        if (options?.onSessionStatus) {
+          options.onSessionStatus(payload.status)
+        }
       } else {
         if (options?.onSessionStatus) {
           options.onSessionStatus(payload.status)

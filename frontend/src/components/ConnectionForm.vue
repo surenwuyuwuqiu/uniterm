@@ -76,6 +76,14 @@
       <el-form-item v-if="form.type === 'database' && form.dbType !== 'rqlite'" :label="t('db.databases')">
         <el-input v-model="form.dbName" :placeholder="t('db.databases')" />
       </el-form-item>
+      <el-form-item v-if="form.type === 'ssh'" :label="t('conn.postLoginScript')">
+        <el-input
+          v-model="form.postLoginScript"
+          type="textarea"
+          :rows="3"
+          :placeholder="t('conn.postLoginScriptPlaceholder')"
+        />
+      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="visible = false">{{ t('conn.cancel') }}</el-button>
@@ -160,6 +168,7 @@ const form = reactive<ConnectionConfig>({
   rdpSmartSizing: true,
   dbType: '',
   dbName: '',
+  postLoginScript: '',
 })
 
 const rdpResolutions = [
@@ -205,6 +214,7 @@ watch(() => props.defaultGroupId, (gid) => {
 
 // Auto-switch default port when changing type
 watch(() => form.type, (newType) => {
+  if (isEdit.value) return
   if (newType === 'rdp' && form.port === 22) form.port = 3389
   else if (newType === 'ssh' && form.port === 3389) form.port = 22
   else if (newType === 'vnc' && form.port === 22) form.port = 5900
@@ -217,6 +227,7 @@ watch(() => form.type, (newType) => {
 
 // Auto-switch default port when changing database type
 watch(() => form.dbType, (newType) => {
+  if (isEdit.value) return
   if (newType === 'mysql') form.port = 3306
   else if (newType === 'postgres') form.port = 5432
   else if (newType === 'rqlite') form.port = 4001
@@ -247,6 +258,7 @@ function resetForm() {
   form.rdpSmartSizing = true
   form.dbType = ''
   form.dbName = ''
+  form.postLoginScript = ''
   rdpResolution.value = '1280 × 720 (HD)'
   selectedGroupId.value = undefined
 }

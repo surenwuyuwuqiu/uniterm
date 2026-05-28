@@ -307,6 +307,7 @@ export namespace session {
 	    shellPath?: string;
 	    dbType?: string;
 	    dbName?: string;
+	    postLoginScript?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConnectionConfig(source);
@@ -330,6 +331,7 @@ export namespace session {
 	        this.shellPath = source["shellPath"];
 	        this.dbType = source["dbType"];
 	        this.dbName = source["dbName"];
+	        this.postLoginScript = source["postLoginScript"];
 	    }
 	}
 	export class ConnectionGroup {

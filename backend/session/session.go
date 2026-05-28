@@ -37,6 +37,8 @@ type ConnectionConfig struct {
 	// Database-specific fields
 	DBType string `json:"dbType,omitempty"` // "mysql", "postgres", "rqlite"
 	DBName string `json:"dbName,omitempty"` // default database name
+	// SSH post-login script: commands to execute after successful login
+	PostLoginScript string `json:"postLoginScript,omitempty"`
 }
 
 // ConnectionStoreData is the top-level structure persisted to connections.json.

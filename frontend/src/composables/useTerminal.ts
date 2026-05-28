@@ -223,7 +223,8 @@ export function useTerminal(
     // Use the container's actual rendered size (rect) to compute cols/rows.
     // terminal.element's clientWidth may not shrink when the container shrinks
     // because xterm's internal screen/canvas width can hold it at the old size.
-    const cols = Math.floor(rect.width / cellWidth)
+    const scrollbarWidth = (terminal as any)._core?.viewport?.scrollBarWidth || 0
+    const cols = Math.floor((rect.width - scrollbarWidth) / cellWidth)
     const rows = Math.floor(rect.height / cellHeight)
     const newCols = Math.max(2, cols)
     const newRows = Math.max(1, rows)

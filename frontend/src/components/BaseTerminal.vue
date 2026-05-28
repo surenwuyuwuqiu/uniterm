@@ -151,7 +151,9 @@ function resize() {
       return
     }
 
-    const cols = Math.floor(rect.width / cellWidth)
+    // Subtract scrollbar width so the canvas doesn't overlap the scrollbar.
+    const scrollbarWidth = (terminal as any)._core?.viewport?.scrollBarWidth || 0
+    const cols = Math.floor((rect.width - scrollbarWidth) / cellWidth)
     const rows = Math.floor(rect.height / cellHeight)
     const newCols = Math.max(2, cols)
     const newRows = Math.max(1, rows)

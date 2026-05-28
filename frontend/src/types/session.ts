@@ -24,6 +24,7 @@ export interface ConnectionConfig {
   shellPath?: string
   dbType?: string   // "mysql", "postgres", "rqlite"
   dbName?: string   // default database name
+  postLoginScript?: string
 }
 
 export interface SessionInfo {

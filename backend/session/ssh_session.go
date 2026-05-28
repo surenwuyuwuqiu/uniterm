@@ -5,7 +5,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -19,13 +21,14 @@ const (
 
 type SSHSession struct {
 	baseSession
-	client   *ssh.Client
-	session  *ssh.Session
-	stdin    io.WriteCloser
-	stdout   io.Reader
-	stderr   io.Reader
-	quit     chan struct{}
-	quitOnce sync.Once
+	client       *ssh.Client
+	session      *ssh.Session
+	stdin        io.WriteCloser
+	stdout       io.Reader
+	stderr       io.Reader
+	quit         chan struct{}
+	quitOnce     sync.Once
+	lastReadTime atomic.Int64
 }
 
 func NewSSHSession(id string) *SSHSession {
@@ -162,6 +165,7 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 	go s.readLoop()
 	go s.readStderr()
 	go s.startKeepAlive()
+	go s.runPostLoginScript(config.PostLoginScript)
 
 	return nil
 }
@@ -186,6 +190,7 @@ func (s *SSHSession) readLoop() {
 	for {
 		n, err := s.stdout.Read(buf)
 		if n > 0 {
+			s.lastReadTime.Store(time.Now().UnixNano())
 			s.emitData(append([]byte(nil), buf[:n]...))
 		}
 		if err != nil {
@@ -198,6 +203,45 @@ func (s *SSHSession) readLoop() {
 			return
 		}
 	}
+}
+
+func (s *SSHSession) runPostLoginScript(script string) {
+	if strings.TrimSpace(script) == "" {
+		return
+	}
+	// Wait for shell to finish initialization (first idle period).
+	if !s.waitIdle(5*time.Second, 300*time.Millisecond) {
+		return
+	}
+	lines := strings.Split(script, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if s.Status() != StatusConnected {
+			return
+		}
+		if s.stdin != nil {
+			_, _ = s.stdin.Write([]byte(line + "\r"))
+		}
+		// Wait for command output to settle before sending the next line.
+		s.waitIdle(3*time.Second, 300*time.Millisecond)
+	}
+}
+
+// waitIdle blocks until stdout has been idle for the given duration,
+// or until the overall timeout expires. It returns true on idle detection.
+func (s *SSHSession) waitIdle(timeout, idle time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		last := time.Unix(0, s.lastReadTime.Load())
+		if !last.IsZero() && time.Since(last) >= idle {
+			return true
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return false
 }
 
 func (s *SSHSession) startKeepAlive() {

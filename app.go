@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -971,14 +972,17 @@ func (a *App) GetTables(sessionID string, dbName string) ([]database.TableInfo, 
 	tables, err := p.GetTables(ds.DB(), dbName)
 	if err != nil {
 		log.Writef("[GetTables] failed: %v", err)
-	} else {
-		names := make([]string, len(tables))
-		for i, t := range tables {
-			names[i] = t.Name
-		}
-		log.Writef("[GetTables] got %d tables: %v", len(tables), names)
+		return nil, err
 	}
-	return tables, err
+	sort.Slice(tables, func(i, j int) bool {
+		return tables[i].Name < tables[j].Name
+	})
+	names := make([]string, len(tables))
+	for i, t := range tables {
+		names[i] = t.Name
+	}
+	log.Writef("[GetTables] got %d tables: %v", len(tables), names)
+	return tables, nil
 }
 
 func (a *App) GetTableSchema(sessionID string, dbName string, tableName string) (*database.SchemaResult, error) {

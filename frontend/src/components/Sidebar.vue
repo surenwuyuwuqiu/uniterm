@@ -131,8 +131,7 @@
           <div class="conn-details">
             <span class="name">{{ conn.name }}</span>
             <span class="conn-meta">
-              <span class="conn-type">{{ conn.type === 'database' ? (conn.dbType || conn.type).toUpperCase() : conn.type.toUpperCase() }}</span>
-              <span class="host">{{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
+              <span class="host">{{ conn.type === 'database' ? (conn.dbType || conn.type) : conn.type }} {{ conn.user ? `${conn.user}@${conn.host}:${conn.port}` : `${conn.host}:${conn.port}` }}</span>
             </span>
           </div>
         </div>

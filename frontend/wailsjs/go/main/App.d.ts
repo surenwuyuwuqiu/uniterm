@@ -22,6 +22,8 @@ export function CreateSession(arg1:string,arg2:session.ConnectionConfig):Promise
 
 export function CreateTable(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function DeleteTerminalHistoryEntry(arg1:Array<string>):Promise<void>;
+
 export function DropColumn(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function DropDatabase(arg1:string,arg2:string):Promise<void>;
@@ -64,7 +66,7 @@ export function LoadConnections():Promise<session.ConnectionStoreData>;
 
 export function LoadSettings():Promise<store.AppSettings>;
 
-export function LoadTerminalHistory():Promise<Array<string>>;
+export function LoadTerminalHistory():Promise<Array<store.HistoryEntry>>;
 
 export function ModifyColumn(arg1:string,arg2:string,arg3:string,arg4:database.ColumnDef):Promise<void>;
 
@@ -96,7 +98,7 @@ export function SaveFileDialog(arg1:string):Promise<string>;
 
 export function SaveSettings(arg1:store.AppSettings):Promise<void>;
 
-export function SaveTerminalHistory(arg1:Array<string>):Promise<void>;
+export function SaveTerminalHistory(arg1:Array<store.HistoryEntry>):Promise<void>;
 
 export function SessionResize(arg1:string,arg2:number,arg3:number):Promise<void>;
 

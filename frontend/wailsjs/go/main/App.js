@@ -34,6 +34,10 @@ export function CreateTable(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateTable'](arg1, arg2, arg3);
 }
 
+export function DeleteTerminalHistoryEntry(arg1) {
+  return window['go']['main']['App']['DeleteTerminalHistoryEntry'](arg1);
+}
+
 export function DropColumn(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['DropColumn'](arg1, arg2, arg3, arg4);
 }

@@ -603,6 +603,7 @@ export namespace store {
 	    selectionAction: string;
 	    rightClickAction: string;
 	    maxHistoryLines: number;
+	    smartCompletion?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new TerminalSettings(source);
@@ -616,6 +617,7 @@ export namespace store {
 	        this.selectionAction = source["selectionAction"];
 	        this.rightClickAction = source["rightClickAction"];
 	        this.maxHistoryLines = source["maxHistoryLines"];
+	        this.smartCompletion = source["smartCompletion"];
 	    }
 	}
 	export class AppSettings {
@@ -653,6 +655,20 @@ export namespace store {
 		    }
 		    return a;
 		}
+	}
+	export class HistoryEntry {
+	    id: string;
+	    command: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.command = source["command"];
+	    }
 	}
 
 }

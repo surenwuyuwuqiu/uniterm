@@ -53,6 +53,7 @@
       :cursor-y="terminalInput?.cursorPixelPos.value.y ?? 0"
       @select="(idx: number) => applySuggestion(suggestions.state.value.items[idx])"
       @hover="(idx: number) => suggestions.state.value.selectedIndex = idx"
+      @remove="(id: string) => suggestions.removeHistoryCommandById(id)"
     />
   </div>
 </template>
@@ -105,6 +106,7 @@ let intersectionObserver: IntersectionObserver | null = null
 let unsubscribe: (() => void) | null = null
 let statusUnsubscribe: (() => void) | null = null
 let onDocumentMouseUp: (() => void) | null = null
+let onDocumentMouseDown: ((e: MouseEvent) => void) | null = null
 
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 let isResizing = false
@@ -147,23 +149,20 @@ async function applySuggestion(item: ReturnType<typeof suggestions.getSelectedIt
     return
   }
 
-  // For history or ai-result: replace current token at cursor
   const currentLine = terminalInput.lineBuffer.value
   const currentToken = terminalInput.currentToken.value
+  const sid = props.sessionId
 
-  if (currentToken && currentLine.endsWith(currentToken)) {
-    // Send backspaces to clear current token
-    for (let i = 0; i < currentToken.length; i++) {
-      const sid = props.sessionId
-      if (sid) SessionWrite(sid, '\b')
+  if (item.type === 'ai-result' || item.type === 'history') {
+    // Replace entire line with Ctrl+U. Using backspaces only works when the
+    // replacement is exactly the currentToken; for multi-token input (e.g.
+    // "git che" → "git checkout") backspaces leave the earlier text behind.
+    if (sid && currentLine) {
+      SessionWrite(sid, '\x15')
+      SessionWrite(sid, item.value)
     }
-    // Send new value
-    const sid = props.sessionId
-    if (sid) SessionWrite(sid, item.value)
-
-    // Update internal buffer
-    terminalInput.lineBuffer.value = currentLine.slice(0, -currentToken.length) + item.value
-    terminalInput.cursorIndex.value = terminalInput.lineBuffer.value.length
+    terminalInput.lineBuffer.value = item.value
+    terminalInput.cursorIndex.value = item.value.length
     terminalInput.currentToken.value = ''
   }
 
@@ -312,15 +311,22 @@ onMounted(() => {
 
   // Initialize terminal input handling for SSH
   if (props.mode === 'ssh') {
+    const smartOn = settingsStore.settings.terminal.smartCompletion ?? true
     terminalInput = useTerminalInput(terminal, {
       mode: props.mode,
       sessionId: props.sessionId,
+      enableHistory: smartOn,
       onHistoryExtract: (command: string) => {
         suggestions.addHistoryCommand(command)
       },
+      onResetSuppress: () => {
+        suggestions.resetSuppress()
+      },
     })
-    // Load history on startup
-    suggestions.loadHistory()
+    // Load history on startup only when smart completion is enabled
+    if (smartOn) {
+      suggestions.loadHistory()
+    }
   }
 
   if (props.mode === 'ssh' || props.mode === 'local') {
@@ -347,18 +353,25 @@ onMounted(() => {
         return
       }
 
-      // Handle suggestions input
-      if (terminalInput && (props.mode === 'ssh' || props.mode === 'local')) {
+      // Handle suggestions input (skip in alternate screen apps like vim/k9s)
+      if (terminalInput && !terminalInput.isInAlternateScreen() && (props.mode === 'ssh' || props.mode === 'local')) {
         terminalInput.handleInput(data)
 
-        // When suggestions are visible, intercept certain keys
+        // When suggestions are visible, intercept certain keys synchronously
         if (suggestions.isVisible()) {
-          if (data === '\t' || data === '\r' || data === '\n') {
+          if (data === '\t') {
             const selected = suggestions.getSelectedItem()
             if (selected) {
               applySuggestion(selected)
+              return
             }
-            return
+          }
+          if (data === '\r' || data === '\n') {
+            const selected = suggestions.getSelectedItem()
+            if (selected) {
+              applySuggestion(selected)
+              return
+            }
           }
           if (data === '\x1b') {
             suggestions.close()
@@ -366,12 +379,22 @@ onMounted(() => {
           }
         }
 
-        // Update suggestions if at line end
-        if (terminalInput.isAtLineEnd() && terminalInput.currentToken.value) {
-          suggestions.updateSuggestions(terminalInput.currentToken.value)
-        } else {
-          suggestions.close()
-        }
+        // Defer suggestion update/close so SessionWrite is not blocked
+        setTimeout(() => {
+          if (!terminalInput) return
+          const smartOn = settingsStore.settings.terminal.smartCompletion ?? true
+          if (!smartOn) {
+            suggestions.close()
+            return
+          }
+          if (terminalInput.isAtLineEnd() && terminalInput.currentToken.value) {
+            suggestions.updateSuggestions(terminalInput.currentToken.value)
+          } else {
+            suggestions.close()
+          }
+        }, 0)
+      } else if (terminalInput?.isInAlternateScreen()) {
+        suggestions.close()
       }
 
       const sid = props.sessionId
@@ -430,6 +453,16 @@ onMounted(() => {
   }
   document.addEventListener('mouseup', onDocumentMouseUp)
 
+  // Close suggestion popup when clicking outside
+  onDocumentMouseDown = (event: MouseEvent) => {
+    if (!suggestions.isVisible()) return
+    const popupEl = document.querySelector('.terminal-suggestion-popup')
+    if (popupEl && !popupEl.contains(event.target as Node)) {
+      suggestions.close()
+    }
+  }
+  document.addEventListener('mousedown', onDocumentMouseDown)
+
   // Session data
   unsubscribe = EventsOn('session:data', (payload: { id: string; data: string }) => {
     if (payload.id !== props.sessionId || !terminal) return
@@ -442,6 +475,10 @@ onMounted(() => {
       // Extract history commands from SSH output
       if (props.mode === 'ssh' && terminalInput) {
         terminalInput.handleSessionData(payload.data)
+        // Close suggestions if we entered an alternate screen app (vim, k9s, etc.)
+        if (terminalInput.isInAlternateScreen()) {
+          suggestions.close()
+        }
       }
       terminal.write(payload.data)
       if (props.mode === 'ssh' && props.onSessionStatus) {
@@ -492,8 +529,8 @@ onMounted(() => {
       return false
     }
 
-    // Suggestion navigation
-    if (suggestions.isVisible()) {
+    // Suggestion navigation (only on keydown, ignore keyup)
+    if (suggestions.isVisible() && e.type === 'keydown') {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         suggestions.selectNext()
@@ -504,13 +541,23 @@ onMounted(() => {
         suggestions.selectPrev()
         return false
       }
-      if (e.key === 'Tab' || e.key === 'Enter') {
-        e.preventDefault()
+      if (e.key === 'Tab') {
         const selected = suggestions.getSelectedItem()
         if (selected) {
+          e.preventDefault()
           applySuggestion(selected)
+          return false
         }
-        return false
+      }
+      if (e.key === 'Enter') {
+        // Only apply suggestion if user explicitly selected one with arrow keys
+        const selected = suggestions.getSelectedItem()
+        if (selected) {
+          e.preventDefault()
+          applySuggestion(selected)
+          return false
+        }
+        // No selection: let xterm handle Enter normally (terminal command execution)
       }
       if (e.key === 'Escape') {
         suggestions.close()
@@ -626,6 +673,10 @@ onUnmounted(() => {
   if (onDocumentMouseUp) {
     document.removeEventListener('mouseup', onDocumentMouseUp)
     onDocumentMouseUp = null
+  }
+  if (onDocumentMouseDown) {
+    document.removeEventListener('mousedown', onDocumentMouseDown)
+    onDocumentMouseDown = null
   }
   window.removeEventListener('resize', onWindowResize)
   window.removeEventListener('split:resize-start', onSplitResizeStart)

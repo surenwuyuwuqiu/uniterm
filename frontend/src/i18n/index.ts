@@ -229,6 +229,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.selectionActionDesc': '选中文字后的默认操作',
     'settings.rightClickDesc': '右键点击终端的行为',
     'settings.maxHistoryDesc': '终端保留的最大输出行数',
+    'settings.smartCompletion': '智能补全',
+    'settings.smartCompletionDesc': '输入时显示历史命令和 AI 补全建议',
     'settings.localShell': '本地终端 Shell',
     'settings.localShellDesc': '本地终端使用的 Shell 路径（留空使用系统默认）',
     'settings.modelList': '模型列表',
@@ -243,6 +245,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.modelProtocol': '协议',
     'settings.cancel': '取消',
     'settings.save': '保存',
+    'settings.history': '历史命令',
+    'settings.historySearchPlaceholder': '搜索历史命令...',
+    'settings.historyCommand': '命令',
+    'settings.historyEmpty': '暂无历史记录',
+    'settings.historyBatchDelete': '删除选中项 ({count})',
 
     // Common
     'common.cancel': '取消',
@@ -669,6 +676,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.selectionActionDesc': 'Default action after selecting text',
     'settings.rightClickDesc': 'Right-click behavior in terminal',
     'settings.maxHistoryDesc': 'Maximum output lines to keep in terminal',
+    'settings.smartCompletion': 'Smart Completion',
+    'settings.smartCompletionDesc': 'Show history and AI suggestions while typing',
     'settings.localShell': 'Local Terminal Shell',
     'settings.localShellDesc': 'Shell path for local terminal (leave empty for system default)',
     'settings.modelList': 'Model List',
@@ -683,6 +692,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.modelProtocol': 'Protocol',
     'settings.cancel': 'Cancel',
     'settings.save': 'Save',
+    'settings.history': 'Command History',
+    'settings.historySearchPlaceholder': 'Search history commands...',
+    'settings.historyCommand': 'Command',
+    'settings.historyEmpty': 'No history records',
+    'settings.historyBatchDelete': 'Delete selected ({count})',
 
     // Common
     'common.cancel': 'Cancel',

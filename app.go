@@ -614,18 +614,25 @@ func (a *App) GetAppInfo() AppInfo {
 	}
 }
 
-func (a *App) SaveTerminalHistory(commands []string) error {
+func (a *App) SaveTerminalHistory(entries []store.HistoryEntry) error {
 	if a.terminalHistoryStore == nil {
 		return fmt.Errorf("terminal history store not initialized")
 	}
-	return a.terminalHistoryStore.Save(commands)
+	return a.terminalHistoryStore.Save(entries)
 }
 
-func (a *App) LoadTerminalHistory() ([]string, error) {
+func (a *App) LoadTerminalHistory() ([]store.HistoryEntry, error) {
 	if a.terminalHistoryStore == nil {
-		return []string{}, fmt.Errorf("terminal history store not initialized")
+		return []store.HistoryEntry{}, fmt.Errorf("terminal history store not initialized")
 	}
 	return a.terminalHistoryStore.Load()
+}
+
+func (a *App) DeleteTerminalHistoryEntry(ids []string) error {
+	if a.terminalHistoryStore == nil {
+		return fmt.Errorf("terminal history store not initialized")
+	}
+	return a.terminalHistoryStore.DeleteByIDs(ids)
 }
 
 // ChatCompletion proxies Anthropic-native LLM API requests through the Go backend.

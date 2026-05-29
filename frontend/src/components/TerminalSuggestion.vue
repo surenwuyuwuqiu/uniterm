@@ -4,23 +4,48 @@
     class="terminal-suggestion-popup"
     :style="popupStyle"
   >
+    <!-- Scrollable history list -->
+    <div class="history-list" ref="historyListRef">
+      <div
+        v-for="{ item, index } in historyItemsWithIndex"
+        :key="item.id"
+        :ref="(el) => setItemRef(el as HTMLElement, index)"
+        class="suggestion-item"
+        :class="{ selected: index === selectedIndex }"
+        @click="onSelect(index)"
+        @mouseenter="onHover(index)"
+      >
+        <span v-if="item.icon" class="suggestion-icon">{{ item.icon }}</span>
+        <span class="suggestion-label">
+          <template v-for="(char, charIdx) in item.label" :key="charIdx">
+            <span :class="{ 'match-char': item.matchIndices?.includes(charIdx) }">{{ char }}</span>
+          </template>
+        </span>
+        <span v-if="item.description" class="suggestion-desc">{{ item.description }}</span>
+        <button v-if="item.id" class="delete-btn" @click.stop="onRemove(item.id)">×</button>
+      </div>
+    </div>
+    <!-- AI section (fixed at bottom) -->
     <div
-      v-for="(item, index) in items"
-      :key="`${item.type}-${index}`"
-      class="suggestion-item"
-      :class="{ selected: index === selectedIndex, 'ai-result': item.type === 'ai-result', 'ai-preview': item.type === 'ai-preview' }"
-      @click="onSelect(index)"
-      @mouseenter="onHover(index)"
+      v-if="aiItemWithIndex"
+      class="suggestion-item ai-fixed"
+      :class="{
+        selected: aiItemWithIndex.index === selectedIndex,
+        'ai-result': aiItemWithIndex.item.type === 'ai-result',
+        'ai-preview': aiItemWithIndex.item.type === 'ai-preview'
+      }"
+      @click="onSelect(aiItemWithIndex.index)"
+      @mouseenter="onHover(aiItemWithIndex.index)"
     >
-      <span v-if="item.icon" class="suggestion-icon">{{ item.icon }}</span>
-      <span class="suggestion-label">{{ item.label }}</span>
-      <span v-if="item.description" class="suggestion-desc">{{ item.description }}</span>
+      <span v-if="aiItemWithIndex.item.icon" class="suggestion-icon">{{ aiItemWithIndex.item.icon }}</span>
+      <span class="suggestion-label">{{ aiItemWithIndex.item.label }}</span>
+      <span v-if="aiItemWithIndex.item.description" class="suggestion-desc">{{ aiItemWithIndex.item.description }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import type { SuggestionItem } from '../composables/useSuggestions'
 
 const props = defineProps<{
@@ -34,12 +59,93 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [index: number]
   hover: [index: number]
+  remove: [id: string]
 }>()
+
+const adjustedY = ref(0)
 
 const popupStyle = computed(() => ({
   left: `${props.cursorX}px`,
-  top: `${props.cursorY}px`,
+  top: `${props.cursorY + adjustedY.value}px`,
 }))
+
+const itemRefs = ref<Record<number, HTMLElement>>({})
+const historyListRef = ref<HTMLDivElement | null>(null)
+
+function adjustPosition() {
+  if (!props.visible) {
+    adjustedY.value = 0
+    return
+  }
+  nextTick(() => {
+    const popupEl = document.querySelector('.terminal-suggestion-popup') as HTMLElement | null
+    const terminalEl = document.querySelector('.terminal-area') as HTMLElement | null
+    if (!popupEl || !terminalEl) return
+    const popupRect = popupEl.getBoundingClientRect()
+    const terminalRect = terminalEl.getBoundingClientRect()
+    const overflow = popupRect.bottom - terminalRect.bottom
+    if (overflow > 0) {
+      adjustedY.value = -(overflow + 16)
+    } else {
+      adjustedY.value = 0
+    }
+  })
+}
+
+watch(() => props.visible, (visible) => {
+  if (visible) adjustPosition()
+  else adjustedY.value = 0
+})
+
+watch(() => props.items, () => {
+  if (props.visible) adjustPosition()
+}, { deep: true })
+
+const historyItemsWithIndex = computed(() => {
+  const result: { item: SuggestionItem; index: number }[] = []
+  props.items.forEach((item, index) => {
+    if (item.type === 'history') {
+      result.push({ item, index })
+    }
+  })
+  return result
+})
+
+const aiItemWithIndex = computed(() => {
+  const index = props.items.findIndex(item => item.type === 'ai-preview' || item.type === 'ai-result')
+  if (index >= 0) {
+    return { item: props.items[index], index }
+  }
+  return null
+})
+
+function setItemRef(el: HTMLElement | null, index: number) {
+  if (el) {
+    itemRefs.value[index] = el
+  }
+}
+
+// Reset scroll position to top when items change (new input triggers refresh)
+watch(() => props.items, () => {
+  nextTick(() => {
+    if (historyListRef.value) {
+      historyListRef.value.scrollTop = 0
+    }
+  })
+}, { deep: true })
+
+// Scroll selected history item into view when navigating with arrow keys.
+// AI items are fixed at the bottom and should not scroll.
+watch(() => props.selectedIndex, (newIndex) => {
+  nextTick(() => {
+    const item = props.items[newIndex]
+    if (!item || item.type === 'ai-preview' || item.type === 'ai-result') return
+    const el = itemRefs.value[newIndex]
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  })
+})
 
 function onSelect(index: number) {
   emit('select', index)
@@ -47,6 +153,10 @@ function onSelect(index: number) {
 
 function onHover(index: number) {
   emit('hover', index)
+}
+
+function onRemove(id: string) {
+  emit('remove', id)
 }
 </script>
 
@@ -57,13 +167,21 @@ function onHover(index: number) {
   min-width: 200px;
   max-width: 400px;
   max-height: 200px;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
-  padding: 4px 0;
   backdrop-filter: blur(8px);
+}
+
+.history-list {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 4px 0 0 0;
 }
 
 .suggestion-item {
@@ -90,10 +208,14 @@ function onHover(index: number) {
 }
 
 .suggestion-item.ai-preview {
-  border-top: 1px solid var(--border-subtle);
-  margin-top: 2px;
-  padding-top: 8px;
   color: var(--accent);
+}
+
+.ai-fixed {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  background: var(--bg-surface);
 }
 
 .suggestion-icon {
@@ -108,21 +230,53 @@ function onHover(index: number) {
   white-space: nowrap;
 }
 
+.match-char {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .suggestion-desc {
   font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-ui);
 }
 
-.terminal-suggestion-popup::-webkit-scrollbar {
+.delete-btn {
+  display: none;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  margin-left: 4px;
+}
+
+.suggestion-item:hover .delete-btn,
+.suggestion-item.selected .delete-btn {
+  display: flex;
+}
+
+.delete-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ef4444;
+}
+
+.history-list::-webkit-scrollbar {
   width: 6px;
 }
 
-.terminal-suggestion-popup::-webkit-scrollbar-track {
+.history-list::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.terminal-suggestion-popup::-webkit-scrollbar-thumb {
+.history-list::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 3px;
 }

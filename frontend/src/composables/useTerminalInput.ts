@@ -10,6 +10,8 @@ export interface UseTerminalInputOptions {
   mode: 'ssh' | 'sftp' | 'local'
   sessionId: string | null | undefined
   onHistoryExtract?: (command: string) => void
+  onResetSuppress?: () => void
+  enableHistory?: boolean
 }
 
 export function useTerminalInput(terminal: Terminal | null, options: UseTerminalInputOptions) {
@@ -18,24 +20,43 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
   const currentToken = ref('')
   const cursorPixelPos = ref<CursorPosition>({ x: 0, y: 0 })
 
-  let outputBuffer = ''
+  let inAlternateScreen = false
+  let cursorPosTimer: ReturnType<typeof setTimeout> | null = null
 
-  function extractCommandFromOutput(data: string): string | null {
-    outputBuffer += data
-    const lines = outputBuffer.split('\n')
-    if (lines.length > 5) {
-      outputBuffer = lines.slice(-5).join('\n')
-    }
+  function stripAnsi(str: string): string {
+    return str
+      // OSC sequences: ESC ] ... BEL or ESC ] ... ESC \
+      .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+      // CSI sequences: ESC [ params final-byte
+      .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
+      // Single-char FE escapes: ESC @ to ESC _, ESC ` to ESC ~
+      .replace(/\x1b[@-Z\-_]/g, '')
+      // Character set designation: ESC ( B, ESC ) B, etc.
+      .replace(/\x1b[()[\]{}][0-9A-Za-z]/g, '')
+  }
 
-    const lastLine = lines[lines.length - 1]
-    if (!lastLine) return null
+  const MAX_COMMAND_LENGTH = 200
 
-    const match = lastLine.match(/(.+?[$#>\]])\s*(.+)/)
-    if (match) {
-      const command = match[2].trim()
-      if (command && !command.includes('__AI_DONE_')) {
-        return command
+  function getCurrentCommandFromTerminal(): string | null {
+    if (!terminal) return null
+    try {
+      const buffer = (terminal as any).buffer?.active
+      if (!buffer) return null
+      const line = buffer.getLine(buffer.cursorY)
+      if (!line) return null
+      const lineText = line.translateToString().trim()
+      // Strip ANSI escape sequences before matching
+      const cleanText = stripAnsi(lineText)
+      // Match prompt followed by command; use (?:\s+|$) so empty commands after prompt are handled too
+      const match = cleanText.match(/(.+?[$#>\]])(?:\s+|$)(.*)/)
+      if (match) {
+        const command = match[2].trim()
+        if (command && !command.includes('__AI_DONE_') && command.length <= MAX_COMMAND_LENGTH) {
+          return command
+        }
       }
+    } catch {
+      // Ignore errors
     }
     return null
   }
@@ -44,8 +65,9 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
     const text = lineBuffer.value
     const idx = cursorIndex.value
     const beforeCursor = text.slice(0, idx)
-    const tokens = beforeCursor.split(/\s+/)
-    currentToken.value = tokens[tokens.length - 1] || ''
+    // Use the entire command before cursor for suggestion matching,
+    // so "git status" matches history entries like "git status --short".
+    currentToken.value = beforeCursor.trim()
   }
 
   function updateCursorPosition() {
@@ -65,10 +87,9 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
       if (dims && dims.css && dims.css.cell) {
         const cellWidth = dims.css.cell.width || 9
         const cellHeight = dims.css.cell.height || 17
-        cursorPixelPos.value = {
-          x: cursorX * cellWidth,
-          y: (cursorY + 1) * cellHeight + 4,
-        }
+        const x = cursorX * cellWidth
+        const belowY = (cursorY + 1) * cellHeight + 16
+        cursorPixelPos.value = { x, y: belowY }
       }
     } catch {
       const el = terminal.element
@@ -85,39 +106,111 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
 
   function handleInput(data: string) {
     if (options.mode !== 'ssh') return
+    if (inAlternateScreen) return
     for (let i = 0; i < data.length; i++) {
       const char = data[i]
       const code = data.charCodeAt(i)
       if (char === '\r' || char === '\n') {
+        // Save command to history before clearing.
+        // Prefer terminal buffer (includes tab completion), fallback to lineBuffer.
+        if (options.enableHistory !== false) {
+          let command = getCurrentCommandFromTerminal()
+          if (!command) {
+            command = lineBuffer.value.trim()
+          }
+          if (command && options.onHistoryExtract) {
+            options.onHistoryExtract(command)
+          }
+        }
         lineBuffer.value = ''
         cursorIndex.value = 0
+        // Reset suggestion suppress on new command
+        if (options.onResetSuppress) {
+          options.onResetSuppress()
+        }
       } else if (code === 127 || char === '\b') {
         if (cursorIndex.value > 0) {
           lineBuffer.value = lineBuffer.value.slice(0, cursorIndex.value - 1) + lineBuffer.value.slice(cursorIndex.value)
           cursorIndex.value--
         }
+      } else if (code === 1) {
+        // Ctrl+A — beginning of line
+        cursorIndex.value = 0
+      } else if (code === 5) {
+        // Ctrl+E — end of line
+        cursorIndex.value = lineBuffer.value.length
+      } else if (code === 11) {
+        // Ctrl+K — delete from cursor to end of line
+        lineBuffer.value = lineBuffer.value.slice(0, cursorIndex.value)
+      } else if (code === 21) {
+        // Ctrl+U — delete from beginning to cursor
+        lineBuffer.value = lineBuffer.value.slice(cursorIndex.value)
+        cursorIndex.value = 0
       } else if (code === 27) {
         i++
         if (data[i] === '[') {
           i++
-          while (i < data.length && (data[i] < 'A' || data[i] > 'Z') && (data[i] < 'a' || data[i] > 'z')) {
+          let param = ''
+          while (i < data.length && ((data[i] >= '0' && data[i] <= '9') || data[i] === ';')) {
+            param += data[i]
             i++
           }
+          const finalChar = data[i]
+          if (finalChar === 'D') {
+            // Left arrow
+            if (cursorIndex.value > 0) cursorIndex.value--
+          } else if (finalChar === 'C') {
+            // Right arrow
+            if (cursorIndex.value < lineBuffer.value.length) cursorIndex.value++
+          } else if (finalChar === 'H' && param === '') {
+            // Home
+            cursorIndex.value = 0
+          } else if (finalChar === 'F' && param === '') {
+            // End
+            cursorIndex.value = lineBuffer.value.length
+          } else if (finalChar === '~') {
+            if (param === '1' || param === '7') {
+              // Home (alternate)
+              cursorIndex.value = 0
+            } else if (param === '4' || param === '8') {
+              // End (alternate)
+              cursorIndex.value = lineBuffer.value.length
+            } else if (param === '3') {
+              // Delete
+              if (cursorIndex.value < lineBuffer.value.length) {
+                lineBuffer.value = lineBuffer.value.slice(0, cursorIndex.value) + lineBuffer.value.slice(cursorIndex.value + 1)
+              }
+            }
+          }
         }
-      } else if (code >= 32 && code <= 126) {
+      } else if (code >= 32) {
+        // Support all printable characters including CJK
         lineBuffer.value = lineBuffer.value.slice(0, cursorIndex.value) + char + lineBuffer.value.slice(cursorIndex.value)
         cursorIndex.value++
       }
     }
     updateToken()
-    updateCursorPosition()
+    // Defer cursor position update to next tick to avoid blocking rapid input
+    // (getBoundingClientRect() inside updateCursorPosition forces synchronous layout)
+    if (cursorPosTimer) {
+      clearTimeout(cursorPosTimer)
+    }
+    cursorPosTimer = setTimeout(() => {
+      cursorPosTimer = null
+      updateCursorPosition()
+    }, 0)
   }
 
   function handleSessionData(data: string) {
     if (options.mode !== 'ssh') return
-    const command = extractCommandFromOutput(data)
-    if (command && options.onHistoryExtract) {
-      options.onHistoryExtract(command)
+
+    // Detect alternate screen buffer enter/exit (vim, k9s, less, etc.)
+    if (data.includes('\x1b[?1049h') || data.includes('\x1b[?47h')) {
+      inAlternateScreen = true
+      return
+    }
+    if (data.includes('\x1b[?1049l') || data.includes('\x1b[?47l')) {
+      inAlternateScreen = false
     }
   }
 
@@ -125,6 +218,10 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
     lineBuffer.value = ''
     cursorIndex.value = 0
     currentToken.value = ''
+  }
+
+  function isInAlternateScreen(): boolean {
+    return inAlternateScreen
   }
 
   return {
@@ -136,5 +233,6 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
     handleInput,
     handleSessionData,
     clearBuffer,
+    isInAlternateScreen,
   }
 }

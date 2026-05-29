@@ -356,12 +356,15 @@ export namespace session {
 	    name: string;
 	    type: string;
 	    size: string;
-	    model: string;
 	    mountPoint: string;
 	    used: string;
 	    total: string;
 	    usage: number;
 	    media: string;
+	    fsType: string;
+	    uuid: string;
+	    vendor: string;
+	    model: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DiskInfo(source);
@@ -372,12 +375,15 @@ export namespace session {
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.size = source["size"];
-	        this.model = source["model"];
 	        this.mountPoint = source["mountPoint"];
 	        this.used = source["used"];
 	        this.total = source["total"];
 	        this.usage = source["usage"];
 	        this.media = source["media"];
+	        this.fsType = source["fsType"];
+	        this.uuid = source["uuid"];
+	        this.vendor = source["vendor"];
+	        this.model = source["model"];
 	    }
 	}
 	export class FileItem {

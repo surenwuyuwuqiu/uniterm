@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, computed } from 'vue'
-import type { Tab, TerminalTab, SettingsTab, WorkspaceTab, SFTPTab, RDPTab, VNCTab, DBTab, PanelLayout, LayoutNode } from '../types/workspace'
+import type { Tab, TerminalTab, SettingsTab, WorkspaceTab, SFTPTab, RDPTab, VNCTab, DBTab, MonitorTab, PanelLayout, LayoutNode } from '../types/workspace'
 import { usePanelStore } from './panelStore'
 import { t } from '../i18n'
 
@@ -125,6 +125,18 @@ export const useTabStore = defineStore('tab', () => {
     return tab
   }
 
+  function createMonitorTab(name: string, panelId: string): MonitorTab {
+    const tab: MonitorTab = {
+      type: 'monitor',
+      id: genId('monitor-tab'),
+      panelId,
+      name
+    }
+    tabState.tabs.push(tab)
+    tabState.activeTabId = tab.id
+    return tab
+  }
+
   function createWorkspaceTab(name: string, panelIds: string[], layout: PanelLayout): WorkspaceTab {
     const tab: WorkspaceTab = {
       type: 'workspace',
@@ -157,7 +169,7 @@ export const useTabStore = defineStore('tab', () => {
     }
 
     // Clear AI lock if locked panel was in this tab
-    const removedPanelIds = removed.type === 'terminal' || removed.type === 'settings' || removed.type === 'rdp' || removed.type === 'vnc' || removed.type === 'database'
+    const removedPanelIds = removed.type === 'terminal' || removed.type === 'settings' || removed.type === 'rdp' || removed.type === 'vnc' || removed.type === 'database' || removed.type === 'monitor'
       ? [removed.panelId]
       : removed.type === 'workspace'
         ? removed.panelIds
@@ -458,6 +470,7 @@ export const useTabStore = defineStore('tab', () => {
     createRDPTab,
     createVNCTab,
     createDBTab,
+    createMonitorTab,
     createWorkspaceTab,
     closeTab,
     setActiveTab,

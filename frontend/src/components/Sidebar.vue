@@ -171,6 +171,7 @@
     >
       <div v-if="selectedConn && selectedConn.type === 'ssh'" class="menu-item" @click="doConnect">{{ connectLabel }}</div>
       <div v-if="selectedConn && selectedConn.type === 'ssh'" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
+      <div v-if="selectedConn && selectedConn.type === 'ssh'" class="menu-item" @click="doConnectMonitor">{{ t('sidebar.connectMonitor') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'vnc'" class="menu-item" @click="doConnectVNC">{{ t('sidebar.connectVNC') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'database'" class="menu-item" @click="doConnectDB">{{ t('db.connectDB') }}</div>
@@ -312,7 +313,7 @@ import type { ConnectionConfig, ConnectionGroup } from '../types/session'
 defineProps<{
   visible: boolean
 }>()
-const emit = defineEmits(['connect', 'connectSftp', 'connectRdp', 'connectVnc', 'connectDB', 'toggle'])
+const emit = defineEmits(['connect', 'connectSftp', 'connectRdp', 'connectVnc', 'connectDB', 'connectMonitor', 'toggle'])
 const connectionStore = useConnectionStore()
 const { t } = useI18n()
 const showForm = ref(false)
@@ -691,6 +692,16 @@ function doConnectSFTP() {
   closeMenu()
   for (const c of conns) {
     emit('connectSftp', c)
+  }
+}
+
+function doConnectMonitor() {
+  const ids = getSelectedConnectionIds()
+  const conns = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
+  selectedIds.value = new Set()
+  closeMenu()
+  for (const c of conns) {
+    emit('connectMonitor', c)
   }
 }
 

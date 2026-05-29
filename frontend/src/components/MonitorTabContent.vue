@@ -89,63 +89,64 @@
     </div>
 
     <!-- Ports -->
-    <div v-show="activeTab === 'ports'" class="tab-pane ports-pane">
+    <div v-show="activeTab === 'ports'" class="tab-pane ports-pane" @contextmenu.prevent="showContextMenu($event)">
       <div class="od-toolbar">
+        <el-input v-model="portSearch" :placeholder="t('monitor.searchPort')" clearable class="od-search" />
         <el-button size="small" :icon="RefreshRight" :loading="loadingPorts" @click="fetchPorts">
           {{ t('monitor.refresh') }}
         </el-button>
       </div>
-      <el-table :data="portList" v-loading="loadingPorts" height="calc(100% - 36px)" size="small" class="od-table">
+      <el-table :data="filteredPorts" v-loading="loadingPorts" height="calc(100% - 36px)" size="small" class="od-table">
         <el-table-column prop="protocol" :label="t('monitor.port.protocol')" sortable width="90" />
-        <el-table-column prop="localAddr" :label="t('monitor.port.localAddr')" sortable />
-        <el-table-column prop="state" :label="t('monitor.port.state')" sortable width="100" />
+        <el-table-column prop="localAddr" :label="t('monitor.port.localAddr')" sortable width="160" />
         <el-table-column prop="process" :label="t('monitor.port.process')" sortable />
       </el-table>
     </div>
 
     <!-- Disks -->
-    <div v-show="activeTab === 'disks'" class="tab-pane disks-pane">
+    <div v-show="activeTab === 'disks'" class="tab-pane disks-pane" @contextmenu.prevent="showContextMenu($event)">
       <div class="od-toolbar">
+        <el-input v-model="diskSearch" :placeholder="t('monitor.searchDisk')" clearable class="od-search" />
         <el-button size="small" :icon="RefreshRight" :loading="loadingDisks" @click="fetchDisks">
           {{ t('monitor.refresh') }}
         </el-button>
       </div>
-      <el-table :data="diskList" v-loading="loadingDisks" height="calc(100% - 36px)" size="small" class="od-table">
+      <el-table :data="filteredDisks" v-loading="loadingDisks" height="calc(100% - 36px)" size="small" class="od-table">
         <el-table-column prop="name" :label="t('monitor.disk.name')" sortable>
           <template #default="{ row }">
             <span :style="{ paddingLeft: (row.name.match(/^ +/)?.[0].length || 0) * 6 + 'px' }">{{ row.name.trim() }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="type" :label="t('monitor.disk.type')" sortable width="90" />
-        <el-table-column prop="size" :label="t('monitor.disk.size')" sortable width="100" />
-        <el-table-column prop="model" :label="t('monitor.disk.model')" sortable />
         <el-table-column prop="mountPoint" :label="t('monitor.disk.mountPoint')" sortable />
+        <el-table-column prop="size" :label="t('monitor.disk.size')" sortable width="100" />
         <el-table-column prop="used" :label="t('monitor.disk.used')" sortable width="90" />
-        <el-table-column prop="total" :label="t('monitor.disk.total')" sortable width="90" />
         <el-table-column prop="usage" :label="t('monitor.disk.usage')" sortable width="100">
           <template #default="{ row }">{{ row.usage ? row.usage + '%' : '-' }}</template>
         </el-table-column>
         <el-table-column prop="media" :label="t('monitor.disk.media')" sortable width="80" />
+        <el-table-column prop="fsType" :label="t('monitor.disk.fstype')" sortable width="100" />
+        <el-table-column prop="uuid" :label="t('monitor.disk.uuid')" sortable width="180" />
+        <el-table-column prop="vendor" :label="t('monitor.disk.vendor')" sortable width="120" />
+        <el-table-column prop="model" :label="t('monitor.disk.model')" sortable />
       </el-table>
     </div>
 
     <!-- Network -->
-    <div v-show="activeTab === 'network'" class="tab-pane network-pane">
+    <div v-show="activeTab === 'network'" class="tab-pane network-pane" @contextmenu.prevent="showContextMenu($event)">
       <div class="od-toolbar">
+        <el-input v-model="netSearch" :placeholder="t('monitor.searchNetwork')" clearable class="od-search" />
         <el-button size="small" :icon="RefreshRight" :loading="loadingNetCards" @click="fetchNetCards">
           {{ t('monitor.refresh') }}
         </el-button>
       </div>
-      <el-table :data="netCardList" v-loading="loadingNetCards" height="calc(100% - 36px)" size="small" class="od-table">
+      <el-table :data="filteredNetCards" v-loading="loadingNetCards" height="calc(100% - 36px)" size="small" class="od-table">
         <el-table-column prop="name" :label="t('monitor.net.name')" sortable width="120" />
         <el-table-column prop="state" :label="t('monitor.net.state')" sortable width="90" />
         <el-table-column prop="mac" :label="t('monitor.net.mac')" sortable width="160" />
         <el-table-column prop="speed" :label="t('monitor.net.speed')" sortable width="120" />
         <el-table-column prop="type" :label="t('monitor.net.type')" sortable width="100" />
         <el-table-column prop="bondMaster" :label="t('monitor.net.bond')" sortable width="120" />
-        <el-table-column prop="bondSlaves" :label="t('monitor.net.bondSlaves')" sortable width="180">
-          <template #default="{ row }">{{ row.bondSlaves?.join(', ') || '-' }}</template>
-        </el-table-column>
         <el-table-column prop="ipAddrs" :label="t('monitor.net.ipAddrs')" sortable>
           <template #default="{ row }">{{ row.ipAddrs?.join(', ') || '-' }}</template>
         </el-table-column>
@@ -315,6 +316,9 @@ const { t } = useI18n()
 const activeTab = ref('performance')
 const selectedPerf = ref('cpu')
 const processSearch = ref('')
+const portSearch = ref('')
+const diskSearch = ref('')
+const netSearch = ref('')
 const paused = ref(false)
 
 // Process detail
@@ -447,7 +451,9 @@ const currentPerf = computed(() => {
       return {
         bigValue: formatBytes(currentNet.value.rx + currentNet.value.tx) + '/s',
         color: '#a78bfa',
-        history: netRxHistory.value.map((v, i) => v + (netTxHistory.value[i] || 0)),
+        color2: '#c4b5fd',
+        history: netRxHistory.value,
+        history2: netTxHistory.value,
         yMin: 0,
         details: [
           { label: t('monitor.rx'), value: formatBytes(currentNet.value.rx) + '/s' },
@@ -479,6 +485,35 @@ const filteredProcesses = computed(() => {
     String(p.name).toLowerCase().includes(q) ||
     String(p.user).toLowerCase().includes(q) ||
     String(p.pid).includes(q)
+  )
+})
+
+const filteredPorts = computed(() => {
+  const q = portSearch.value.trim().toLowerCase()
+  if (!q) return portList.value
+  return portList.value.filter((p: any) =>
+    String(p.localAddr).toLowerCase().includes(q) ||
+    String(p.process).toLowerCase().includes(q)
+  )
+})
+
+const filteredNetCards = computed(() => {
+  const q = netSearch.value.trim().toLowerCase()
+  if (!q) return netCardList.value
+  return netCardList.value.filter((n: any) =>
+    String(n.name).toLowerCase().includes(q) ||
+    String(n.mac).toLowerCase().includes(q) ||
+    (n.ipAddrs || []).some((ip: string) => ip.toLowerCase().includes(q)) ||
+    String(n.bondMaster).toLowerCase().includes(q) ||
+    (n.bondSlaves || []).some((s: string) => s.toLowerCase().includes(q))
+  )
+})
+
+const filteredDisks = computed(() => {
+  const q = diskSearch.value.trim().toLowerCase()
+  if (!q) return diskList.value
+  return diskList.value.filter((d: any) =>
+    String(d.name).toLowerCase().includes(q)
   )
 })
 
@@ -662,6 +697,7 @@ function drawChart() {
   const w = rect.width
   const h = rect.height
   const history = currentPerf.value.history
+  const history2 = currentPerf.value.history2 as number[] | undefined
 
   ctx.clearRect(0, 0, w, h)
 
@@ -670,7 +706,9 @@ function drawChart() {
   const yMin = currentPerf.value.yMin ?? 0
   let yMax = currentPerf.value.yMax
   if (yMax == null) {
-    yMax = Math.max(...history, yMin + 1)
+    const allVals = [...history]
+    if (history2) allVals.push(...history2)
+    yMax = Math.max(...allVals, yMin + 1)
   }
   const range = yMax - yMin
   const padding = 4
@@ -686,33 +724,45 @@ function drawChart() {
     ctx.stroke()
   }
 
-  // Line
-  ctx.strokeStyle = currentPerf.value.color
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  history.forEach((val, i) => {
-    const x = (i / (history.length - 1)) * w
-    const normalizedVal = Math.max(Math.min(val, yMax) - yMin, 0)
-    const y = h - padding - ((normalizedVal / range) * (h - padding * 2))
-    if (i === 0) ctx.moveTo(x, y)
-    else ctx.lineTo(x, y)
-  })
-  ctx.stroke()
+  // Helper to draw a line
+  const ctx2 = ctx
+  function drawLine(data: number[], color: string, fill?: boolean) {
+    ctx2.strokeStyle = color
+    ctx2.lineWidth = 2
+    ctx2.beginPath()
+    data.forEach((val: number, i: number) => {
+      const x = (i / (data.length - 1)) * w
+      const normalizedVal = Math.max(Math.min(val, yMax!) - yMin, 0)
+      const y = h - padding - ((normalizedVal / range) * (h - padding * 2))
+      if (i === 0) ctx2.moveTo(x, y)
+      else ctx2.lineTo(x, y)
+    })
+    ctx2.stroke()
 
-  // Fill
-  ctx.fillStyle = currentPerf.value.color + '20'
-  ctx.beginPath()
-  history.forEach((val, i) => {
-    const x = (i / (history.length - 1)) * w
-    const normalizedVal = Math.max(Math.min(val, yMax) - yMin, 0)
-    const y = h - padding - ((normalizedVal / range) * (h - padding * 2))
-    if (i === 0) ctx.moveTo(x, y)
-    else ctx.lineTo(x, y)
-  })
-  ctx.lineTo(w, h)
-  ctx.lineTo(0, h)
-  ctx.closePath()
-  ctx.fill()
+    if (fill) {
+      ctx2.fillStyle = color + '20'
+      ctx2.beginPath()
+      data.forEach((val: number, i: number) => {
+        const x = (i / (data.length - 1)) * w
+        const normalizedVal = Math.max(Math.min(val, yMax!) - yMin, 0)
+        const y = h - padding - ((normalizedVal / range) * (h - padding * 2))
+        if (i === 0) ctx2.moveTo(x, y)
+        else ctx2.lineTo(x, y)
+      })
+      ctx2.lineTo(w, h)
+      ctx2.lineTo(0, h)
+      ctx2.closePath()
+      ctx2.fill()
+    }
+  }
+
+  // Draw second line first (so it appears behind the main line)
+  if (history2 && history2.length >= 2) {
+    drawLine(history2, currentPerf.value.color2 || currentPerf.value.color)
+  }
+
+  // Draw main line with fill
+  drawLine(history, currentPerf.value.color, true)
 }
 
 let unlisten: (() => void) | null = null
@@ -786,6 +836,7 @@ onUnmounted(() => {
 })
 
 watch(() => currentPerf.value.history, drawChart, { deep: true })
+watch(() => currentPerf.value.history2, drawChart, { deep: true })
 watch(selectedPerf, () => nextTick(drawChart))
 watch(activeTab, (tab) => {
   SetMonitorActiveTab(props.sessionId, tab).catch(() => {})
@@ -1099,6 +1150,7 @@ watch(activeTab, (tab) => {
 .process-detail .detail-section {
   flex: 1;
   overflow-y: auto;
+  padding: 0 16px;
 }
 
 .process-detail .detail-row {
@@ -1145,7 +1197,7 @@ watch(activeTab, (tab) => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding-top: 12px;
+  padding: 12px 16px;
   border-top: 1px solid var(--border-subtle);
   margin-top: 12px;
 }
@@ -1243,9 +1295,15 @@ watch(activeTab, (tab) => {
 /* On-demand tabs (ports, disks, network) */
 .od-toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   padding: 8px 12px;
   flex-shrink: 0;
+  gap: 12px;
+}
+
+.od-search {
+  width: 240px;
 }
 
 .ports-pane,
@@ -1258,5 +1316,9 @@ watch(activeTab, (tab) => {
 .od-table {
   flex: 1;
   min-height: 0;
+}
+
+.od-table :deep(.cell) {
+  user-select: text;
 }
 </style>

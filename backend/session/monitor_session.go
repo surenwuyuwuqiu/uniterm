@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,12 +33,15 @@ type DiskInfo struct {
 	Name       string `json:"name"`
 	Type       string `json:"type"`
 	Size       string `json:"size"`
-	Model      string `json:"model"`
 	MountPoint string `json:"mountPoint"`
 	Used       string `json:"used"`
 	Total      string `json:"total"`
 	Usage      int    `json:"usage"`
 	Media      string `json:"media"`
+	FSType     string `json:"fsType"`
+	UUID       string `json:"uuid"`
+	Vendor     string `json:"vendor"`
+	Model      string `json:"model"`
 }
 
 type NetCardInfo struct {
@@ -713,6 +717,64 @@ func (s *MonitorSession) KillProcess(pid int, signal string) error {
 	return session.Run(cmd)
 }
 
+// parsePortProcess converts ss output like users:(("nginx",pid=1001,fd=6),("nginx",pid=1002,fd=6))
+// into "1001/nginx, 1002/nginx"
+func parsePortProcess(raw string) string {
+	if raw == "" || raw == "-" {
+		return "-"
+	}
+	// Match "name",pid=123
+	re := regexp.MustCompile(`"([^"]+)",pid=(\d+)`)
+	matches := re.FindAllStringSubmatch(raw, -1)
+	if len(matches) == 0 {
+		return raw
+	}
+	seen := map[string]bool{}
+	var parts []string
+	for _, m := range matches {
+		if len(m) < 3 {
+			continue
+		}
+		name := m[1]
+		pid := m[2]
+		key := pid + "/" + name
+		if !seen[key] {
+			seen[key] = true
+			parts = append(parts, pid+"/"+name)
+		}
+	}
+	if len(parts) == 0 {
+		return raw
+	}
+	return strings.Join(parts, ", ")
+}
+
+// collectMounts recursively gathers all unique non-empty mountpoints from lsblk JSON devices.
+func collectMounts(devs []map[string]interface{}) []string {
+	seen := map[string]bool{}
+	var mounts []string
+	var walk func([]map[string]interface{})
+	walk = func(ds []map[string]interface{}) {
+		for _, dev := range ds {
+			if mp, ok := dev["mountpoint"].(string); ok && mp != "" && !seen[mp] {
+				seen[mp] = true
+				mounts = append(mounts, mp)
+			}
+			if children, ok := dev["children"].([]interface{}); ok {
+				childMaps := make([]map[string]interface{}, 0, len(children))
+				for _, c := range children {
+					if cm, ok := c.(map[string]interface{}); ok {
+						childMaps = append(childMaps, cm)
+					}
+				}
+				walk(childMaps)
+			}
+		}
+	}
+	walk(devs)
+	return mounts
+}
+
 func (s *MonitorSession) GetPorts() ([]PortInfo, error) {
 	session, err := s.client.NewSession()
 	if err != nil {
@@ -722,9 +784,9 @@ func (s *MonitorSession) GetPorts() ([]PortInfo, error) {
 
 	script := `exec 2>/dev/null
 if command -v ss >/dev/null 2>&1; then
-    ss -tlnp | tail -n +2
+    ss -tulnp | tail -n +2
 else
-    netstat -tlnp 2>/dev/null | tail -n +2
+    netstat -tulnp 2>/dev/null | tail -n +2
 fi`
 	out, err := session.Output(script)
 	if err != nil {
@@ -745,11 +807,11 @@ fi`
 		var protocol, localAddr, state, process string
 		if fields[0] == "tcp" || fields[0] == "udp" || fields[0] == "tcp6" || fields[0] == "udp6" {
 			protocol = fields[0]
+			state = fields[1]
 			if len(fields) >= 6 {
-				localAddr = fields[3]
-				state = fields[5]
+				localAddr = fields[4]
 				if len(fields) >= 7 {
-					process = fields[6]
+					process = parsePortProcess(fields[6])
 				}
 			}
 		} else {
@@ -768,12 +830,26 @@ fi`
 					process = processField
 				}
 			}
+			// Infer protocol from state and address
+			isUDP := state == "UNCONN"
 			if strings.Contains(localAddr, ":") && !strings.Contains(localAddr, ".") && !strings.HasPrefix(localAddr, "[::]") {
-				protocol = "tcp6"
+				if isUDP {
+					protocol = "udp6"
+				} else {
+					protocol = "tcp6"
+				}
 			} else if strings.HasPrefix(localAddr, "[::]") {
-				protocol = "tcp6"
+				if isUDP {
+					protocol = "udp6"
+				} else {
+					protocol = "tcp6"
+				}
 			} else {
-				protocol = "tcp"
+				if isUDP {
+					protocol = "udp"
+				} else {
+					protocol = "tcp"
+				}
 			}
 		}
 		if localAddr == "" {
@@ -790,32 +866,30 @@ fi`
 }
 
 func (s *MonitorSession) GetDisks() ([]DiskInfo, error) {
+	// Run lsblk and df in a single shell script to avoid extra SSH round-trips.
+	// df only queries paths that actually have a mountpoint.
 	session, err := s.client.NewSession()
 	if err != nil {
 		return nil, err
 	}
-	defer session.Close()
-
-	script := `exec 2>/dev/null
-lsblk -b -o NAME,SIZE,TYPE,MOUNTPOINT,MODEL,ROTA 2>/dev/null || lsblk -o NAME,SIZE,TYPE,MOUNTPOINT,MODEL,ROTA 2>/dev/null
-echo "---DF---"
-df -h 2>/dev/null`
-
+	script := `lsblk -J -b -o NAME,SIZE,TYPE,MOUNTPOINT,MODEL,ROTA,FSTYPE,UUID,VENDOR 2>/dev/null
+echo "__SPLIT__"
+mp=$(lsblk -n -o MOUNTPOINT 2>/dev/null | grep -v '^$' | sort -u | tr '\n' ' ')
+[ -n "$mp" ] && df -h $mp 2>/dev/null`
 	out, err := session.Output(script)
-	if err != nil {
-		return nil, err
-	}
+	session.Close()
 
-	output := string(out)
-	parts := strings.Split(output, "---DF---\n")
-	lsblkPart := strings.TrimSpace(parts[0])
-	var dfPart string
+	parts := strings.Split(string(out), "__SPLIT__")
+	var jsonOut, dfOut []byte
+	if len(parts) > 0 {
+		jsonOut = []byte(strings.TrimSpace(parts[0]))
+	}
 	if len(parts) > 1 {
-		dfPart = strings.TrimSpace(parts[1])
+		dfOut = []byte(strings.TrimSpace(parts[1]))
 	}
 
 	mountUsage := map[string]struct{ Used, Total string; Usage int }{}
-	for _, line := range strings.Split(dfPart, "\n") {
+	for _, line := range strings.Split(string(dfOut), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "Filesystem") {
 			continue
@@ -834,7 +908,125 @@ df -h 2>/dev/null`
 	}
 
 	var disks []DiskInfo
-	lines := strings.Split(lsblkPart, "\n")
+
+	// Parse JSON output
+	var lsblkJSON struct {
+		BlockDevices []map[string]interface{} `json:"blockdevices"`
+	}
+	if err == nil && json.Unmarshal(jsonOut, &lsblkJSON) == nil {
+		var walk func(devs []map[string]interface{}, depth int)
+		walk = func(devs []map[string]interface{}, depth int) {
+				for _, dev := range devs {
+					name, _ := dev["name"].(string)
+					devType, _ := dev["type"].(string)
+
+					var sizeBytes uint64
+					switch s := dev["size"].(type) {
+					case float64:
+						sizeBytes = uint64(s)
+					case string:
+						sizeBytes, _ = strconv.ParseUint(s, 10, 64)
+					}
+
+					var mount string
+					switch mp := dev["mountpoint"].(type) {
+					case string:
+						if mp != "" {
+							mount = mp
+						}
+					}
+
+					var model string
+					switch m := dev["model"].(type) {
+					case string:
+						if m != "" {
+							model = m
+						}
+					}
+
+					media := "-"
+					if devType == "rom" {
+						media = "ROM"
+					} else {
+						switch r := dev["rota"].(type) {
+						case bool:
+							if r {
+								media = "HDD"
+							} else {
+								media = "SSD"
+							}
+						case string:
+							if r == "1" || r == "true" {
+								media = "HDD"
+							} else if r == "0" || r == "false" {
+								media = "SSD"
+							}
+						case float64:
+							if r != 0 {
+								media = "HDD"
+							} else {
+								media = "SSD"
+							}
+						}
+					}
+
+					var fsType, uuid, vendor string
+					if v, ok := dev["fstype"].(string); ok && v != "" {
+						fsType = v
+					}
+					if v, ok := dev["uuid"].(string); ok && v != "" {
+						uuid = v
+					}
+					if v, ok := dev["vendor"].(string); ok && v != "" {
+						vendor = v
+					}
+
+					usage := mountUsage[mount]
+					disk := DiskInfo{
+						Name:       strings.Repeat("  ", depth) + name,
+						Type:       devType,
+						Size:       formatBytes(sizeBytes),
+						MountPoint: mount,
+						Media:      media,
+						FSType:     fsType,
+						UUID:       uuid,
+						Vendor:     vendor,
+						Model:      model,
+					}
+					if mount != "" {
+						disk.Used = usage.Used
+						disk.Total = usage.Total
+						disk.Usage = usage.Usage
+					}
+					disks = append(disks, disk)
+
+					if children, ok := dev["children"].([]interface{}); ok {
+						childMaps := make([]map[string]interface{}, 0, len(children))
+						for _, c := range children {
+							if cm, ok := c.(map[string]interface{}); ok {
+								childMaps = append(childMaps, cm)
+							}
+						}
+						walk(childMaps, depth+1)
+					}
+				}
+			}
+			walk(lsblkJSON.BlockDevices, 0)
+			return disks, nil
+		}
+
+	// Fallback to text parsing
+	session2, err := s.client.NewSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session2.Close()
+	out2, err := session2.Output(`lsblk -b -o NAME,SIZE,TYPE,MOUNTPOINT,MODEL,ROTA 2>/dev/null || lsblk -o NAME,SIZE,TYPE,MOUNTPOINT,MODEL,ROTA 2>/dev/null`)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(string(out2), "\n")
 	var headers []string
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
@@ -874,7 +1066,9 @@ df -h 2>/dev/null`
 		sizeBytes, _ := strconv.ParseUint(colMap["SIZE"], 10, 64)
 		sizeStr := formatBytes(sizeBytes)
 		media := "-"
-		if colMap["ROTA"] == "1" {
+		if colMap["TYPE"] == "rom" {
+			media = "ROM"
+		} else if colMap["ROTA"] == "1" {
 			media = "HDD"
 		} else if colMap["ROTA"] == "0" {
 			media = "SSD"
@@ -921,6 +1115,29 @@ for f in /proc/net/bonding/*; do
     [ -f "$f" ] || continue
     echo "---BONDNAME---$(basename "$f")"
     cat "$f"
+done
+echo "---SPEED---"
+for iface in $(ls /sys/class/net/ 2>/dev/null); do
+    val=$(cat /sys/class/net/$iface/speed 2>/dev/null || echo -1)
+    echo "$iface $val"
+done
+echo "---KIND---"
+for d in /sys/class/net/*; do
+    iface=$(basename "$d")
+    [ "$iface" = "lo" ] && continue
+    is_virt=0
+    readlink -f "$d" | grep -q '/devices/virtual/net/' && is_virt=1
+    has_dev=0; [ -L "$d/device" ] && has_dev=1
+    if [ "$is_virt" -eq 0 ] && [ "$has_dev" -eq 1 ]; then
+        kind=Physical
+    elif [ "$is_virt" -eq 1 ] && [ -d "$d/bridge" ]; then
+        kind=Bridge
+    elif [ -f "$d/bonding/mode" ]; then
+        kind=Bond
+    else
+        kind=Virtual
+    fi
+    echo "$iface $kind"
 done`
 
 	out, err := session.Output(script)
@@ -1004,6 +1221,34 @@ done`
 		}
 	}
 
+	// Parse speed info
+	speedMap := map[string]int{}
+	if rest != "" {
+		if idx := strings.Index(rest, "---SPEED---"); idx >= 0 {
+			for _, line := range strings.Split(strings.TrimSpace(rest[idx+11:]), "\n") {
+				fields := strings.Fields(line)
+				if len(fields) == 2 {
+					if val, err := strconv.Atoi(fields[1]); err == nil {
+						speedMap[fields[0]] = val
+					}
+				}
+			}
+		}
+	}
+
+	// Parse kind info
+	kindMap := map[string]string{}
+	if rest != "" {
+		if idx := strings.Index(rest, "---KIND---"); idx >= 0 {
+			for _, line := range strings.Split(strings.TrimSpace(rest[idx+10:]), "\n") {
+				fields := strings.Fields(line)
+				if len(fields) == 2 {
+					kindMap[fields[0]] = fields[1]
+				}
+			}
+		}
+	}
+
 	// Parse link info
 	var cards []NetCardInfo
 	if strings.HasPrefix(linkPart, "[") {
@@ -1018,21 +1263,16 @@ done`
 				mac, _ := iface["address"].(string)
 				linkType, _ := iface["link_type"].(string)
 				speed := "-"
-				if speedFile, err := session.Output(fmt.Sprintf("cat /sys/class/net/%s/speed 2>/dev/null || echo -1", name)); err == nil {
-					speedVal, _ := strconv.Atoi(strings.TrimSpace(string(speedFile)))
-					if speedVal > 0 {
-						speed = fmt.Sprintf("%d Mbps", speedVal)
-					}
+				if speedVal, ok := speedMap[name]; ok && speedVal > 0 {
+					speed = fmt.Sprintf("%d Mbps", speedVal)
 				}
-				ifType := "Virtual"
-				if linkType == "ether" {
-					if _, isBond := bondMasters[name]; isBond {
-						ifType = "Bond"
+				ifType := kindMap[name]
+				if ifType == "" {
+					if linkType == "loopback" {
+						ifType = "Loopback"
 					} else {
-						ifType = "Physical"
+						ifType = "Virtual"
 					}
-				} else if linkType == "loopback" {
-					ifType = "Loopback"
 				}
 				card := NetCardInfo{
 					Name:       name,
@@ -1062,22 +1302,23 @@ done`
 				parts := strings.SplitN(line, ":", 3)
 				if len(parts) >= 2 {
 					name := strings.TrimSpace(parts[1])
+					ifType := kindMap[name]
+					if ifType == "" {
+						if strings.Contains(line, "loopback") {
+							ifType = "Loopback"
+						} else {
+							ifType = "Virtual"
+						}
+					}
 					currentCard = &NetCardInfo{
 						Name:    name,
 						State:   "UNKNOWN",
 						Speed:   "-",
-						Type:    "Virtual",
+						Type:    ifType,
 						IPAddrs: addrMap[name],
 					}
 					if len(parts) >= 3 && strings.Contains(parts[2], "UP") {
 						currentCard.State = "UP"
-					}
-					if _, isBond := bondMasters[name]; isBond {
-						currentCard.Type = "Bond"
-					} else if strings.Contains(line, "loopback") {
-						currentCard.Type = "Loopback"
-					} else if strings.Contains(line, "ether") {
-						currentCard.Type = "Physical"
 					}
 					currentCard.BondMaster = bondSlaves[name]
 					currentCard.BondSlaves = bondMasters[name]

@@ -9,11 +9,11 @@
       @open-settings="openSettings"
     />
     <div class="main-content">
-      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" @connect-d-b="onConnectDB" />
+      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" @connect-d-b="onConnectDB" @connect-monitor="onConnectMonitor" />
       <div class="tab-area">
         <TabBar />
         <template v-if="activeTab">
-          <KeepAlive :include="['DBTabContent']">
+          <KeepAlive :include="['DBTabContent', 'MonitorTabContent']">
             <TerminalTabContent
               v-if="activeTab.type === 'terminal'"
               :key="activeTab.id"
@@ -54,6 +54,11 @@
               :default-db-name="getPanelConfig(activeTab.panelId)?.dbName || ''"
               :db-type="getPanelConfig(activeTab.panelId)?.dbType || 'mysql'"
             />
+            <MonitorTabContent
+              v-else-if="activeTab.type === 'monitor'"
+              :key="activeTab.id"
+              :session-id="getPanelSessionId(activeTab.panelId) || ''"
+            />
           </KeepAlive>
         </template>
       </div>
@@ -90,6 +95,7 @@ import SFTPTabContent from './components/SFTPTabContent.vue'
 import RDPTabContent from './components/RDPTabContent.vue'
 import VNCTabContent from './components/VNCTabContent.vue'
 import DBTabContent from './components/DBTabContent.vue'
+import MonitorTabContent from './components/MonitorTabContent.vue'
 import ConnectionForm from './components/ConnectionForm.vue'
 import AISidebar from './components/AISidebar.vue'
 import SyncConflictDialog from './components/SyncConflictDialog.vue'
@@ -347,6 +353,13 @@ async function closeTab(tabId: string) {
       try { await CloseSession(p.sessionId) } catch (_) {}
     }
   }
+  // Close monitor session
+  if (tab && tab.type === 'monitor') {
+    const p = panelStore.getPanel(tab.panelId)
+    if (p?.sessionId) {
+      try { await CloseSession(p.sessionId) } catch (_) {}
+    }
+  }
   // Local terminals must be explicitly closed to terminate the shell process
   if (tab && tab.type === 'terminal') {
     const p = panelStore.getPanel(tab.panelId)
@@ -489,6 +502,24 @@ async function onConnectVNC(config: ConnectionConfig) {
     sessionStore.initSession(info.id)
   } catch (e) {
     console.error('Failed to create VNC session:', e)
+    tabStore.closeTab(tab.id)
+    panelStore.removePanel(panel.id)
+  }
+}
+
+async function onConnectMonitor(config: ConnectionConfig) {
+  const panel = panelStore.createPanel(config, 'monitor')
+  const displayTitle = config.name || `${config.user}@${config.host}`
+  panel.title = displayTitle
+  const tab = tabStore.createMonitorTab(displayTitle, panel.id)
+  panelStore.movePanelToTab(panel.id, tab.id)
+
+  try {
+    const info = await CreateSession('monitor', config)
+    panelStore.bindSession(panel.id, info.id)
+    sessionStore.initSession(info.id)
+  } catch (e) {
+    console.error('Failed to create monitor session:', e)
     tabStore.closeTab(tab.id)
     panelStore.removePanel(panel.id)
   }

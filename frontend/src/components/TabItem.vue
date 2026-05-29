@@ -64,11 +64,11 @@ import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import { useI18n } from '../i18n'
 import { CreateSession } from '../../wailsjs/go/main/App'
-import type { TerminalTab, SettingsTab, SFTPTab, RDPTab, VNCTab, DBTab } from '../types/workspace'
-import { SquareTerminal, Laptop, FolderUp, Monitor, MonitorCloud, Settings, Sparkles, Database } from '@lucide/vue'
+import type { TerminalTab, SettingsTab, SFTPTab, RDPTab, VNCTab, DBTab, MonitorTab } from '../types/workspace'
+import { SquareTerminal, Laptop, FolderUp, Monitor, MonitorCloud, Settings, Sparkles, Database, Activity } from '@lucide/vue'
 
 const props = defineProps<{
-  tab: TerminalTab | SettingsTab | SFTPTab | RDPTab | VNCTab | DBTab
+  tab: TerminalTab | SettingsTab | SFTPTab | RDPTab | VNCTab | DBTab | MonitorTab
   isActive: boolean
   showClose?: boolean
 }>()
@@ -102,6 +102,7 @@ const tabIcon = computed(() => {
   if (t.type === 'rdp') return Monitor
   if (t.type === 'vnc') return MonitorCloud
   if (t.type === 'database') return Database
+  if (t.type === 'monitor') return Activity
   if (t.type === 'terminal') {
     const panel = panelStore.getPanel(t.panelId)
     if (panel?.type === 'local') return Laptop

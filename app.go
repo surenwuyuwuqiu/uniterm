@@ -26,16 +26,17 @@ import (
 )
 
 type App struct {
-	ctx              context.Context
-	sessionManager   *session.SessionManager
-	connectionStore  *store.ConnectionStore
-	aiSessionStore   *store.AISessionStore
-	settingsStore    *store.SettingsStore
-	syncService      *sync.SyncService
-	mainHwnd        uintptr
-	originalWndProc uintptr
-	wndProcCb       uintptr // keep alive to prevent GC
-	inSizeMove      bool
+	ctx                  context.Context
+	sessionManager       *session.SessionManager
+	connectionStore      *store.ConnectionStore
+	aiSessionStore       *store.AISessionStore
+	settingsStore        *store.SettingsStore
+	terminalHistoryStore *store.TerminalHistoryStore
+	syncService          *sync.SyncService
+	mainHwnd            uintptr
+	originalWndProc     uintptr
+	wndProcCb           uintptr // keep alive to prevent GC
+	inSizeMove          bool
 }
 
 func NewApp() *App {
@@ -76,6 +77,11 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	a.settingsStore = ss
+
+	// Init terminal history store (same config dir as other stores)
+	configDir, _ := os.UserConfigDir()
+	appDir := filepath.Join(configDir, "uniTerm")
+	a.terminalHistoryStore = store.NewTerminalHistoryStore(appDir)
 
 	syncSvc, err := sync.NewSyncService()
 	if err != nil {
@@ -606,6 +612,20 @@ func (a *App) GetAppInfo() AppInfo {
 		Name:    "uniTerm",
 		Version: Version,
 	}
+}
+
+func (a *App) SaveTerminalHistory(commands []string) error {
+	if a.terminalHistoryStore == nil {
+		return fmt.Errorf("terminal history store not initialized")
+	}
+	return a.terminalHistoryStore.Save(commands)
+}
+
+func (a *App) LoadTerminalHistory() ([]string, error) {
+	if a.terminalHistoryStore == nil {
+		return []string{}, fmt.Errorf("terminal history store not initialized")
+	}
+	return a.terminalHistoryStore.Load()
 }
 
 // ChatCompletion proxies Anthropic-native LLM API requests through the Go backend.

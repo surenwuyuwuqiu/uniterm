@@ -2,7 +2,8 @@
 
 ## v2026.05.29-alpha
 
-- **new** Terminal smart completion. While typing in SSH terminals, a popup shows matching history commands and an AI rewrite option. Supports arrow-key navigation, Tab/Enter to apply, and Escape to close. History entries now have UUIDs; the settings page adds a "Command History" section for search, select-all, and batch delete. Includes a Smart Completion toggle in Terminal Settings (default on).
+- **new** Terminal smart completion. Real-time popup with history command and AI rewrite suggestions while typing in SSH terminals. Settings page adds a command history management section with search, select-all, and batch delete.
+- **new** Server monitor. Real-time monitoring for connected servers. Supports performance metrics (CPU/memory/disk/network), process list with details, listening ports, disk usage and mount info, network interfaces with bond/bridge detection.
 - **new** SSH post-login script execution. Configure a script to run automatically after SSH connection; supports idle detection to avoid executing during manual interaction.
 - **new** SSH keepalive to prevent idle disconnect. Sends periodic keepalive packets and shows a reconnect prompt when the connection drops.
 - **improve** Sidebar splitter visibility and terminal scrollbar contrast improved for easier interaction.

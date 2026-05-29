@@ -1,5 +1,14 @@
 # Changelog
 
+## v2026.05.29-alpha
+
+- **new** Terminal smart completion. While typing in SSH terminals, a popup shows matching history commands and an AI rewrite option. Supports arrow-key navigation, Tab/Enter to apply, and Escape to close. History entries now have UUIDs; the settings page adds a "Command History" section for search, select-all, and batch delete. Includes a Smart Completion toggle in Terminal Settings (default on).
+- **new** SSH post-login script execution. Configure a script to run automatically after SSH connection; supports idle detection to avoid executing during manual interaction.
+- **new** SSH keepalive to prevent idle disconnect. Sends periodic keepalive packets and shows a reconnect prompt when the connection drops.
+- **improve** Sidebar splitter visibility and terminal scrollbar contrast improved for easier interaction.
+- **bugfix** Fixed MySQL multi-database race condition in database query capabilities.
+- **bugfix** Unified connection type label rendering between grouped and ungrouped views in the sidebar.
+
 ## v2026.05.27-alpha
 
 - **new** Database connection and query. Supports MySQL, PostgreSQL, and rqlite. Provides SQL query execution, table schema browsing, CRUD on data rows, and tree navigation of databases/tables.

@@ -43,6 +43,17 @@
       </div>
       <div class="menu-item" @click="menu.pasteFromClipboard">{{ t('terminal.paste') }}</div>
     </div>
+
+    <!-- Terminal suggestions popup -->
+    <TerminalSuggestion
+      :visible="suggestions.state.value.visible"
+      :items="suggestions.state.value.items"
+      :selected-index="suggestions.state.value.selectedIndex"
+      :cursor-x="terminalInput?.cursorPixelPos.value.x ?? 0"
+      :cursor-y="terminalInput?.cursorPixelPos.value.y ?? 0"
+      @select="(idx: number) => applySuggestion(suggestions.state.value.items[idx])"
+      @hover="(idx: number) => suggestions.state.value.selectedIndex = idx"
+    />
   </div>
 </template>
 
@@ -62,6 +73,9 @@ import { usePanelStore } from '../stores/panelStore'
 import { useTerminalMenu } from '../composables/useTerminalMenu'
 import { useI18n } from '../i18n'
 import { getXtermTheme } from '../composables/useTerminal'
+import { useTerminalInput } from '../composables/useTerminalInput'
+import { useSuggestions } from '../composables/useSuggestions'
+import TerminalSuggestion from './TerminalSuggestion.vue'
 
 const props = defineProps<{
   mode: 'ssh' | 'sftp' | 'local'
@@ -81,6 +95,8 @@ const { t } = useI18n()
 const terminalRef = ref<HTMLDivElement>()
 const searchInputRef = ref<HTMLInputElement>()
 const searchVisible = ref(false)
+const suggestions = useSuggestions()
+let terminalInput: ReturnType<typeof useTerminalInput> | null = null
 let terminal: Terminal | null = null
 let fitAddon: FitAddon | null = null
 let searchAddon: SearchAddon | null = null
@@ -120,6 +136,38 @@ function getTerminalOptions() {
 
 function getSelection(): string {
   return terminal?.getSelection() || ''
+}
+
+async function applySuggestion(item: ReturnType<typeof suggestions.getSelectedItem>) {
+  if (!item || !terminal || !terminalInput) return
+
+  if (item.type === 'ai-preview') {
+    // Step 1: Generate AI suggestion
+    await suggestions.generateAISuggestion(terminalInput.lineBuffer.value)
+    return
+  }
+
+  // For history or ai-result: replace current token at cursor
+  const currentLine = terminalInput.lineBuffer.value
+  const currentToken = terminalInput.currentToken.value
+
+  if (currentToken && currentLine.endsWith(currentToken)) {
+    // Send backspaces to clear current token
+    for (let i = 0; i < currentToken.length; i++) {
+      const sid = props.sessionId
+      if (sid) SessionWrite(sid, '\b')
+    }
+    // Send new value
+    const sid = props.sessionId
+    if (sid) SessionWrite(sid, item.value)
+
+    // Update internal buffer
+    terminalInput.lineBuffer.value = currentLine.slice(0, -currentToken.length) + item.value
+    terminalInput.cursorIndex.value = terminalInput.lineBuffer.value.length
+    terminalInput.currentToken.value = ''
+  }
+
+  suggestions.close()
 }
 
 function resize() {
@@ -262,6 +310,19 @@ onMounted(() => {
   void terminalRef.value.offsetHeight
   fitAddon.fit()
 
+  // Initialize terminal input handling for SSH
+  if (props.mode === 'ssh') {
+    terminalInput = useTerminalInput(terminal, {
+      mode: props.mode,
+      sessionId: props.sessionId,
+      onHistoryExtract: (command: string) => {
+        suggestions.addHistoryCommand(command)
+      },
+    })
+    // Load history on startup
+    suggestions.loadHistory()
+  }
+
   if (props.mode === 'ssh' || props.mode === 'local') {
     // Restore terminal content from session buffer
     const sid = props.sessionId
@@ -285,6 +346,34 @@ onMounted(() => {
         }
         return
       }
+
+      // Handle suggestions input
+      if (terminalInput && (props.mode === 'ssh' || props.mode === 'local')) {
+        terminalInput.handleInput(data)
+
+        // When suggestions are visible, intercept certain keys
+        if (suggestions.isVisible()) {
+          if (data === '\t' || data === '\r' || data === '\n') {
+            const selected = suggestions.getSelectedItem()
+            if (selected) {
+              applySuggestion(selected)
+            }
+            return
+          }
+          if (data === '\x1b') {
+            suggestions.close()
+            return
+          }
+        }
+
+        // Update suggestions if at line end
+        if (terminalInput.isAtLineEnd() && terminalInput.currentToken.value) {
+          suggestions.updateSuggestions(terminalInput.currentToken.value)
+        } else {
+          suggestions.close()
+        }
+      }
+
       const sid = props.sessionId
       if (sid) {
         if (props.broadcastActive && props.workspaceId) {
@@ -350,6 +439,10 @@ onMounted(() => {
         terminal.write(cleaned)
       }
     } else {
+      // Extract history commands from SSH output
+      if (props.mode === 'ssh' && terminalInput) {
+        terminalInput.handleSessionData(payload.data)
+      }
       terminal.write(payload.data)
       if (props.mode === 'ssh' && props.onSessionStatus) {
         // onSessionData is handled by the consumer via EventsOn if needed
@@ -398,6 +491,33 @@ onMounted(() => {
       openSearch()
       return false
     }
+
+    // Suggestion navigation
+    if (suggestions.isVisible()) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        suggestions.selectNext()
+        return false
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        suggestions.selectPrev()
+        return false
+      }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault()
+        const selected = suggestions.getSelectedItem()
+        if (selected) {
+          applySuggestion(selected)
+        }
+        return false
+      }
+      if (e.key === 'Escape') {
+        suggestions.close()
+        return false
+      }
+    }
+
     return true
   })
 
@@ -511,6 +631,7 @@ onUnmounted(() => {
   window.removeEventListener('split:resize-start', onSplitResizeStart)
   window.removeEventListener('split:resize-end', onSplitResizeEnd)
   window.removeEventListener('terminal:open-search', openSearch)
+  suggestions.close()
 })
 
 // Paste handling

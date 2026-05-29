@@ -16,8 +16,8 @@ Autonomous AI Agent that works like Claude Code — independently plans and exec
 - **LLM Integration** — Sidebar chat with Anthropic-compatible API, supporting Claude and other compliant models.
 - **Flexible Execution Modes** — Confirm all, confirm dangerous only, or bypass — you control how much oversight the AI Agent needs.
 - **Persistent Conversations** — Chat history is saved per session, so conversations survive app restarts.
-- **Direct Terminal Control** — Commands execute directly in the active terminal tab, with full access to your SSH sessions.
-- **AI Terminal Pinning** — Pin the AI Agent to a specific terminal tab or follow your active one — collaborate side-by-side in split panes, each with your own terminal context.
+- **Terminal Integration** — AI commands execute directly in the active terminal tab, with optional pinning to a specific tab or following your active one. Collaborate side-by-side in split panes, each with its own terminal context.
+- **Smart Completion** — While typing in SSH terminals, get real-time suggestions from your command history and AI-powered command rewrites.
 
 ### Full-Featured Terminal
 

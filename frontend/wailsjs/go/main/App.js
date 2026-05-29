@@ -118,6 +118,10 @@ export function LoadSettings() {
   return window['go']['main']['App']['LoadSettings']();
 }
 
+export function LoadTerminalHistory() {
+  return window['go']['main']['App']['LoadTerminalHistory']();
+}
+
 export function ModifyColumn(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ModifyColumn'](arg1, arg2, arg3, arg4);
 }
@@ -176,6 +180,10 @@ export function SaveFileDialog(arg1) {
 
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
+}
+
+export function SaveTerminalHistory(arg1) {
+  return window['go']['main']['App']['SaveTerminalHistory'](arg1);
 }
 
 export function SessionResize(arg1, arg2, arg3) {

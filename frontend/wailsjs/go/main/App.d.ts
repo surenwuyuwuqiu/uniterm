@@ -64,6 +64,8 @@ export function LoadConnections():Promise<session.ConnectionStoreData>;
 
 export function LoadSettings():Promise<store.AppSettings>;
 
+export function LoadTerminalHistory():Promise<Array<string>>;
+
 export function ModifyColumn(arg1:string,arg2:string,arg3:string,arg4:database.ColumnDef):Promise<void>;
 
 export function OnConnectionsChanged(arg1:any):Promise<void>;
@@ -93,6 +95,8 @@ export function SaveConnections(arg1:session.ConnectionStoreData):Promise<void>;
 export function SaveFileDialog(arg1:string):Promise<string>;
 
 export function SaveSettings(arg1:store.AppSettings):Promise<void>;
+
+export function SaveTerminalHistory(arg1:Array<string>):Promise<void>;
 
 export function SessionResize(arg1:string,arg2:number,arg3:number):Promise<void>;
 

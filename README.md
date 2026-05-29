@@ -23,9 +23,9 @@ Autonomous AI Agent that works like Claude Code — independently plans and exec
 
 - **SSH Client** — Connect via password or private key authentication. Multi-tab management with 5 color schemes, 6 monospace fonts, adjustable font size and scrollback, configurable selection behavior and right-click actions.
 - **SFTP File Manager** — Dual-pane browser for local and remote files. Upload, download, drag-and-drop, delete, rename, and more. Transfers tracked per tab with pause, resume, and cancel support.
+- **Server Monitor** — Real-time monitoring for connected servers. View performance metrics (CPU, memory, disk, network), process list with detail panel, listening ports, disk usage with mountpoint info, and network interfaces with bond/bridge detection.
 - **Local Terminal** — Full-featured local terminal supporting PowerShell, CMD, Git Bash, and other shells with the same font, color, and behavior settings as SSH sessions.
-- **RDP** — Support Windows Remote Desktop connections.
-- **VNC** — Support VNC connections.
+- **RDP / VNC** — Support Windows Remote Desktop and VNC connections.
 - **Database Client** — Connect to MySQL, PostgreSQL, and rqlite databases. Execute SQL queries, browse table structures, and edit data rows inline — all from a unified interface.
 
 ### Customization

@@ -1,4 +1,4 @@
-export type PanelType = 'ssh' | 'sftp' | 'settings' | 'rdp' | 'vnc' | 'local' | 'database' | 'other'
+export type PanelType = 'ssh' | 'sftp' | 'settings' | 'rdp' | 'vnc' | 'local' | 'database' | 'monitor' | 'other'
 export type PanelStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 import type { ConnectionConfig } from './session'
@@ -24,7 +24,7 @@ export type LayoutNode =
 
 // ── Tab types ──
 
-export type Tab = TerminalTab | SettingsTab | WorkspaceTab | SFTPTab | RDPTab | VNCTab | DBTab
+export type Tab = TerminalTab | SettingsTab | WorkspaceTab | SFTPTab | RDPTab | VNCTab | DBTab | MonitorTab
 
 export interface TerminalTab {
   type: 'terminal'
@@ -72,6 +72,13 @@ export interface VNCTab {
 
 export interface DBTab {
   type: 'database'
+  id: string
+  panelId: string
+  name: string
+}
+
+export interface MonitorTab {
+  type: 'monitor'
   id: string
   panelId: string
   name: string

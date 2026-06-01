@@ -338,8 +338,17 @@ onMounted(() => {
         terminal.write(history)
       }
     }
-    // Retry resize multiple times
-    ;[100, 300, 600, 1000, 1500].forEach(d => setTimeout(() => resize(), d))
+    // Force initial resize with retries — needed because cell dimensions
+    // may not be available immediately.
+    ;[100, 200, 400, 800, 1500].forEach(d => setTimeout(() => {
+      if (!terminal || terminal.cols <= 0 || terminal.rows <= 0) {
+        fitAddon?.fit()
+      }
+      const sessionId = props.sessionId
+      if (sessionId && terminal && terminal.cols > 0 && terminal.rows > 0) {
+        SessionResize(sessionId, terminal.cols, terminal.rows).catch(() => {})
+      }
+    }, d))
   }
 
   // Input handling

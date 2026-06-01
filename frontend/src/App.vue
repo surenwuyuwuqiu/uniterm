@@ -360,10 +360,10 @@ async function closeTab(tabId: string) {
       try { await CloseSession(p.sessionId) } catch (_) {}
     }
   }
-  // Local terminals must be explicitly closed to terminate the shell process
+  // Terminal sessions must be explicitly closed to terminate the connection/shell process
   if (tab && tab.type === 'terminal') {
     const p = panelStore.getPanel(tab.panelId)
-    if (p?.type === 'local' && p?.sessionId) {
+    if (p?.sessionId) {
       try { await CloseSession(p.sessionId) } catch (_) {}
     }
   }
@@ -388,21 +388,28 @@ async function onConnect(config: ConnectionConfig) {
   if (config.type === 'vnc') return onConnectVNC(config)
   if (config.type === 'database') return onConnectDB(config)
   connectionStore.add(config)
-  const panel = panelStore.createPanel(config, 'ssh')
-  const displayTitle = config.name || `${config.user}@${config.host}`
-  panel.title = displayTitle
-  const tab = tabStore.createTerminalTab(displayTitle, panel.id)
-  panelStore.movePanelToTab(panel.id, tab.id)
 
+  // Create session BEFORE panel so the terminal has a sessionId when it first
+  // fires SessionResize. Otherwise the resize is silently dropped because the
+  // terminal calls getSessionId() too early and never retries.
+  let sessionId = ''
   try {
     const info = await CreateSession(config.type, config)
-    panelStore.bindSession(panel.id, info.id)
-    sessionStore.initSession(info.id)
+    sessionId = info.id
   } catch (e) {
     console.error('Failed to create session:', e)
-    tabStore.closeTab(tab.id)
-    panelStore.removePanel(panel.id)
+    return
   }
+
+  const panel = panelStore.createPanel(config, config.type)
+  const displayTitle = config.name || (config.type === 'telnet'
+    ? `${config.host}:${config.port}`
+    : `${config.user}@${config.host}`)
+  panel.title = displayTitle
+  panelStore.bindSession(panel.id, sessionId)
+  sessionStore.initSession(sessionId)
+  const tab = tabStore.createTerminalTab(displayTitle, panel.id)
+  panelStore.movePanelToTab(panel.id, tab.id)
 }
 
 function getShellLabel(path: string): string {

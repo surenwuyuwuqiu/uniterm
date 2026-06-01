@@ -378,6 +378,8 @@ const messages: Record<Locale, Record<string, string>> = {
 
     // Monitor
     'sidebar.connectMonitor': '服务器监控',
+    'sidebar.connectTelnet': '连接 Telnet',
+    'sidebar.connectMosh': '连接 Mosh',
     'monitor.performance': '性能',
     'monitor.processes': '进程',
     'monitor.system': '系统信息',
@@ -932,6 +934,8 @@ const messages: Record<Locale, Record<string, string>> = {
 
     // Monitor
     'sidebar.connectMonitor': 'Server Monitor',
+    'sidebar.connectTelnet': 'Connect Telnet',
+    'sidebar.connectMosh': 'Connect Mosh',
     'monitor.performance': 'Performance',
     'monitor.processes': 'Processes',
     'monitor.system': 'System Info',

@@ -37,10 +37,11 @@ type App struct {
 	originalWndProc     uintptr
 	wndProcCb           uintptr // keep alive to prevent GC
 	inSizeMove          bool
+	webviewDataPath     string
 }
 
-func NewApp() *App {
-	return &App{}
+func NewApp(webviewDataPath string) *App {
+	return &App{webviewDataPath: webviewDataPath}
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -117,6 +118,7 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.sessionManager != nil {
 		a.sessionManager.CloseAll()
 	}
+	os.RemoveAll(a.webviewDataPath)
 }
 
 // ConnectionStore methods

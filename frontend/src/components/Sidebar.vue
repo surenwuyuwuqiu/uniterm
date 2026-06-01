@@ -169,7 +169,7 @@
       :style="menuStyle"
       @click.stop
     >
-      <div v-if="selectedConn && selectedConn.type === 'ssh'" class="menu-item" @click="doConnect">{{ connectLabel }}</div>
+      <div v-if="selectedConn && (selectedConn.type === 'ssh' || selectedConn.type === 'telnet' || selectedConn.type === 'mosh')" class="menu-item" @click="doConnect">{{ connectLabel }}</div>
       <div v-if="selectedConn && selectedConn.type === 'ssh'" class="menu-item" @click="doConnectSFTP">{{ t('sidebar.connectSftp') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'ssh'" class="menu-item" @click="doConnectMonitor">{{ t('sidebar.connectMonitor') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
@@ -636,6 +636,8 @@ const menuVisible = ref(false)
 const menuStyle = ref({ left: '0px', top: '0px' })
 const selectedConn = ref<ConnectionConfig | null>(null)
 const connectLabel = computed(() => {
+  if (selectedConn.value?.type === 'telnet') return t('sidebar.connectTelnet')
+  if (selectedConn.value?.type === 'mosh') return t('sidebar.connectMosh')
   if (selectedConn.value?.type === 'ssh') return t('sidebar.connectSSH')
   return t('sidebar.connect')
 })

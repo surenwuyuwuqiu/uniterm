@@ -25,6 +25,8 @@
       <el-form-item :label="t('conn.type')">
         <el-radio-group v-model="form.type">
           <el-radio-button label="ssh">SSH</el-radio-button>
+          <el-radio-button label="telnet">Telnet</el-radio-button>
+          <el-radio-button label="mosh">Mosh</el-radio-button>
           <el-radio-button label="rdp" v-if="isWindows">RDP</el-radio-button>
           <el-radio-button label="vnc">VNC</el-radio-button>
           <el-radio-button label="database">{{ t('db.database') }}</el-radio-button>
@@ -46,16 +48,16 @@
       <el-form-item v-if="form.type !== 'vnc' && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.user')">
         <el-input v-model="form.user" :placeholder="t('conn.userPlaceholder')" />
       </el-form-item>
-      <el-form-item v-if="form.type === 'ssh'" :label="t('conn.authType')">
+      <el-form-item v-if="form.type === 'ssh' || form.type === 'mosh'" :label="t('conn.authType')">
         <el-radio-group v-model="form.authType">
           <el-radio-button label="password">{{ t('conn.password') }}</el-radio-button>
           <el-radio-button label="key">{{ t('conn.keyPath') }}</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      <el-form-item v-if="(form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc' || form.type === 'database') && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.password')">
+      <el-form-item v-if="(form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc' || form.type === 'database' || form.type === 'mosh' || form.type === 'telnet') && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.password')">
         <el-input v-model="form.password" type="password" show-password :key="passwordInputKey" />
       </el-form-item>
-      <el-form-item v-if="form.authType === 'key' && form.type === 'ssh'" :label="t('conn.keyPath')">
+      <el-form-item v-if="form.authType === 'key' && (form.type === 'ssh' || form.type === 'mosh')" :label="t('conn.keyPath')">
         <el-input v-model="form.keyPath" :placeholder="t('conn.keyPathPlaceholder')" />
       </el-form-item>
       <template v-if="form.type === 'rdp'">
@@ -76,7 +78,7 @@
       <el-form-item v-if="form.type === 'database' && form.dbType !== 'rqlite'" :label="t('db.databases')">
         <el-input v-model="form.dbName" :placeholder="t('db.databases')" />
       </el-form-item>
-      <el-form-item v-if="form.type === 'ssh'" :label="t('conn.postLoginScript')">
+      <el-form-item v-if="form.type === 'ssh' || form.type === 'telnet' || form.type === 'mosh'" :label="t('conn.postLoginScript')">
         <el-input
           v-model="form.postLoginScript"
           type="textarea"
@@ -219,6 +221,8 @@ watch(() => form.type, (newType) => {
   else if (newType === 'ssh' && form.port === 3389) form.port = 22
   else if (newType === 'vnc' && form.port === 22) form.port = 5900
   else if (newType === 'ssh' && form.port === 5900) form.port = 22
+  else if (newType === 'telnet') form.port = 23
+  else if (newType === 'mosh') form.port = 22
   else if (newType === 'database') form.port = 3306
   if (newType === 'rdp' || newType === 'vnc' || newType === 'database') {
     form.authType = 'password'

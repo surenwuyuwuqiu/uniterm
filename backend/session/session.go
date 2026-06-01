@@ -128,3 +128,16 @@ func (s *baseSession) GetPendingSize() (cols, rows int) {
 	defer s.mu.RUnlock()
 	return s.pendingCols, s.pendingRows
 }
+
+// getInitialSize returns the pending size if already set, otherwise the
+// supplied defaults. Use this for initial PTY / terminal allocation.
+func (s *baseSession) getInitialSize(defCols, defRows int) (int, int) {
+	cols, rows := s.GetPendingSize()
+	if cols <= 0 {
+		cols = defCols
+	}
+	if rows <= 0 {
+		rows = defRows
+	}
+	return cols, rows
+}

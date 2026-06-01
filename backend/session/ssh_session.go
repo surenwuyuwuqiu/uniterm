@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -46,27 +45,7 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 	s.setStatus(StatusConnecting)
 	s.title = fmt.Sprintf("%s@%s", config.User, config.Host)
 
-	authMethods := []ssh.AuthMethod{}
-
-	switch config.AuthType {
-	case "password":
-		authMethods = append(authMethods, ssh.Password(config.Password))
-	case "key":
-		key, err := os.ReadFile(config.KeyPath)
-		if err != nil {
-			s.setStatus(StatusError)
-			return fmt.Errorf("read key: %w", err)
-		}
-		signer, err := ssh.ParsePrivateKey(key)
-		if err != nil {
-			s.setStatus(StatusError)
-			return fmt.Errorf("parse key: %w", err)
-		}
-		authMethods = append(authMethods, ssh.PublicKeys(signer))
-	case "agent":
-		// Agent auth not yet implemented; fall back to password for now
-		authMethods = append(authMethods, ssh.Password(config.Password))
-	}
+	authMethods := makeSSHAuthMethods(config)
 
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	clientConfig := &ssh.ClientConfig{
@@ -107,7 +86,8 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 		ssh.TTY_OP_OSPEED: 14400,
 	}
 
-	if err := session.RequestPty("xterm-256color", 24, 80, modes); err != nil {
+	cols, rows := s.getInitialSize(80, 24)
+	if err := session.RequestPty("xterm-256color", rows, cols, modes); err != nil {
 		session.Close()
 		client.Close()
 		s.setStatus(StatusError)

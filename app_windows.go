@@ -21,12 +21,31 @@ const (
 )
 
 func (a *App) findMainWindow() uintptr {
-	title, _ := windows.UTF16PtrFromString("uniTerm")
-	hwnd, _, _ := windows.NewLazySystemDLL("user32.dll").NewProc("FindWindowW").Call(
-		0,
-		uintptr(unsafe.Pointer(title)),
-	)
-	return hwnd
+	pid := windows.GetCurrentProcessId()
+	var result uintptr
+
+	user32 := windows.NewLazySystemDLL("user32.dll")
+	procEnumWindows := user32.NewProc("EnumWindows")
+	procGetWindowThreadProcessId := user32.NewProc("GetWindowThreadProcessId")
+	procGetWindowTextW := user32.NewProc("GetWindowTextW")
+
+	cb := windows.NewCallback(func(hwnd windows.HWND, lParam uintptr) uintptr {
+		var wndPid uint32
+		procGetWindowThreadProcessId.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&wndPid)))
+		if wndPid != pid {
+			return 1 // continue
+		}
+		// Verify it has our window title so we don't pick up invisible helper windows.
+		buf := make([]uint16, 256)
+		procGetWindowTextW.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&buf[0])), 255)
+		if windows.UTF16ToString(buf) == "uniTerm" {
+			result = uintptr(hwnd)
+			return 0 // stop
+		}
+		return 1 // continue
+	})
+	procEnumWindows.Call(cb, 0)
+	return result
 }
 
 func (a *App) subclassMainWindow() {

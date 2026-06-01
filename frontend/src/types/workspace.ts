@@ -1,4 +1,4 @@
-export type PanelType = 'ssh' | 'sftp' | 'settings' | 'rdp' | 'vnc' | 'local' | 'database' | 'monitor' | 'other'
+export type PanelType = 'ssh' | 'telnet' | 'mosh' | 'sftp' | 'settings' | 'rdp' | 'vnc' | 'local' | 'database' | 'monitor' | 'other'
 export type PanelStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 import type { ConnectionConfig } from './session'

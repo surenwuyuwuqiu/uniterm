@@ -304,7 +304,7 @@ export function useSuggestions() {
       return
     }
     debounceTimer = setTimeout(async () => {
-      if (state.value.loading) return
+      if (state.value.loading || !token) return
       const historyItems = getHistorySuggestions(token)
       const items: SuggestionItem[] = [...historyItems]
       items.push({
@@ -343,6 +343,10 @@ export function useSuggestions() {
   }
 
   function close() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+    }
     state.value.visible = false
     state.value.items = []
     state.value.selectedIndex = -1

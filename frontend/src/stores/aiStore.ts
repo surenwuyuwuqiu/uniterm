@@ -163,7 +163,7 @@ export const useAIStore = defineStore('ai', () => {
   async function init() {
     await initConfig()
     const data = await loadSessionsFromBackend()
-    sessions.value = data.sessions
+    sessions.value = data.sessions.filter(s => s.messages.length > 0)
     // Always start with a fresh session after restart
     currentSessionId.value = null
     initialized.value = true
@@ -256,7 +256,11 @@ export const useAIStore = defineStore('ai', () => {
     sessions.value.unshift(session)
     currentSessionId.value = session.id
     messages.value = []
-    doSave()
+    // Trim to max 15 sessions
+    if (sessions.value.length > 15) {
+      sessions.value = sessions.value.slice(0, 15)
+    }
+    // Don't save empty sessions — only persist when first message is added
   }
 
   function switchSession(sessionId: string) {

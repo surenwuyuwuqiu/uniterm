@@ -62,6 +62,7 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
@@ -133,7 +134,7 @@ function getTerminalOptions() {
     cursorBlink: true,
     rightClickSelectsWord: false,
     scrollback: ts.maxHistoryLines || 2500,
-    allowProposedApi: false
+    allowProposedApi: true
   }
 }
 
@@ -267,6 +268,8 @@ onMounted(() => {
   terminal = new Terminal(getTerminalOptions())
   fitAddon = new FitAddon()
   terminal.loadAddon(fitAddon)
+  terminal.loadAddon(new Unicode11Addon())
+  try { terminal.unicode.activeVersion = '11' } catch (_) {}
 
   // Web links addon
   let hoverEl: HTMLDivElement | null = null
@@ -352,6 +355,11 @@ onMounted(() => {
     }, d))
   }
 
+  // Strip OSC sequences that xterm.js generates internally (color queries etc.)
+  function filterOSC(input: string): string {
+    return input.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+  }
+
   // Input handling
   terminal.onData((data) => {
     if (props.mode === 'ssh' || props.mode === 'local') {
@@ -397,6 +405,11 @@ onMounted(() => {
             suggestions.close()
             return
           }
+          // Don't show suggestions if line buffer was already cleared (e.g. Enter pressed)
+          if (!terminalInput.lineBuffer.value) {
+            suggestions.close()
+            return
+          }
           if (terminalInput.isAtLineEnd() && terminalInput.currentToken.value && !terminalInput.isPasswordMode()) {
             suggestions.updateSuggestions(terminalInput.currentToken.value)
           } else {
@@ -415,13 +428,13 @@ onMounted(() => {
             for (const pid of tab.panelIds) {
               const p = panelStore.getPanel(pid)
               if (p?.sessionId && (p.type === 'ssh' || p.type === 'local')) {
-                SessionWrite(p.sessionId, data)
+                SessionWrite(p.sessionId, filterOSC(data))
               }
             }
             return
           }
         }
-        SessionWrite(sid, data)
+        SessionWrite(sid, filterOSC(data))
       }
     } else {
       // SFTP line buffering

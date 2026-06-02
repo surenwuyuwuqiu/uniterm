@@ -43,14 +43,22 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
     try {
       const buffer = (terminal as any).buffer?.active
       if (!buffer) return null
-      const line = buffer.getLine(buffer.cursorY)
-      if (!line) return null
-      const lineText = line.translateToString().trim()
-      // Strip ANSI escape sequences before matching
-      const cleanText = stripAnsi(lineText)
-      // Match prompt followed by command; use (?:\s+|$) so empty commands after prompt are handled too
-      const match = cleanText.match(/(.+?[$#>\]])(?:\s+|$)(.*)/)
-      if (match) {
+      const PROMPT_RE = /(.+?[$#>\]])(?:\s+|$)(.*)/
+      // Scan entire visible area from bottom to top to find the prompt
+      const rows = (terminal as any).rows || 24
+      for (let dy = 0; dy < rows; dy++) {
+        const y = buffer.baseY + rows - 1 - dy
+        if (y < 0) break
+        const line = buffer.getLine(y)
+        if (!line) continue
+        const rawText = line.translateToString().trim()
+        if (!rawText) continue
+        const cleanText = stripAnsi(rawText)
+        const match = cleanText.match(PROMPT_RE)
+        if (!match) continue
+        const promptPart = match[1]
+        if (!promptPart.includes('@') && !promptPart.includes('~') &&
+            promptPart !== '$' && promptPart !== '#') continue
         const command = match[2].trim()
         if (command && !command.includes('__AI_DONE_') && command.length <= MAX_COMMAND_LENGTH) {
           return command
@@ -123,12 +131,10 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
       const code = data.charCodeAt(i)
       if (char === '\r' || char === '\n') {
         // Save command to history before clearing.
-        // Skip if we detected hidden input (password mode — cursor didn't advance).
+        // Always prefer terminal buffer (has server echo + tab completion),
+        // only fall back to local lineBuffer if terminal buffer is unreadable.
         if (options.enableHistory !== false && !isPasswordPrompt) {
-          let command = getCurrentCommandFromTerminal()
-          if (!command) {
-            command = lineBuffer.value.trim()
-          }
+          const command = getCurrentCommandFromTerminal()
           if (command && options.onHistoryExtract) {
             options.onHistoryExtract(command)
           }

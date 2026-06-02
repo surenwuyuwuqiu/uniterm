@@ -11,7 +11,6 @@
 - **improve** Smart completion UX fixes: popup flips above/below intelligently to avoid covering input; mouse hover only activates after movement to prevent accidental selection; password (hidden) input is not saved to history and does not trigger suggestions.
 - **improve** Terminal tabs restyled as buttons with accent border + background for active state, AI lock + active effects combined.
 - **improve** AI sidebar defaults to new session on restart; empty sessions are not saved; max 15 sessions retained.
-- **bugfix** Fixed Mosh terminal character ghosting and garbled cat output. Transport layer enforces strict sequential chaining (oldNum == ackNum) and rejects stale cumulative diffs.
 - **bugfix** Fixed terminal history capture logic. Scans visible buffer area (bottom to top) instead of relying on cursorY, which is unreliable after buffer scrolling.
 - **bugfix** Fixed race condition where suggestion popup remained open after Enter (debounce timer cancellation + empty token check).
 

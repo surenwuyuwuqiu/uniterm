@@ -16,6 +16,7 @@ type TerminalSettings struct {
 	RightClickAction  string `json:"rightClickAction"`
 	MaxHistoryLines   int    `json:"maxHistoryLines"`
 	SmartCompletion   *bool  `json:"smartCompletion"`
+		HighlightEnabled  *bool  `json:"highlightEnabled"`
 }
 
 // AIConfig is the legacy flat AI config type, kept for Wails binding compatibility.

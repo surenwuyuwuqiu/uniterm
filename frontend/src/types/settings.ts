@@ -10,6 +10,7 @@ export interface TerminalSettings {
   rightClickAction: 'menu' | 'paste'
   maxHistoryLines: number
   smartCompletion: boolean
+  highlightEnabled: boolean
 }
 
 export interface AIModelConfig {
@@ -42,7 +43,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     selectionAction: 'none',
     rightClickAction: 'menu',
     maxHistoryLines: 2500,
-    smartCompletion: true
+    smartCompletion: true,
+    highlightEnabled: true
   },
   ai: {
     models: [

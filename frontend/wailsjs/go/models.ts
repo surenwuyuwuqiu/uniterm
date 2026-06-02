@@ -682,6 +682,7 @@ export namespace store {
 	    rightClickAction: string;
 	    maxHistoryLines: number;
 	    smartCompletion?: boolean;
+	    highlightEnabled?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new TerminalSettings(source);
@@ -696,6 +697,7 @@ export namespace store {
 	        this.rightClickAction = source["rightClickAction"];
 	        this.maxHistoryLines = source["maxHistoryLines"];
 	        this.smartCompletion = source["smartCompletion"];
+	        this.highlightEnabled = source["highlightEnabled"];
 	    }
 	}
 	export class AppSettings {

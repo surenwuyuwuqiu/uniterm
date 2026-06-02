@@ -68,6 +68,7 @@ import '@xterm/xterm/css/xterm.css'
 import { SessionWrite, SessionResize } from '../../wailsjs/go/main/App'
 import { EventsOn, BrowserOpenURL } from '../../wailsjs/runtime'
 import { useSettingsStore } from '../stores/settingsStore'
+import { highlight } from '../composables/useHighlight'
 import { useSessionStore } from '../stores/sessionStore'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
@@ -489,7 +490,8 @@ onMounted(() => {
           suggestions.close()
         }
       }
-      terminal.write(payload.data)
+      const hlOn = settingsStore.settings.terminal.highlightEnabled ?? true
+      terminal.write(hlOn ? highlight(payload.data) : payload.data)
       if (props.mode === 'ssh' && props.onSessionStatus) {
         // onSessionData is handled by the consumer via EventsOn if needed
       }

@@ -158,6 +158,16 @@
             </div>
           </div>
 
+          <div class="setting-card">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.highlight') }}</div>
+              <div class="setting-desc">{{ t('settings.highlightDesc') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-switch :model-value="settingsStore.settings.terminal.highlightEnabled ?? true" @update:model-value="(v: boolean) => { settingsStore.settings.terminal.highlightEnabled = v; settingsStore.save() }" />
+            </div>
+          </div>
+
         </div>
       </div>
 

@@ -21,6 +21,7 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
   const cursorPixelPos = ref<CursorPosition>({ x: 0, y: 0 })
 
   let inAlternateScreen = false
+  let isPasswordPrompt = false
   let cursorPosTimer: ReturnType<typeof setTimeout> | null = null
 
   function stripAnsi(str: string): string {
@@ -70,6 +71,8 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
     currentToken.value = beforeCursor.trim()
   }
 
+  let lastTerminalCursorX = -1
+
   function updateCursorPosition() {
     if (!terminal) {
       cursorPixelPos.value = { x: 0, y: 0 }
@@ -88,9 +91,17 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
         const cellWidth = dims.css.cell.width || 9
         const cellHeight = dims.css.cell.height || 17
         const x = cursorX * cellWidth
-        const belowY = (cursorY + 1) * cellHeight + 16
+        const belowY = (cursorY + 1) * cellHeight
         cursorPixelPos.value = { x, y: belowY }
       }
+      // Detect hidden input: local lineBuffer grew but terminal cursor
+      // didn't advance → echo is off (password mode)
+      if (lineBuffer.value.length > 0 && cursorX === lastTerminalCursorX && cursorX >= 0) {
+        isPasswordPrompt = true
+      } else if (cursorX !== lastTerminalCursorX) {
+        isPasswordPrompt = false
+      }
+      lastTerminalCursorX = cursorX
     } catch {
       const el = terminal.element
       if (el) {
@@ -112,8 +123,8 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
       const code = data.charCodeAt(i)
       if (char === '\r' || char === '\n') {
         // Save command to history before clearing.
-        // Prefer terminal buffer (includes tab completion), fallback to lineBuffer.
-        if (options.enableHistory !== false) {
+        // Skip if we detected hidden input (password mode — cursor didn't advance).
+        if (options.enableHistory !== false && !isPasswordPrompt) {
           let command = getCurrentCommandFromTerminal()
           if (!command) {
             command = lineBuffer.value.trim()
@@ -121,6 +132,9 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
           if (command && options.onHistoryExtract) {
             options.onHistoryExtract(command)
           }
+        }
+        if (isPasswordPrompt) {
+          isPasswordPrompt = false
         }
         lineBuffer.value = ''
         cursorIndex.value = 0
@@ -224,6 +238,10 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
     return inAlternateScreen
   }
 
+  function isPasswordMode(): boolean {
+    return isPasswordPrompt
+  }
+
   return {
     lineBuffer,
     cursorIndex,
@@ -234,5 +252,6 @@ export function useTerminalInput(terminal: Terminal | null, options: UseTerminal
     handleSessionData,
     clearBuffer,
     isInAlternateScreen,
+    isPasswordMode,
   }
 }

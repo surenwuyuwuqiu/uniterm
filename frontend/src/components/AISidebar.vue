@@ -689,6 +689,11 @@ onUnmounted(() => {
 }
 .textarea-wrap :deep(.el-textarea__inner) {
   padding-bottom: 36px;
+  font-size: 13px;
+}
+.textarea-wrap :deep(.el-textarea__inner::placeholder) {
+  font-size: 13px;
+  color: var(--text-muted);
 }
 .input-actions {
   position: absolute;

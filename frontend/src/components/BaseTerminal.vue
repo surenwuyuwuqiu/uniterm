@@ -132,7 +132,7 @@ function getTerminalOptions() {
     cursorBlink: true,
     rightClickSelectsWord: false,
     scrollback: ts.maxHistoryLines || 2500,
-    allowProposedApi: true
+    allowProposedApi: false
   }
 }
 
@@ -396,7 +396,7 @@ onMounted(() => {
             suggestions.close()
             return
           }
-          if (terminalInput.isAtLineEnd() && terminalInput.currentToken.value) {
+          if (terminalInput.isAtLineEnd() && terminalInput.currentToken.value && !terminalInput.isPasswordMode()) {
             suggestions.updateSuggestions(terminalInput.currentToken.value)
           } else {
             suggestions.close()

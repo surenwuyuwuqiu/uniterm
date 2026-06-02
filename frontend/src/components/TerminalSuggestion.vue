@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { SuggestionItem } from '../composables/useSuggestions'
 
 const props = defineProps<{
@@ -63,6 +63,23 @@ const emit = defineEmits<{
 }>()
 
 const adjustedY = ref(0)
+const mouseMoved = ref(false)
+
+watch(() => props.visible, (v) => {
+  if (v) mouseMoved.value = false
+})
+
+function onGlobalMouseMove() {
+  mouseMoved.value = true
+}
+
+onMounted(() => {
+  document.addEventListener('mousemove', onGlobalMouseMove)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', onGlobalMouseMove)
+})
 
 const popupStyle = computed(() => ({
   left: `${props.cursorX}px`,
@@ -83,11 +100,28 @@ function adjustPosition() {
     if (!popupEl || !terminalEl) return
     const popupRect = popupEl.getBoundingClientRect()
     const terminalRect = terminalEl.getBoundingClientRect()
-    const overflow = popupRect.bottom - terminalRect.bottom
-    if (overflow > 0) {
-      adjustedY.value = -(overflow + 16)
+    const cursorScreenY = terminalRect.top + props.cursorY
+
+    // Space below cursor line (within terminal area)
+    const spaceBelow = terminalRect.bottom - cursorScreenY - 8
+    // Space above cursor line
+    const spaceAbove = cursorScreenY - terminalRect.top - 8
+
+    // cursorY = (buffer.y + 1) * cellHeight (bottom edge of cursor line)
+    const cellHeight = 17
+    if (spaceBelow >= popupRect.height + 4) {
+      // Enough room below — show below cursor line with 4px gap
+      adjustedY.value = 4
+    } else if (spaceAbove >= popupRect.height + 4) {
+      // Not enough below — show above cursor line.
+      // Popup bottom must be above cursor top (cursorY - cellHeight).
+      // adjustedY = cursorTop - gap - popupHeight - cursorY
+      //            = (cursorY - cellHeight) - 4 - popupHeight - cursorY
+      //            = -(cellHeight + 4 + popupHeight)
+      adjustedY.value = -(cellHeight + 4 + popupRect.height)
     } else {
-      adjustedY.value = 0
+      // Neither direction has full room — show below and push up to fit
+      adjustedY.value = -(popupRect.height - spaceBelow + 4)
     }
   })
 }
@@ -152,6 +186,7 @@ function onSelect(index: number) {
 }
 
 function onHover(index: number) {
+  if (!mouseMoved.value) return
   emit('hover', index)
 }
 

@@ -23,21 +23,33 @@
         </el-select>
       </el-form-item>
       <el-form-item :label="t('conn.type')">
-        <el-radio-group v-model="form.type">
-          <el-radio-button label="ssh">SSH</el-radio-button>
-          <el-radio-button label="telnet">Telnet</el-radio-button>
-          <el-radio-button label="mosh">Mosh</el-radio-button>
-          <el-radio-button label="rdp" v-if="isWindows">RDP</el-radio-button>
-          <el-radio-button label="vnc">VNC</el-radio-button>
-          <el-radio-button label="database">{{ t('db.database') }}</el-radio-button>
+        <el-radio-group :model-value="category" @change="onCategoryChange">
+          <el-radio-button value="terminal">{{ t('conn.categoryTerminal') }}</el-radio-button>
+          <el-radio-button value="remote">{{ t('conn.categoryRemote') }}</el-radio-button>
+          <el-radio-button value="database">{{ t('db.database') }}</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      <el-form-item v-if="form.type === 'database'" :label="t('db.dbType')">
-        <el-select v-model="form.dbType" :placeholder="t('db.dbType')">
-          <el-option label="MySQL" value="mysql" />
-          <el-option label="PostgreSQL" value="postgres" />
-          <el-option label="rqlite" value="rqlite" />
-        </el-select>
+      <el-form-item v-if="category" label="">
+        <template v-if="category === 'terminal'">
+          <el-radio-group v-model="form.type">
+            <el-radio-button label="ssh">SSH</el-radio-button>
+            <el-radio-button label="telnet">Telnet</el-radio-button>
+            <el-radio-button label="mosh">Mosh</el-radio-button>
+          </el-radio-group>
+        </template>
+        <template v-if="category === 'remote'">
+          <el-radio-group v-model="form.type">
+            <el-radio-button label="rdp" v-if="isWindows">RDP</el-radio-button>
+            <el-radio-button label="vnc">VNC</el-radio-button>
+          </el-radio-group>
+        </template>
+        <template v-if="category === 'database'">
+          <el-radio-group v-model="form.dbType">
+            <el-radio-button label="mysql">MySQL</el-radio-button>
+            <el-radio-button label="postgres">PostgreSQL</el-radio-button>
+            <el-radio-button label="rqlite">rqlite</el-radio-button>
+          </el-radio-group>
+        </template>
       </el-form-item>
       <el-form-item :label="t('conn.host')" required>
         <el-input v-model="form.host" :placeholder="t('conn.hostPlaceholder')" />
@@ -154,6 +166,30 @@ watch(visible, (val) => {
 
 const isEdit = computed(() => !!props.editConfig?.id)
 
+const TERMINAL_TYPES = ['ssh', 'telnet', 'mosh']
+const REMOTE_TYPES = ['rdp', 'vnc']
+
+const category = computed(() => {
+  if (TERMINAL_TYPES.includes(form.type)) return 'terminal'
+  if (REMOTE_TYPES.includes(form.type)) return 'remote'
+  if (form.type === 'database') return 'database'
+  return 'terminal'
+})
+
+function onCategoryChange(cat: string) {
+  if (cat === 'terminal') {
+    form.type = 'ssh'
+    if (!isEdit.value) form.port = 22
+  } else if (cat === 'remote') {
+    form.type = isWindows.value ? 'rdp' : 'vnc'
+    if (!isEdit.value) form.port = isWindows.value ? 3389 : 5900
+  } else if (cat === 'database') {
+    form.type = 'database'
+    form.dbType = form.dbType || 'mysql'
+    if (!isEdit.value) form.port = 3306
+  }
+}
+
 const form = reactive<ConnectionConfig>({
   id: '',
   name: '',
@@ -215,16 +251,15 @@ watch(() => props.defaultGroupId, (gid) => {
 })
 
 // Auto-switch default port when changing type
-watch(() => form.type, (newType) => {
+watch(() => form.type, (newType, oldType) => {
   if (isEdit.value) return
-  if (newType === 'rdp' && form.port === 22) form.port = 3389
-  else if (newType === 'ssh' && form.port === 3389) form.port = 22
-  else if (newType === 'vnc' && form.port === 22) form.port = 5900
-  else if (newType === 'ssh' && form.port === 5900) form.port = 22
+  if (newType === 'rdp' && !REMOTE_TYPES.includes(oldType || '')) form.port = 3389
+  else if (newType === 'vnc' && !REMOTE_TYPES.includes(oldType || '')) form.port = 5900
+  else if (newType === 'ssh') form.port = 22
   else if (newType === 'telnet') form.port = 23
   else if (newType === 'mosh') form.port = 22
   else if (newType === 'database') form.port = 3306
-  if (newType === 'rdp' || newType === 'vnc' || newType === 'database') {
+  if (REMOTE_TYPES.includes(newType) || newType === 'database') {
     form.authType = 'password'
   }
 })

@@ -1,5 +1,20 @@
 # 更新日志
 
+## v2026.06.02-alpha
+
+- **new** Telnet 和 Mosh 连接协议支持。Telnet 提供 IAC 协商（二进制模式、终端类型、窗口大小）；Mosh 基于 UDP 的 SSP 协议实现低延迟移动连接。
+- **new** 终端文本高亮。自动高亮终端输出中的时间戳、IP 地址、URL、文件路径、关键词（ERROR/WARN/INFO）、引号字符串、数字、括号等符号。设置中可开关，含 ESC 的行自动跳过避免干扰 TUI 应用。
+- **new** xterm.js Unicode11 插件，正确渲染 emoji 等宽字符（如 k9s 小狗图标）。
+- **improve** 标签栏与标题栏合并为一行，节省约 40px 垂直空间。按钮全部图标化，新建连接与本地终端合并为 `+` 下拉，窗口控制按钮风格统一。
+- **improve** 新建/编辑连接界面重构为两级分类结构（终端 / 远程桌面 / 数据库），子级用 radio-button toggle 切换协议。
+- **improve** 全界面控件风格统一：高 28px、字号 12px、圆角统一、边框和底色一致，涵盖 el-input、el-button、el-select、el-radio-button、el-switch、el-checkbox 等。
+- **improve** 智能提示 UX 修复：提示框智能上下翻转避免遮挡输入行；鼠标静止时不会误选中提示项；密码隐藏输入不记入历史、不弹出提示。
+- **improve** 终端标签改为按钮风格，活跃态有 accent 边框 + 底色，AI 锁定与选中效果叠加。
+- **improve** AI 侧边栏默认新建会话，空会话不保存，最多保留 15 个会话。
+- **bugfix** 修复 Mosh 终端字符重影和 cat 大文本乱码问题。传输层严格顺序链验证（oldNum == ackNum），拒绝过期累积 diff。
+- **bugfix** 修复终端历史记录读取逻辑。从可视区域末行扫描替代 cursorY，解决 buffer 滚动后无法读取 prompt 行命令的问题。
+- **bugfix** 修复提示框 Enter 后未关闭的竞态条件（debounce 计时器取消 + 空 token 检查）。
+
 ## v2026.05.29-alpha
 
 - **new** 终端智能补全。SSH 终端输入时实时弹出历史命令和 AI 转写建议。设置页面新增历史命令管理栏目，支持搜索、全选、批量删除。

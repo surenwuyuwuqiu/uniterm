@@ -82,3 +82,5 @@ require (
 	golang.org/x/tools v0.43.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
+
+replace github.com/unixshells/mosh-go v0.5.2 => ./backend/mosh-go-local

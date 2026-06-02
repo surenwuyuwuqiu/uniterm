@@ -13,6 +13,8 @@
 - **improve** AI sidebar defaults to new session on restart; empty sessions are not saved; max 15 sessions retained.
 - **bugfix** Fixed terminal history capture logic. Scans visible buffer area (bottom to top) instead of relying on cursorY, which is unreliable after buffer scrolling.
 - **bugfix** Fixed race condition where suggestion popup remained open after Enter (debounce timer cancellation + empty token check).
+- **bugfix** Fixed WebView2 conflict causing input failure when opening multiple processes on Windows 11. UserDataFolder now uses a per-process PID-isolated path.
+- **bugfix** Fixed garbled text on tab switch. xterm.js OSC color queries sent via onData were echoed back by the server as scrambled text; added OSC filtering to resolve.
 
 ## v2026.05.29-alpha
 

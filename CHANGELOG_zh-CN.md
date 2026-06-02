@@ -13,6 +13,8 @@
 - **improve** AI 侧边栏默认新建会话，空会话不保存，最多保留 15 个会话。
 - **bugfix** 修复终端历史记录读取逻辑。从可视区域末行扫描替代 cursorY，解决 buffer 滚动后无法读取 prompt 行命令的问题。
 - **bugfix** 修复提示框 Enter 后未关闭的竞态条件（debounce 计时器取消 + 空 token 检查）。
+- **bugfix** 修复 Windows 11 多进程 WebView2 冲突导致无法输入。UserDataFolder 改用进程 PID 隔离路径。
+- **bugfix** 修复 Tab 切换时终端出现乱码。xterm.js allowProposedApi 开启后 OSC 颜色查询经 onData 被发往服务端回显为乱码，增加 OSC 过滤解决。
 
 ## v2026.05.29-alpha
 

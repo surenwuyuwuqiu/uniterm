@@ -51,6 +51,9 @@ func (sm *SessionManager) Create(sessionType string, config ConnectionConfig) (S
 		case "mosh":
 			s = NewMoshSession(config.ID)
 
+		case "spice":
+			s = NewSPICESession(config.ID)
+
 	default:
 		return nil, fmt.Errorf("unsupported session type: %s", sessionType)
 	}

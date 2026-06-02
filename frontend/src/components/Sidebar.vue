@@ -171,6 +171,7 @@
       <div v-if="selectedConn && selectedConn.type === 'ssh'" class="menu-item" @click="doConnectMonitor">{{ t('sidebar.connectMonitor') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'rdp'" class="menu-item" @click="doConnectRDP">{{ t('sidebar.connectRDP') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'vnc'" class="menu-item" @click="doConnectVNC">{{ t('sidebar.connectVNC') }}</div>
+      <div v-if="selectedConn && selectedConn.type === 'spice'" class="menu-item" @click="doConnectSPICE">{{ t('sidebar.connectSPICE') }}</div>
       <div v-if="selectedConn && selectedConn.type === 'database'" class="menu-item" @click="doConnectDB">{{ t('db.connectDB') }}</div>
       <div class="menu-divider" />
       <div class="menu-item" :class="{ disabled: selectedIds.size > 1 }" @click="selectedIds.size <= 1 && doEdit()">{{ t('sidebar.edit') }}</div>
@@ -310,7 +311,7 @@ import type { ConnectionConfig, ConnectionGroup } from '../types/session'
 defineProps<{
   visible: boolean
 }>()
-const emit = defineEmits(['connect', 'connectSftp', 'connectRdp', 'connectVnc', 'connectDB', 'connectMonitor', 'toggle'])
+const emit = defineEmits(['connect', 'connectSftp', 'connectRdp', 'connectVnc', 'connectSpice', 'connectDB', 'connectMonitor', 'toggle'])
 const connectionStore = useConnectionStore()
 const { t } = useI18n()
 const showForm = ref(false)
@@ -609,6 +610,8 @@ function onItemDblClick(conn: ConnectionConfig) {
     emit('connectRdp', conn)
   } else if (conn.type === 'vnc') {
     emit('connectVnc', conn)
+  } else if (conn.type === 'spice') {
+    emit('connectSpice', conn)
   } else {
     emit('connect', conn)
   }
@@ -721,6 +724,16 @@ function doConnectVNC() {
   closeMenu()
   for (const c of conns) {
     emit('connectVnc', c)
+  }
+}
+
+function doConnectSPICE() {
+  const ids = getSelectedConnectionIds()
+  const conns = ids.map(id => connectionStore.connections.find(c => c.id === id)).filter(Boolean) as ConnectionConfig[]
+  selectedIds.value = new Set()
+  closeMenu()
+  for (const c of conns) {
+    emit('connectSpice', c)
   }
 }
 

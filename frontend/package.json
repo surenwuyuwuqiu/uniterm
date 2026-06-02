@@ -20,6 +20,7 @@
     "element-plus": "^2.5.0",
     "lz-string": "^1.5.0",
     "pinia": "^2.1.7",
+    "spice-client": "^1.2.0",
     "vue": "^3.4.0"
   },
   "devDependencies": {

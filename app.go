@@ -455,9 +455,12 @@ func (a *App) CreateSession(sessionType string, config session.ConnectionConfig)
 				payload["clientW"] = cw
 				payload["clientH"] = ch
 			}
-			// NEW: Attach proxyAddr for VNC sessions
+			// Attach proxyAddr for VNC and SPICE sessions
 			if vnc, ok := s.(*session.VNCSession); ok {
 				payload["proxyAddr"] = vnc.ProxyAddr()
+			}
+			if spice, ok := s.(*session.SPICESession); ok {
+				payload["proxyAddr"] = spice.ProxyAddr()
 			}
 		}
 		runtime.EventsEmit(a.ctx, "session:status", payload)

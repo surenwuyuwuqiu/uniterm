@@ -230,28 +230,45 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 8px 16px;
+  padding: 4px 12px;
+  margin: 0 1px;
   cursor: pointer;
   user-select: none;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm);
   position: relative;
+  color: var(--text-secondary);
+  font-size: 12px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  --wails-draggable: no-drag;
+}
+.tab-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 .tab-item.active {
-  border-bottom-color: var(--accent);
-  background: var(--bg-surface);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--accent-dim);
 }
 .tab-item.ai-locked {
-  box-shadow: inset 3px 0 0 var(--warning, #f59e0b);
+  box-shadow: inset 2px 0 0 var(--warning, #f59e0b);
+}
+.tab-item.active.ai-locked {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--accent-dim), inset 2px 0 0 var(--warning, #f59e0b);
 }
 .tab-name {
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-right: 6px;
+  margin-right: 4px;
+  font-weight: 500;
 }
 .tab-type-icon {
   flex-shrink: 0;
@@ -267,7 +284,7 @@ onUnmounted(() => {
   line-height: 1;
 }
 .tab-name-input {
-  font-size: 13px;
+  font-size: 12px;
   font-family: inherit;
   color: var(--text-primary);
   background: var(--bg-base);

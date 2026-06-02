@@ -2,16 +2,17 @@
   <div class="app-container">
     <AppHeader
       @new-connection="showConnectionForm = true"
-      @new-local-terminal="createLocalTerminal"
       @new-local-terminal-with-shell="createLocalTerminalWithShell"
       @toggle-ai="aiStore.toggle"
       @toggle-sidebar="sidebarVisible = !sidebarVisible"
       @open-settings="openSettings"
+      @close-tab="closeTab"
+      @toggle-ai-lock="onToggleAiLock"
+      @tab-dragstart="onTabDragStart"
     />
     <div class="main-content">
       <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" @connect-d-b="onConnectDB" @connect-monitor="onConnectMonitor" />
       <div class="tab-area">
-        <TabBar />
         <template v-if="activeTab">
           <KeepAlive :include="['DBTabContent', 'MonitorTabContent']">
             <TerminalTabContent
@@ -87,7 +88,6 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import Sidebar from './components/Sidebar.vue'
-import TabBar from './components/TabBar.vue'
 import TerminalTabContent from './components/TerminalTabContent.vue'
 import SettingsTabContent from './components/SettingsTabContent.vue'
 import WorkspaceContent from './components/WorkspaceContent.vue'
@@ -424,6 +424,18 @@ function getShellLabel(path: string): string {
 
 async function createLocalTerminalWithShell(shellPath: string) {
   await createLocalTerminal(shellPath)
+}
+
+function onToggleAiLock(panelId: string) {
+  if (tabStore.aiLockedPanelId === panelId) {
+    tabStore.setAILockedPanel(null)
+  } else {
+    tabStore.setAILockedPanel(panelId)
+  }
+}
+
+function onTabDragStart(_e: DragEvent, _tabId: string) {
+  // Data is set in TabItem / WorkspaceTabItem
 }
 
 async function createLocalTerminal(shellPath?: string) {

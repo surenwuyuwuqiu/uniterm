@@ -17,10 +17,10 @@
     <!-- Windows / Linux: square buttons on the right -->
     <template v-else>
       <button class="wc-btn win minimise" @click="$emit('minimise')" aria-label="最小化">
-        <svg viewBox="0 0 12 12" width="10" height="10"><path d="M1 5.5h10v1H1z"/></svg>
+        <svg viewBox="0 0 12 12" width="14" height="14"><path d="M1 5.5h10v1H1z"/></svg>
       </button>
       <button class="wc-btn win maximise" @click="$emit('maximise')" aria-label="最大化">
-        <svg v-if="isMaximised" viewBox="0 0 12 12" width="10" height="10">
+        <svg v-if="isMaximised" viewBox="0 0 12 12" width="14" height="14">
           <defs>
             <mask :id="restoreMaskId">
               <rect width="12" height="12" fill="white"/>
@@ -32,10 +32,10 @@
           <!-- 前方小矩形（左下），完整显示 -->
           <rect x="1" y="3.5" width="6.5" height="6.5" fill="none" stroke="currentColor" stroke-width="1"/>
         </svg>
-        <svg v-else viewBox="0 0 12 12" width="10" height="10"><rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+        <svg v-else viewBox="0 0 12 12" width="14" height="14"><rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>
       </button>
       <button class="wc-btn win close" @click="$emit('close')" aria-label="关闭">
-        <svg viewBox="0 0 12 12" width="10" height="10"><path d="M2 2l8 8M10 2L2 10" stroke="currentColor" stroke-width="1.2"/></svg>
+        <svg viewBox="0 0 12 12" width="14" height="14"><path d="M2 2l8 8M10 2L2 10" stroke="currentColor" stroke-width="1.2"/></svg>
       </button>
     </template>
   </div>
@@ -115,19 +115,19 @@ const restoreMaskId = `rm-${Math.random().toString(36).slice(2, 9)}`
   opacity: 1;
 }
 
-/* Windows/Linux buttons */
+/* Windows/Linux buttons — match header-btn style */
 .wc-btn.win {
-  width: 46px;
-  height: 32px;
-  border: none;
-  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 32px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   background: transparent;
   color: var(--text-secondary);
-  transition: background 0.1s ease, color 0.1s ease;
+  transition: all 0.15s ease;
 }
 
 .wc-btn.win:hover {

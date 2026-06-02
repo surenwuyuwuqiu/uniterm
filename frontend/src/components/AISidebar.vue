@@ -4,9 +4,6 @@
     <div class="ai-header">
       <span>{{ t('ai.title') }}</span>
       <div class="ai-actions">
-        <button class="ai-action-btn" @click="openGlobalSettings" :title="t('settings.ai')">
-          <el-icon><Settings :size="14" /></el-icon>
-        </button>
         <button class="ai-action-btn" @click="toggleMaximize" :title="isMaximized ? t('ai.restore') : t('ai.maximize')">
           <el-icon><Shrink v-if="isMaximized" :size="14" /><Expand v-else :size="14" /></el-icon>
         </button>
@@ -134,7 +131,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, computed, watch, onMounted, onUnmounted } from 'vue'
-import { Settings, X, ChevronDown, Plus, Trash2, Expand, Shrink } from '@lucide/vue'
+import { X, ChevronDown, Plus, Trash2, Expand, Shrink } from '@lucide/vue'
 import { useAIStore } from '../stores/aiStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useTabStore } from '../stores/tabStore'
@@ -389,24 +386,6 @@ async function onContinue() {
   scrollToBottom()
 }
 
-function openGlobalSettings() {
-  if (isMaximized.value) {
-    isMaximized.value = false
-    sidebarWidth.value = preMaxWidth.value
-    window.dispatchEvent(new CustomEvent('rdp:overlay-pop'))
-  }
-  const existingTab = tabStore.tabs.find(t => t.type === 'settings')
-  if (existingTab) {
-    tabStore.setActiveTab(existingTab.id)
-  } else {
-    const panel = panelStore.createPanel(null, 'settings')
-    panel.title = t('settings.title')
-    const tab = tabStore.createSettingsTab(t('settings.title'), panel.id)
-    panelStore.movePanelToTab(panel.id, tab.id)
-  }
-  settingsStore.openCategory = 'ai'
-}
-
 function onResizeStart(e: MouseEvent) {
   isResizing.value = true
   const el = sidebarEl.value
@@ -587,7 +566,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 10px;
+  height: 28px;
+  padding: 0 10px;
+  box-sizing: border-box;
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
   cursor: pointer;

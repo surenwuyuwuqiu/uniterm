@@ -9,9 +9,6 @@
     <div class="sidebar-header">
       <span class="header-label">{{ t('sidebar.title') }}</span>
       <div class="header-actions">
-        <button class="icon-btn" @click="openNewForm" :title="t('sidebar.newConnection')">
-          <el-icon><Plus :size="14" /></el-icon>
-        </button>
         <button class="icon-btn" @click="emit('toggle')" :title="t('sidebar.collapse')">
           <el-icon><X :size="14" /></el-icon>
         </button>
@@ -303,7 +300,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { Plus, X, ChevronRight, ChevronDown } from '@lucide/vue'
+import { X, ChevronRight, ChevronDown } from '@lucide/vue'
 import { ElMessageBox } from 'element-plus'
 import { useConnectionStore } from '../stores/connectionStore'
 import { useI18n } from '../i18n'

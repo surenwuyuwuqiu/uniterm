@@ -164,7 +164,8 @@ export const useAIStore = defineStore('ai', () => {
     await initConfig()
     const data = await loadSessionsFromBackend()
     sessions.value = data.sessions
-    currentSessionId.value = data.currentSessionId
+    // Always start with a fresh session after restart
+    currentSessionId.value = null
     initialized.value = true
 
     // Restore current session or create a new one

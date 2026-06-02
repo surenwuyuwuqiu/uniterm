@@ -3,91 +3,108 @@
     class="app-header"
     @dblclick="onDblClick"
   >
-    <div class="header-left">
-      <!-- macOS controls on the left -->
-      <WindowControls
-        v-if="platform === 'darwin'"
-        :platform="platform"
-        :is-maximised="isMaximised"
-        @minimise="onMinimise"
-        @maximise="onMaximise"
-        @close="onClose"
-      />
+    <!-- macOS: window controls left -->
+    <WindowControls
+      v-if="platform === 'darwin'"
+      :platform="platform"
+      :is-maximised="isMaximised"
+      @minimise="onMinimise"
+      @maximise="onMaximise"
+      @close="onClose"
+    />
 
-      <div class="left-actions">
-        <button class="header-btn secondary" @click="$emit('toggle-sidebar')">
-          <el-icon><Network :size="14" /></el-icon>
-          <span>{{ t('header.connections') }}</span>
-        </button>
-        <button class="header-btn secondary" @click="$emit('new-connection')">
-          <el-icon><Plus :size="14" /></el-icon>
-          <span>{{ t('header.newConnection') }}</span>
-        </button>
-        <el-dropdown
-          v-if="settingsStore.availableShells.length > 0"
-          trigger="click"
-          @command="(path: string) => $emit('new-local-terminal-with-shell', path)"
-          @visible-change="onShellDropdownVisibleChange"
-        >
-          <button class="header-btn secondary">
-            <el-icon><Laptop :size="14" /></el-icon>
-            <span>{{ t('header.newLocalTerminal') }}</span>
-            <el-icon><ChevronDown :size="14" /></el-icon>
-          </button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item
+    <!-- Connections button (icon only, leftmost) -->
+    <button class="header-btn" @click="emit('toggle-sidebar')" :title="t('header.connections')">
+      <el-icon><Network :size="14" /></el-icon>
+    </button>
+
+    <!-- New connection dropdown (+ icon, after connections) -->
+    <el-dropdown
+      v-if="settingsStore.availableShells.length > 0"
+      trigger="click"
+      @command="onNewCommand"
+      @visible-change="onShellDropdownVisibleChange"
+    >
+      <button class="header-btn" :title="t('header.newConnection')">
+        <el-icon><Plus :size="14" /></el-icon>
+      </button>
+      <template #dropdown>
+        <el-dropdown-menu>
+          <el-dropdown-item command="new-connection">{{ t('header.newConnection') }}</el-dropdown-item>
+          <div
+            v-if="settingsStore.availableShells.length > 0"
+            ref="submenuTriggerRef"
+            class="submenu-wrapper"
+            @mouseenter="onShellTriggerEnter"
+            @mouseleave="onShellTriggerLeave"
+          >
+            <el-dropdown-item class="submenu-trigger">
+              {{ t('header.newLocalTerminal') }} <el-icon class="submenu-arrow"><ChevronRight :size="12" /></el-icon>
+            </el-dropdown-item>
+          </div>
+          <Teleport to="body">
+            <div
+              v-show="showShellSubmenu"
+              class="shell-submenu"
+              :style="shellSubmenuStyle"
+              @mouseenter="showShellSubmenu = true"
+              @mouseleave="showShellSubmenu = false"
+            >
+              <div
                 v-for="sh in settingsStore.availableShells"
                 :key="sh"
-                :command="sh"
+                class="shell-item"
+                @click="onShellSelect(sh)"
               >
                 {{ getShellLabel(sh) }}
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <button v-else class="header-btn secondary" @click="$emit('new-local-terminal')">
-          <el-icon><Laptop :size="14" /></el-icon>
-          <span>{{ t('header.newLocalTerminal') }}</span>
-        </button>
-      </div>
-    </div>
+              </div>
+            </div>
+          </Teleport>
+        </el-dropdown-menu>
+      </template>
+    </el-dropdown>
+    <button v-else class="header-btn" @click="emit('new-connection')" :title="t('header.newConnection')">
+      <el-icon><Plus :size="14" /></el-icon>
+    </button>
 
-    <div class="header-title">
-      <span class="brand">uniTerm</span>
-    </div>
-
-    <div class="header-right">
-      <div class="right-actions">
-        <button class="header-btn secondary" @click="$emit('open-settings')">
-          <el-icon><Settings :size="14" /></el-icon>
-          <span>{{ t('header.settings') }}</span>
-        </button>
-        <button class="header-btn accent" @click="$emit('toggle-ai')">
-          <el-icon><MessageCircleMore :size="14" /></el-icon>
-          <span>{{ t('header.ai') }}</span>
-        </button>
-      </div>
-
-      <!-- Windows/Linux controls on the right -->
-      <WindowControls
-        v-if="platform !== 'darwin'"
-        :platform="platform"
-        :is-maximised="isMaximised"
-        @minimise="onMinimise"
-        @maximise="onMaximise"
-        @close="onClose"
+    <!-- Tabs list -->
+    <div class="header-tabs" :class="{ 'tabs-centered': platform === 'darwin' }">
+      <TabsList
+        @close-tab="(id: string) => emit('close-tab', id)"
+        @toggle-ai-lock="(panelId: string) => emit('toggle-ai-lock', panelId)"
+        @tab-dragstart="(e: DragEvent, tabId: string) => emit('tab-dragstart', e, tabId)"
       />
     </div>
+
+    <!-- AI button (icon only) -->
+    <button class="header-btn accent ai-btn" @click="emit('toggle-ai')" :title="t('header.ai')">
+      AI
+    </button>
+
+    <!-- Settings button (icon only, rightmost) -->
+    <button class="header-btn" @click="emit('open-settings')" :title="t('header.settings')">
+      <el-icon><Settings :size="14" /></el-icon>
+    </button>
+
+    <!-- Windows/Linux: window controls right -->
+    <WindowControls
+      v-if="platform !== 'darwin'"
+      :platform="platform"
+      :is-maximised="isMaximised"
+      @minimise="onMinimise"
+      @maximise="onMaximise"
+      @close="onClose"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { Plus, MessageCircleMore, Network, Settings, Laptop, ChevronDown } from '@lucide/vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { Plus, Network, Settings, ChevronRight } from '@lucide/vue'
 import { useI18n } from '../i18n'
 import { useSettingsStore } from '../stores/settingsStore'
 import WindowControls from './WindowControls.vue'
+import TabsList from './TabsList.vue'
 import {
   Environment,
   WindowMinimise,
@@ -99,7 +116,29 @@ import {
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
-defineEmits(['new-connection', 'new-local-terminal', 'new-local-terminal-with-shell', 'toggle-ai', 'toggle-sidebar', 'open-settings'])
+const emit = defineEmits<{
+  'new-connection': []
+  'new-local-terminal-with-shell': [path: string]
+  'toggle-ai': []
+  'toggle-sidebar': []
+  'open-settings': []
+  'close-tab': [id: string]
+  'toggle-ai-lock': [panelId: string]
+  'tab-dragstart': [e: DragEvent, tabId: string]
+}>()
+
+function onNewCommand(cmd: string) {
+  if (cmd === 'new-connection') {
+    emit('new-connection')
+  } else if (cmd.startsWith('shell:')) {
+    emit('new-local-terminal-with-shell', cmd.slice(6))
+  }
+}
+
+function onShellSelect(sh: string) {
+  showShellSubmenu.value = false
+  emit('new-local-terminal-with-shell', sh)
+}
 
 function getShellLabel(path: string): string {
   const lower = path.toLowerCase()
@@ -108,6 +147,28 @@ function getShellLabel(path: string): string {
   if (lower.includes('bash')) return 'Git Bash'
   if (lower.includes('cmd')) return 'Command Prompt'
   return path.split(/[\\/]/).pop() || path
+}
+
+const showShellSubmenu = ref(false)
+const submenuTriggerRef = ref<HTMLElement | null>(null)
+const shellSubmenuStyle = ref<Record<string, string>>({})
+
+function onShellTriggerEnter() {
+  showShellSubmenu.value = true
+  nextTick(() => {
+    const el = submenuTriggerRef.value
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    shellSubmenuStyle.value = {
+      position: 'fixed',
+      left: rect.right + 4 + 'px',
+      top: rect.top + 'px',
+    }
+  })
+}
+
+function onShellTriggerLeave() {
+  showShellSubmenu.value = false
 }
 
 const platform = ref<'windows' | 'darwin' | 'linux'>('windows')
@@ -127,7 +188,6 @@ function onMinimise() {
 
 async function onMaximise() {
   WindowToggleMaximise()
-  // Give Wails a tick to update state, then query
   setTimeout(updateMaximisedState, 100)
 }
 
@@ -144,7 +204,6 @@ function onShellDropdownVisibleChange(visible: boolean) {
 }
 
 function onDblClick(e: MouseEvent) {
-  // Double-click to maximise only on Windows/Linux, and only on non-button areas
   if (platform.value === 'darwin') return
   const target = e.target as HTMLElement
   if (target.closest('button') || target.closest('.window-controls')) return
@@ -176,11 +235,11 @@ onUnmounted(() => {
 
 <style scoped>
 .app-header {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
   height: 44px;
-  padding: 0 12px;
+  padding: 0 8px;
+  gap: 6px;
   background: var(--bg-elevated);
   flex-shrink: 0;
   position: relative;
@@ -188,7 +247,6 @@ onUnmounted(() => {
   --wails-draggable: drag;
 }
 
-/* Subtle bottom glow instead of border */
 .app-header::after {
   content: '';
   position: absolute;
@@ -206,46 +264,23 @@ onUnmounted(() => {
   );
 }
 
-.header-left {
+.header-tabs {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  justify-content: flex-start;
 }
 
-.header-right {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.left-actions,
-.right-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  --wails-draggable: no-drag;
-}
-
-.header-title {
-  pointer-events: none;
-  padding: 0 16px;
-}
-
-.brand {
-  font-family: var(--font-ui);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--text-primary);
-  text-transform: uppercase;
+.header-tabs.tabs-centered {
+  justify-content: center;
 }
 
 .header-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
+  justify-content: center;
+  padding: 5px 8px;
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
@@ -256,22 +291,13 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  flex-shrink: 0;
   --wails-draggable: no-drag;
 }
 
 .header-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
-}
-
-.header-btn.secondary {
-  background: var(--bg-surface);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
-}
-
-.header-btn.secondary:hover {
-  background: var(--bg-hover);
-  box-shadow: inset 0 0 0 1px var(--border-hover);
 }
 
 .header-btn.accent {
@@ -284,6 +310,13 @@ onUnmounted(() => {
   background: linear-gradient(135deg, var(--accent), var(--accent-dim));
   box-shadow: 0 0 0 1px var(--accent-glow), 0 4px 16px var(--accent-glow);
   transform: translateY(-1px);
+}
+
+.ai-btn {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  min-width: 28px;
 }
 
 .header-btn .el-icon {
@@ -301,8 +334,53 @@ onUnmounted(() => {
   );
 }
 
-/* Ensure WindowControls also has no-drag */
 .app-header :deep(.window-controls) {
   --wails-draggable: no-drag;
+}
+
+/* Allow submenu to overflow the dropdown menu */
+:deep(.el-dropdown-menu) {
+  overflow: visible !important;
+}
+:deep(.el-dropdown-menu__item) {
+  position: static;
+}
+:deep(.el-scrollbar),
+:deep(.el-scrollbar__wrap),
+:deep(.el-scrollbar__view) {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+.submenu-trigger {
+  justify-content: space-between;
+}
+.submenu-arrow {
+  margin-left: 16px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.shell-submenu {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+  min-width: 160px;
+  z-index: 10000;
+}
+
+.shell-item {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.shell-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 </style>

@@ -136,6 +136,7 @@ const lastClickedIndex = ref(-1)
 const contextMenuVisible = ref(false)
 const contextMenuStyle = ref({ left: '0px', top: '0px' })
 const menuType = ref<'file' | 'dir' | 'batch'>('file')
+const tableRef = ref<any>(null)
 
 const targetSide = computed(() => props.mode === 'local' ? t('sftp.remote') : t('sftp.local'))
 const sendToKey = computed(() => props.mode === 'local' ? 'sftp.sendToRemote' : 'sftp.sendToLocal')
@@ -419,9 +420,6 @@ function onDragStart(event: DragEvent, row: FileItem) {
 }
 
 /* Make table fill entire pane with consistent background */
-.sftp-file-list .el-table {
-  flex: 1;
-}
 .sftp-file-list .el-table__inner-wrapper {
   height: 100%;
 }

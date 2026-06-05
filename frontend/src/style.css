@@ -509,8 +509,12 @@ body::before {
   max-height: none !important;
 }
 .el-dropdown__popper .el-scrollbar__wrap,
-.el-dropdown__popper .el-scrollbar__view,
-.el-scrollbar__wrap--hidden-default {
+.el-dropdown__popper .el-scrollbar__view {
+  overflow: visible !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+.el-dropdown__popper .el-scrollbar__wrap--hidden-default {
   overflow: visible !important;
   max-height: none !important;
   overflow-y: visible !important;

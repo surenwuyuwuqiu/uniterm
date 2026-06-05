@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="popupRef"
     v-show="visible"
     class="terminal-suggestion-popup"
     :style="popupStyle"
@@ -62,7 +63,9 @@ const emit = defineEmits<{
   remove: [id: string]
 }>()
 
+const popupRef = ref<HTMLDivElement | null>(null)
 const adjustedY = ref(0)
+const screenPos = ref({ x: 0, y: 0 })
 const mouseMoved = ref(false)
 
 watch(() => props.visible, (v) => {
@@ -82,8 +85,9 @@ onUnmounted(() => {
 })
 
 const popupStyle = computed(() => ({
-  left: `${props.cursorX}px`,
-  top: `${props.cursorY + adjustedY.value}px`,
+  position: 'fixed' as const,
+  left: `${screenPos.value.x}px`,
+  top: `${screenPos.value.y}px`,
 }))
 
 const itemRefs = ref<Record<number, HTMLElement>>({})
@@ -92,14 +96,16 @@ const historyListRef = ref<HTMLDivElement | null>(null)
 function adjustPosition() {
   if (!props.visible) {
     adjustedY.value = 0
+    screenPos.value = { x: 0, y: 0 }
     return
   }
   nextTick(() => {
-    const popupEl = document.querySelector('.terminal-suggestion-popup') as HTMLElement | null
-    const terminalEl = document.querySelector('.terminal-area') as HTMLElement | null
+    const popupEl = popupRef.value
+    const terminalEl = popupEl?.closest('.base-terminal') as HTMLElement | null
     if (!popupEl || !terminalEl) return
     const popupRect = popupEl.getBoundingClientRect()
     const terminalRect = terminalEl.getBoundingClientRect()
+    const cursorScreenX = terminalRect.left + props.cursorX
     const cursorScreenY = terminalRect.top + props.cursorY
 
     // Space below cursor line (within terminal area)
@@ -123,12 +129,21 @@ function adjustPosition() {
       // Neither direction has full room — show below and push up to fit
       adjustedY.value = -(popupRect.height - spaceBelow + 4)
     }
+
+    // Update fixed-position screen coordinates
+    screenPos.value = {
+      x: cursorScreenX,
+      y: cursorScreenY + adjustedY.value,
+    }
   })
 }
 
 watch(() => props.visible, (visible) => {
   if (visible) adjustPosition()
-  else adjustedY.value = 0
+  else {
+    adjustedY.value = 0
+    screenPos.value = { x: 0, y: 0 }
+  }
 })
 
 watch(() => props.items, () => {
@@ -197,7 +212,7 @@ function onRemove(id: string) {
 
 <style scoped>
 .terminal-suggestion-popup {
-  position: absolute;
+  position: fixed;
   z-index: 100;
   min-width: 200px;
   max-width: 400px;

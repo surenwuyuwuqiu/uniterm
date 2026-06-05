@@ -479,7 +479,8 @@ onMounted(() => {
   // Close suggestion popup when clicking outside
   onDocumentMouseDown = (event: MouseEvent) => {
     if (!suggestions.isVisible()) return
-    const popupEl = document.querySelector('.terminal-suggestion-popup')
+    const baseTerminalEl = terminalRef.value?.parentElement
+    const popupEl = baseTerminalEl?.querySelector('.terminal-suggestion-popup')
     if (popupEl && !popupEl.contains(event.target as Node)) {
       suggestions.close()
     }

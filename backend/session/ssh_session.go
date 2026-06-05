@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	sshKeepAliveInterval = 30 * time.Second
+	sshKeepAliveInterval = 60 * time.Second
 	sshKeepAliveTimeout  = 10 * time.Second
-	sshKeepAliveMaxFail  = 2
+	sshKeepAliveMaxFail  = 3
 )
 
 type SSHSession struct {
@@ -243,7 +243,10 @@ func (s *SSHSession) startKeepAlive() {
 						done <- fmt.Errorf("panic: %v", r)
 					}
 				}()
-				_, _, err := s.client.SendRequest("keepalive@openssh.com", true, nil)
+				// Use session channel request instead of global request.
+				// OpenSSH handles keepalive@openssh.com on the session channel,
+				// and some middleboxes drop or mishandle global requests.
+				_, err := s.session.SendRequest("keepalive@openssh.com", true, nil)
 				done <- err
 			}()
 

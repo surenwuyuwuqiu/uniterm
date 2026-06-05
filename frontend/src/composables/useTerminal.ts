@@ -393,6 +393,11 @@ export function useTerminal(
         if (options?.onSessionStatus) {
           options.onSessionStatus(payload.status)
         }
+        // Force send current terminal size to sync the backend PTY after reconnect.
+        const sid = getSessionId()
+        if (sid && terminal && terminal.cols > 0 && terminal.rows > 0) {
+          SessionResize(sid, terminal.cols, terminal.rows).catch(() => {})
+        }
         resize()
       } else if (payload.status === 'error') {
         retryOnEnter = true

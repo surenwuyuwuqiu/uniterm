@@ -522,6 +522,11 @@ onMounted(() => {
         if (props.onSessionStatus) {
           props.onSessionStatus(payload.status)
         }
+        // Force send current terminal size to sync the backend PTY after reconnect.
+        // The new session defaults to 80x24; without this, apps like vim/k9s use the wrong size.
+        if (terminal && terminal.cols > 0 && terminal.rows > 0) {
+          SessionResize(props.sessionId, terminal.cols, terminal.rows).catch(() => {})
+        }
         resize()
       } else if (payload.status === 'error') {
         retryOnEnter = true

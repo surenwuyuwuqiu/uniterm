@@ -128,6 +128,17 @@ function onDragStart(e: DragEvent) {
     e.dataTransfer?.setData('application/is-active-tab', '1')
   }
   e.dataTransfer!.effectAllowed = 'move'
+
+  // If dragging the active terminal tab, switch to adjacent tab first
+  // so the dragged tab becomes "background" and can be merged into it
+  if (props.isActive && props.tab.type === 'terminal') {
+    const tabs = tabStore.tabs
+    const fromIdx = tabs.findIndex(t => t.id === props.tab.id)
+    const adjacentTab = tabs[fromIdx - 1] || tabs[fromIdx + 1]
+    if (adjacentTab) {
+      tabStore.setActiveTab(adjacentTab.id)
+    }
+  }
 }
 
 function onContextMenu(e: MouseEvent) {

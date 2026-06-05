@@ -158,9 +158,10 @@ function onPanelDragStart(e: DragEvent, panelId: string) {
 }
 
 function onDragOver(e: DragEvent, panelId: string) {
-  const hasPanel = e.dataTransfer?.types.includes('application/panel-id')
-  const hasWorkspace = e.dataTransfer?.types.includes('application/workspace-id')
-  const hasTabType = e.dataTransfer?.types.includes('application/tab-type')
+  const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : []
+  const hasPanel = types.includes('application/panel-id')
+  const hasWorkspace = types.includes('application/workspace-id')
+  const hasTabType = types.includes('application/tab-type')
   // Reject workspace tabs and settings tabs
   if (hasWorkspace) return
   if (!hasPanel && !hasTabType) return

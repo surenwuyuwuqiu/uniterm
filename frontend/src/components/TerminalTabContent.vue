@@ -62,15 +62,17 @@ function onToggleAiLock(panelId: string) {
 }
 
 function onDragOver(e: DragEvent) {
-  const hasPanel = e.dataTransfer?.types.includes('application/panel-id')
-  const hasTab = e.dataTransfer?.types.includes('application/tab-id')
-  const hasTabType = e.dataTransfer?.types.includes('application/tab-type')
-  const hasWorkspace = e.dataTransfer?.types.includes('application/workspace-id')
-  const isActiveTab = e.dataTransfer?.types.includes('application/is-active-tab')
+  const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : []
+  const hasPanel = types.includes('application/panel-id')
+  const hasTab = types.includes('application/tab-id')
+  const hasTabType = types.includes('application/tab-type')
+  const hasWorkspace = types.includes('application/workspace-id')
   // Allow: panel drags, terminal tab drags (has tab-id + tab-type, NOT workspace)
   const isTerminalTab = hasTab && hasTabType && !hasWorkspace
   if (!hasPanel && !isTerminalTab) return
-  if (isActiveTab) return
+  // Reject dragging onto itself (dragged tab id === this tab id)
+  const draggedTabId = e.dataTransfer?.getData('application/tab-id')
+  if (draggedTabId && draggedTabId === props.tab.id) return
 
   dragOver.value = true
   e.dataTransfer!.dropEffect = 'move'
@@ -103,9 +105,6 @@ function onDrop(e: DragEvent) {
   e.stopPropagation()
   dragOver.value = false
   dropPos.value = null
-
-  const isActiveTab = e.dataTransfer?.getData('application/is-active-tab')
-  if (isActiveTab) return
 
   const draggedTabId = e.dataTransfer?.getData('application/tab-id')
   const draggedPanelId = e.dataTransfer?.getData('application/panel-id')

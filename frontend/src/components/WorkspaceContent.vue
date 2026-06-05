@@ -99,6 +99,9 @@ function onPanelDrop(e: DragEvent, targetPanelId: string, targetRect?: DOMRect) 
     const draggedTab = tabStore.tabs.find(t => t.id === draggedTabId)
     if (!draggedTab || draggedTab.type !== 'terminal') return
 
+    // Save the adjacent tab that was activated during dragstart
+    const adjacentTabId = tabStore.activeTabId
+
     const rect = targetRect || (e.currentTarget as HTMLElement).getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
@@ -118,6 +121,11 @@ function onPanelDrop(e: DragEvent, targetPanelId: string, targetRect?: DOMRect) 
 
     tabStore.addPanelToWorkspaceTab(draggedTabId, props.tab.id, targetPanelId, direction, insertBefore)
     panelStore.movePanelToTab(draggedTab.panelId, props.tab.id)
+
+    // Restore adjacent tab activation instead of letting workspace take focus
+    if (adjacentTabId && adjacentTabId !== draggedTabId) {
+      tabStore.setActiveTab(adjacentTabId)
+    }
     return
   }
 
@@ -168,8 +176,9 @@ function onPanelDrop(e: DragEvent, targetPanelId: string, targetRect?: DOMRect) 
 }
 
 function onWorkspaceDragOver(e: DragEvent) {
-  const hasPanel = e.dataTransfer?.types.includes('application/panel-id')
-  const hasTab = e.dataTransfer?.types.includes('application/tab-id')
+  const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : []
+  const hasPanel = types.includes('application/panel-id')
+  const hasTab = types.includes('application/tab-id')
   if (hasPanel || hasTab) {
     e.dataTransfer!.dropEffect = 'move'
   }

@@ -77,9 +77,16 @@ func (s *LocalSession) Connect(config ConnectionConfig) error {
 	}
 
 	// Fallback pipe mode for older Windows without ConPTY.
-	if strings.Contains(strings.ToLower(shell), "bash") {
-		s.cmd = exec.Command(shell, "--login", "-i")
-		s.cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	lowerShell := strings.ToLower(shell)
+	if strings.Contains(lowerShell, "bash") {
+		// WSL bash does not support --login -i passed this way.
+		if strings.Contains(lowerShell, "system32") || strings.Contains(lowerShell, "wsl") {
+			s.cmd = exec.Command(shell)
+			s.cmd.Env = os.Environ()
+		} else {
+			s.cmd = exec.Command(shell, "--login", "-i")
+			s.cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+		}
 	} else {
 		s.cmd = exec.Command(shell)
 		s.cmd.Env = os.Environ()
@@ -123,6 +130,10 @@ func buildCommandLine(shell string) string {
 	quoted := fmt.Sprintf(`"%s"`, shell)
 
 	if strings.Contains(lower, "bash") {
+		// WSL bash (inside System32) does not support --login -i passed this way.
+		if strings.Contains(lower, "system32") || strings.Contains(lower, "wsl") {
+			return quoted
+		}
 		return fmt.Sprintf(`"%s" --login -i`, shell)
 	}
 	if strings.Contains(lower, "cmd.exe") {
@@ -210,6 +221,18 @@ func defaultShell() string {
 	}
 	if _, err := exec.LookPath("powershell.exe"); err == nil {
 		return "powershell.exe"
+	}
+	// Prefer Git Bash over WSL bash to avoid WSL relay errors.
+	gitBashPaths := []string{
+		`C:\Program Files\Git\bin\bash.exe`,
+		`C:\Program Files (x86)\Git\bin\bash.exe`,
+		filepath.Join(os.Getenv("ProgramFiles"), "Git", "bin", "bash.exe"),
+		filepath.Join(os.Getenv("ProgramFiles(x86)"), "Git", "bin", "bash.exe"),
+	}
+	for _, p := range gitBashPaths {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
 	}
 	if _, err := exec.LookPath("bash.exe"); err == nil {
 		return "bash.exe"

@@ -8,6 +8,8 @@
       :broadcast-active="broadcastActive"
       @close-panel="$emit('closePanel', $event)"
       @toggle-ai-lock="$emit('toggleAiLock', $event)"
+      @duplicate="$emit('duplicate', $event)"
+      @rename="(id, name) => $emit('rename', id, name)"
       @panel-drag-start="(e, id) => $emit('panelDragStart', e, id)"
       @panel-drop="(e, id, rect) => $emit('panelDrop', e, id, rect)"
       @resize="$emit('resize', $event)"
@@ -30,6 +32,8 @@ defineProps<{
 defineEmits<{
   closePanel: [panelId: string]
   toggleAiLock: [panelId: string]
+  duplicate: [panelId: string]
+  rename: [panelId: string, newName: string]
   panelDragStart: [e: DragEvent, panelId: string]
   panelDrop: [e: DragEvent, targetPanelId: string, rect?: DOMRect]
   resize: [payload: { node: any, index: number, delta: number }]

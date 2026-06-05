@@ -11,6 +11,8 @@
       :broadcast-active="tabStore.isBroadcasting(tab.id)"
       @close-panel="closePanel"
       @toggle-ai-lock="onToggleAiLock"
+      @duplicate="onDuplicatePanel"
+      @rename="onRenamePanel"
       @panel-drag-start="onPanelDragStart"
       @panel-drop="onPanelDrop"
       @resize="onResize"
@@ -22,7 +24,9 @@
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
 import type { WorkspaceTab } from '../types/workspace'
+import type { ConnectionConfig } from '../types/session'
 import PanelGrid from './PanelGrid.vue'
+import { CreateSession } from '../../wailsjs/go/main/App'
 
 const props = defineProps<{
   tab: WorkspaceTab
@@ -45,6 +49,36 @@ function onToggleAiLock(panelId: string) {
   } else {
     tabStore.setAILockedPanel(panelId)
   }
+}
+
+async function onDuplicatePanel(panelId: string) {
+  const panel = panelStore.getPanel(panelId)
+  if (!panel) return
+
+  const newPanel = panelStore.createPanel(
+    panel.config ? { ...panel.config } as ConnectionConfig : null,
+    panel.type
+  )
+  newPanel.title = panel.title
+
+  const newTab = tabStore.createTerminalTab(panel.title, newPanel.id)
+  panelStore.movePanelToTab(newPanel.id, newTab.id)
+
+  if (panel.config) {
+    try {
+      const info = await CreateSession(panel.config.type, panel.config)
+      panelStore.bindSession(newPanel.id, info.id)
+    } catch (e) {
+      console.error('Failed to duplicate session:', e)
+    }
+  }
+}
+
+function onRenamePanel(panelId: string, newName: string) {
+  panelStore.updateTitle(panelId, newName)
+  // Sync tab name for terminal tabs
+  const tab = tabStore.tabs.find(t => t.type === 'terminal' && t.panelId === panelId)
+  if (tab) tab.name = newName
 }
 
 function onPanelDragStart(e: DragEvent, panelId: string) {

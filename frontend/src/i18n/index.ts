@@ -23,7 +23,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'sidebar.connectSSH': '连接 SSH',
     'sidebar.connectSftp': '连接 SFTP',
     'sidebar.edit': '编辑',
-    'sidebar.duplicate': '复制',
+    'sidebar.duplicate': '复制会话',
     'sidebar.delete': '删除',
     'sidebar.deleteConfirm': '确定要删除选中的 {count} 个连接吗？',
     'sidebar.newConnectionFromSearch': '新建连接...',
@@ -75,7 +75,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'conn.changeGroup': '修改分组',
 
     // TabItem
-    'tab.duplicate': '复制标签',
+    'tab.duplicate': '复制会话',
     'tab.rename': '重命名',
     'tab.closeRight': '关闭右侧标签',
     'tab.closeLeft': '关闭左侧标签',
@@ -84,6 +84,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'tab.more': '更多标签',
 
     // TerminalTab
+    'terminal.duplicate': '复制会话',
     'terminal.askAI': '问AI',
     'terminal.copy': '复制',
     'terminal.copyAndPaste': '复制并粘贴',
@@ -584,7 +585,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'sidebar.connectSSH': 'Connect SSH',
     'sidebar.connectSftp': 'Connect SFTP',
     'sidebar.edit': 'Edit',
-    'sidebar.duplicate': 'Duplicate',
+    'sidebar.duplicate': 'Duplicate Session',
     'sidebar.delete': 'Delete',
     'sidebar.deleteConfirm': 'Delete {count} selected connection(s)?',
     'sidebar.newConnectionFromSearch': 'New Connection...',
@@ -636,7 +637,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'conn.changeGroup': 'Change Group',
 
     // TabItem
-    'tab.duplicate': 'Duplicate',
+    'tab.duplicate': 'Duplicate Session',
     'tab.rename': 'Rename',
     'tab.closeRight': 'Close Tabs to the Right',
     'tab.closeLeft': 'Close Tabs to the Left',
@@ -645,6 +646,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'tab.more': 'More Tabs',
 
     // TerminalTab
+    'terminal.duplicate': 'Duplicate Session',
     'terminal.askAI': 'Ask AI',
     'terminal.copy': 'Copy',
     'terminal.copyAndPaste': 'Copy & Paste',

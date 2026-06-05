@@ -6,7 +6,17 @@
     @dragstart="emit('dragstart', $event)"
   >
     <div v-if="showHeader" class="panel-header" :class="{ 'ai-locked': isAILocked }" @dblclick.stop>
-      <span class="panel-title">{{ panel.title }}</span>
+      <span v-if="!editing" class="panel-title" @dblclick.stop="startEdit">{{ panel.title }}</span>
+      <input
+        v-else
+        ref="editInputRef"
+        v-model="editName"
+        class="panel-title-input"
+        @keydown.enter="confirmEdit"
+        @keydown.escape="cancelEdit"
+        @blur="confirmEdit"
+        @click.stop
+      />
       <div class="panel-header-actions">
         <button
           v-if="(panel.type === 'ssh' || panel.type === 'local') && workspaceId"
@@ -26,6 +36,14 @@
         >
           <Sparkles :size="14" />
         </button>
+        <button
+          v-if="panel.type === 'ssh' || panel.type === 'local'"
+          class="panel-duplicate"
+          @click.stop="emit('duplicate', panel.id)"
+          :title="t('terminal.duplicate')"
+        >
+          <Copy :size="14" />
+        </button>
         <button class="panel-close" @click.stop="emit('close', panel.id)">×</button>
       </div>
     </div>
@@ -43,7 +61,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
-import { Radio, Sparkles } from '@lucide/vue'
+import { Radio, Sparkles, Copy } from '@lucide/vue'
 import BaseTerminal from './BaseTerminal.vue'
 import { useTabStore } from '../stores/tabStore'
 import { usePanelStore } from '../stores/panelStore'
@@ -68,6 +86,8 @@ const emit = defineEmits<{
   close: [panelId: string]
   dragstart: [e: DragEvent]
   toggleAiLock: [panelId: string]
+  duplicate: [panelId: string]
+  rename: [panelId: string, newName: string]
 }>()
 
 const tabStore = useTabStore()
@@ -80,6 +100,32 @@ const isAILocked = computed(() =>
 )
 
 const baseTerminalRef = ref<InstanceType<typeof BaseTerminal> | null>(null)
+
+const editing = ref(false)
+const editName = ref('')
+const editInputRef = ref<HTMLInputElement>()
+
+function startEdit() {
+  editName.value = props.panel.title
+  editing.value = true
+  nextTick(() => {
+    editInputRef.value?.focus()
+    editInputRef.value?.select()
+  })
+}
+
+function confirmEdit() {
+  if (!editing.value) return
+  editing.value = false
+  const newName = editName.value.trim()
+  if (newName && newName !== props.panel.title) {
+    emit('rename', props.panel.id, newName)
+  }
+}
+
+function cancelEdit() {
+  editing.value = false
+}
 
 function onSessionStatus(status: string) {
   if (status === 'retry') {
@@ -167,9 +213,21 @@ watch(() => props.isActive, (active) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: text;
 }
 .panel-active .panel-title {
   color: var(--text-primary);
+}
+.panel-title-input {
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  width: 120px;
+  outline: none;
 }
 .panel-header-actions {
   display: flex;
@@ -217,6 +275,20 @@ watch(() => props.isActive, (active) => {
 }
 .panel-ai-lock.locked {
   color: var(--warning, #f59e0b);
+}
+.panel-duplicate {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+}
+.panel-duplicate:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 .panel-close {
   display: flex;

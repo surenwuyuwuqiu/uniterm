@@ -198,6 +198,12 @@ export const useTabStore = defineStore('tab', () => {
   function renameTab(id: string, name: string) {
     const t = tabState.tabs.find(x => x.id === id)
     if (t) t.name = name
+    // Sync panel title for terminal tabs
+    if (t && t.type === 'terminal') {
+      const panelStore = usePanelStore()
+      const panel = panelStore.getPanel(t.panelId)
+      if (panel) panel.title = name
+    }
   }
 
   // ── Workspace panel management ──

@@ -19,6 +19,8 @@
         @close="handleClosePanel(panel.id)"
         @dragstart="onPanelDragStart($event, panel.id)"
         @toggle-ai-lock="$emit('toggleAiLock', $event)"
+        @duplicate="$emit('duplicate', $event)"
+        @rename="(id, name) => $emit('rename', id, name)"
       />
       <!-- Drop zone overlay -->
       <div v-if="dragOverId === node.panelId" class="drop-zone-overlay">
@@ -39,6 +41,8 @@
         :broadcast-active="broadcastActive"
         @close-panel="(id) => $emit('closePanel', id)"
         @toggle-ai-lock="(id) => $emit('toggleAiLock', id)"
+        @duplicate="(id) => $emit('duplicate', id)"
+        @rename="(id, name) => $emit('rename', id, name)"
         @panel-drag-start="(e, id) => $emit('panelDragStart', e, id)"
         @panel-drop="(e, id) => $emit('panelDrop', e, id)"
         @resize="(p) => $emit('resize', p)"
@@ -72,6 +76,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   closePanel: [panelId: string]
   toggleAiLock: [panelId: string]
+  duplicate: [panelId: string]
+  rename: [panelId: string, newName: string]
   panelDragStart: [e: DragEvent, panelId: string]
   panelDrop: [e: DragEvent, targetPanelId: string, rect?: DOMRect]
   resize: [payload: { node: any, index: number, delta: number }]
@@ -121,10 +127,33 @@ function onPanelClick(panelId: string) {
 }
 
 function onPanelDragStart(e: DragEvent, panelId: string) {
-  if (e.dataTransfer) {
-    e.dataTransfer.setData('application/panel-id', panelId)
-    e.dataTransfer.effectAllowed = 'move'
+  if (!e.dataTransfer) return
+
+  e.dataTransfer.setData('application/panel-id', panelId)
+  e.dataTransfer.effectAllowed = 'move'
+
+  // Use a lightweight custom drag image to avoid the browser snapshotting
+  // the entire panel (which contains an xterm.js canvas and can be slow).
+  const panel = panelStore.getPanel(panelId)
+  const title = panel?.title || ''
+  const img = document.createElement('div')
+  img.textContent = title
+  img.style.cssText = `
+    position: fixed; left: -9999px; top: -9999px;
+    padding: 6px 14px; background: var(--bg-surface);
+    border: 1px solid var(--accent-dim); border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: 12px; font-family: var(--font-ui);
+    box-shadow: var(--shadow-md); white-space: nowrap; pointer-events: none;
+  `
+  document.body.appendChild(img)
+  e.dataTransfer.setDragImage(img, 10, 10)
+
+  const cleanup = () => {
+    img.remove()
+    window.removeEventListener('dragend', cleanup)
   }
+  window.addEventListener('dragend', cleanup)
+
   emit('panelDragStart', e, panelId)
 }
 

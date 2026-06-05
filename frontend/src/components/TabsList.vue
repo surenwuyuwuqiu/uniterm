@@ -1,5 +1,5 @@
 <template>
-  <div class="tabs-list" ref="tabsListRef" @wheel="onWheel" @dragleave="onTabsDragLeave">
+  <div class="tabs-list" ref="tabsListRef" @wheel="onWheel" @dragover.prevent="onTabsContainerDragOver" @dragleave="onTabsDragLeave" @drop="onTabsContainerDrop">
     <template v-for="(tab, index) in tabs" :key="tab.id">
       <div
         v-if="(dragOverTabIndex === index && !dragOverInsertAfter) || (dragOverTabIndex === index - 1 && dragOverInsertAfter)"
@@ -33,6 +33,11 @@
     <div
       v-if="dragOverTabIndex === tabs.length - 1 && dragOverInsertAfter"
       class="tab-drop-indicator"
+    ></div>
+    <!-- Drop indicator at end when dragging over empty tabs area -->
+    <div
+      v-if="dragOverContainer"
+      class="tab-drop-indicator tab-drop-indicator-end"
     ></div>
   </div>
   <div class="tab-more" v-if="showMore">
@@ -73,6 +78,7 @@ const activeTabId = computed(() => tabStore.activeTabId)
 
 const dragOverTabIndex = ref<number | null>(null)
 const dragOverInsertAfter = ref(false)
+const dragOverContainer = ref(false)
 
 const tabsListRef = ref<HTMLElement | null>(null)
 const showMore = ref(false)
@@ -141,6 +147,7 @@ function onTabDragOver(e: DragEvent, index: number) {
   const hasTab = e.dataTransfer?.types.includes('application/tab-id')
   if (!hasPanel && !hasTab) return
 
+  dragOverContainer.value = false
   const el = e.currentTarget as HTMLElement
   const rect = el.getBoundingClientRect()
   dragOverTabIndex.value = index
@@ -163,6 +170,65 @@ function onTabsDragLeave(e: DragEvent) {
 function clearDragState() {
   dragOverTabIndex.value = null
   dragOverInsertAfter.value = false
+  dragOverContainer.value = false
+}
+
+function onTabsContainerDragOver(e: DragEvent) {
+  const hasPanel = e.dataTransfer?.types.includes('application/panel-id')
+  const hasTab = e.dataTransfer?.types.includes('application/tab-id')
+  if (!hasPanel && !hasTab) return
+
+  // Ignore if hovering over a tab item (handled by onTabDragOver)
+  const target = e.target as HTMLElement
+  if (target.closest('.tab-item') || target.closest('.workspace-tab-item')) {
+    return
+  }
+
+  dragOverContainer.value = true
+  dragOverTabIndex.value = null
+  dragOverInsertAfter.value = false
+  e.dataTransfer!.dropEffect = 'move'
+}
+
+function onTabsContainerDrop(e: DragEvent) {
+  e.stopPropagation()
+
+  // Skip if drop landed on a tab item (already handled by onTabDrop)
+  const target = e.target as HTMLElement
+  if (target.closest('.tab-item') || target.closest('.workspace-tab-item')) {
+    clearDragState()
+    return
+  }
+
+  const draggedTabId = e.dataTransfer?.getData('application/tab-id')
+  const panelId = e.dataTransfer?.getData('application/panel-id')
+  const sourceTabId = e.dataTransfer?.getData('application/source-tab-id')
+
+  clearDragState()
+
+  // Case 1: Tab dragged to empty area → move to end
+  if (draggedTabId && !panelId) {
+    const fromIdx = tabs.value.findIndex(t => t.id === draggedTabId)
+    if (fromIdx === -1) return
+    const toIdx = tabs.value.length - 1
+    if (fromIdx !== toIdx) {
+      tabStore.moveTab(fromIdx, toIdx)
+    }
+    return
+  }
+
+  // Case 2: Panel dropped on empty area → create terminal tab at end
+  if (panelId) {
+    const panel = panelStore.getPanel(panelId)
+    if (!panel) return
+
+    if (sourceTabId) {
+      tabStore.removePanelFromWorkspaceTab(sourceTabId, panelId)
+    }
+
+    const tab = tabStore.createTerminalTab(panel.title, panelId)
+    panelStore.movePanelToTab(panelId, tab.id)
+  }
 }
 
 function onTabDrop(e: DragEvent, targetTabId: string, index: number) {
@@ -257,5 +323,8 @@ function onTabDrop(e: DragEvent, targetTabId: string, index: number) {
   margin: 4px 0;
   border-radius: 1px;
   flex-shrink: 0;
+}
+.tab-drop-indicator-end {
+  margin-left: auto;
 }
 </style>

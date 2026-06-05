@@ -21,6 +21,7 @@
     <!-- Connected: spice-html5 Canvas mounts here -->
     <div
       v-show="status === 'connected'"
+      :id="'spice-screen-' + panelId"
       ref="spiceContainer"
       class="spice-area"
       tabindex="0"
@@ -32,6 +33,13 @@
       <span>{{ t('spice.connected') }}</span>
       <span class="spice-status-sep">|</span>
       <span>{{ config?.host }}:{{ config?.port || 5900 }}</span>
+      <span class="spice-status-sep">|</span>
+      <span class="spice-scale-label">{{ t('spice.scale') }}</span>
+      <el-switch
+        v-model="scaleViewport"
+        size="small"
+        style="--el-switch-on-color: #67c23a; --el-switch-off-color: #606266"
+      />
     </div>
   </div>
 </template>
@@ -57,6 +65,7 @@ const props = defineProps<{
 const status = ref<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting')
 const currentSessionId = ref<string | null>(props.sessionId)
 const spiceContainer = ref<HTMLDivElement | null>(null)
+const scaleViewport = ref(false)
 
 let sc: any = null
 let unsubStatus: (() => void) | null = null
@@ -105,7 +114,7 @@ async function initSpice(proxyAddr: string, password: string) {
   }
 
   try {
-    const { SpiceMainConn } = await import('spice-client')
+    const { SpiceMainConn } = await import('../vendor/spice-html5.js')
     sc = new SpiceMainConn({
       uri: proxyAddr,
       password: password || '',
@@ -138,6 +147,41 @@ function handleKeyDown(e: KeyboardEvent) {
     }).catch(() => {})
   }
 }
+
+function applyScale() {
+  if (!spiceContainer.value) return
+  const container = spiceContainer.value
+  const canvases = container.querySelectorAll('canvas')
+  canvases.forEach((canvas: HTMLCanvasElement) => {
+    if (scaleViewport.value) {
+      const cw = container.clientWidth
+      const ch = container.clientHeight
+      const iw = canvas.width || canvas.clientWidth
+      const ih = canvas.height || canvas.clientHeight
+      const scale = Math.min(cw / iw, ch / ih, 1)
+      const tx = (cw - iw * scale) / 2
+      const ty = (ch - ih * scale) / 2
+      canvas.style.transformOrigin = '0 0'
+      canvas.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`
+    } else {
+      canvas.style.transform = ''
+    }
+  })
+  container.style.overflow = scaleViewport.value ? 'hidden' : 'auto'
+}
+
+watch(scaleViewport, () => {
+  applyScale()
+  // ResizeObserver to reapply on container size changes
+  if (scaleViewport.value && spiceContainer.value) {
+    const ro = new ResizeObserver(() => applyScale())
+    ro.observe(spiceContainer.value)
+    ;(spiceContainer.value as any).__scaleObserver = ro
+  } else if (spiceContainer.value) {
+    const ro = (spiceContainer.value as any).__scaleObserver
+    if (ro) { ro.disconnect(); (spiceContainer.value as any).__scaleObserver = null }
+  }
+})
 
 onMounted(() => {
   if (props.sessionId) {
@@ -194,11 +238,27 @@ onMounted(() => {
         break
     }
   })
+
+  // Observe canvas creation for auto-scale
+  if (spiceContainer.value) {
+    const mo = new MutationObserver(() => {
+      if (scaleViewport.value) applyScale()
+    })
+    mo.observe(spiceContainer.value, { childList: true, subtree: true, attributes: true, attributeFilter: ['width', 'height'] })
+    ;(spiceContainer.value as any).__domObserver = mo
+  }
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeyDown)
   unsubStatus?.()
+
+  if (spiceContainer.value) {
+    const ro = (spiceContainer.value as any).__scaleObserver
+    if (ro) { ro.disconnect(); (spiceContainer.value as any).__scaleObserver = null }
+    const mo = (spiceContainer.value as any).__domObserver
+    if (mo) { mo.disconnect(); (spiceContainer.value as any).__domObserver = null }
+  }
 
   // Cache DOM + SPICE so switching back is instant
   if (sc && spiceContainer.value && spiceContainer.value.childElementCount > 0) {
@@ -223,25 +283,27 @@ watch(() => props.sessionId, (newId) => {
 
 <style scoped>
 .spice-tab-content {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   background: #000;
 }
 .spice-area {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 24px;
+  flex: 1;
+  overflow: auto;
   background: #000;
   outline: none;
-  overflow: auto;
+  position: relative;
+  min-height: 0;
+}
+.spice-area :deep(canvas) {
+  display: block;
+  image-rendering: pixelated;
 }
 .spice-overlay {
   position: absolute;
   inset: 0;
-  bottom: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -252,10 +314,7 @@ watch(() => props.sessionId, (newId) => {
 }
 .spice-error-text { color: #f56c6c; }
 .spice-statusbar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  flex-shrink: 0;
   height: 24px;
   display: flex;
   align-items: center;
@@ -274,4 +333,8 @@ watch(() => props.sessionId, (newId) => {
   flex-shrink: 0;
 }
 .spice-status-sep { color: #444; }
+.spice-scale-label {
+  margin-left: auto;
+  font-size: 11px;
+}
 </style>

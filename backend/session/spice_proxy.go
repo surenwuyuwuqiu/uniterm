@@ -12,7 +12,6 @@ import (
 
 // SPICEProxy bridges WebSocket (frontend spice-html5) to TCP (SPICE server).
 // One instance per SPICE session, bound to a random local port.
-// Architecture is identical to VNCProxy.
 type SPICEProxy struct {
 	listener net.Listener
 	target   string
@@ -40,7 +39,8 @@ func (p *SPICEProxy) Start() (string, error) {
 	p.listener = ln
 
 	upgrader := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
+		CheckOrigin:  func(r *http.Request) bool { return true },
+		Subprotocols: []string{"binary"},
 	}
 
 	mux := http.NewServeMux()
@@ -76,7 +76,9 @@ func (p *SPICEProxy) handleWebSocket(ws *websocket.Conn) {
 	p.mu.Unlock()
 	log.Printf("[SPICEProxy] WebSocket client connected")
 
-	// Clean up wsConn when this client disconnects so new clients can connect.
+	// Allow large SPICE frames (up to 16 MB).
+	ws.SetReadLimit(16 << 20)
+
 	defer func() {
 		p.mu.Lock()
 		if p.wsConn == ws {

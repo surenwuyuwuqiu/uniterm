@@ -388,6 +388,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'spice.error': '连接失败',
     'spice.reconnect': '重新连接',
     'spice.retry': '重试',
+    'spice.scale': '自动缩放',
+    'spice.scaleOn': '开',
+    'spice.scaleOff': '关',
 
     // Monitor
     'sidebar.connectMonitor': '服务器监控',
@@ -957,6 +960,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'spice.error': 'Connection failed',
     'spice.reconnect': 'Reconnect',
     'spice.retry': 'Retry',
+    'spice.scale': 'Scale',
+    'spice.scaleOn': 'On',
+    'spice.scaleOff': 'Off',
 
     // Monitor
     'sidebar.connectMonitor': 'Server Monitor',

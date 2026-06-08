@@ -109,6 +109,7 @@ let unsubscribe: (() => void) | null = null
 let statusUnsubscribe: (() => void) | null = null
 let onDocumentMouseUp: (() => void) | null = null
 let onDocumentMouseDown: ((e: MouseEvent) => void) | null = null
+let onMouseDownGlobal: ((e: MouseEvent) => void) | null = null
 
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 let isResizing = false
@@ -339,7 +340,10 @@ onMounted(() => {
     if (sid) {
       const history = sessionStore.getData(sid)
       if (history) {
-        terminal.write(history)
+        // Apply syntax highlighting when restoring history so it matches
+        // newly arriving lines after a tab switch.
+        const hlOn = settingsStore.settings.terminal.highlightEnabled ?? true
+        terminal.write(hlOn ? highlight(history) : history)
       }
     }
     // Force initial resize with retries — needed because cell dimensions
@@ -465,16 +469,34 @@ onMounted(() => {
     }
   })
 
-  // Selection action: copy on mouse up
+  // Selection action: copy on mouse up (only when a new selection was made).
+  // Use mouseDownOnThisTerminal to ensure copy only fires when the user
+  // actually started selecting inside this terminal. Without this, clicking
+  // another panel (or returning from another app) would trigger copy from
+  // this terminal's leftover selection.
+  let selectionStartText = ''
+  let mouseDownOnThisTerminal = false
   onDocumentMouseUp = () => {
+    if (!mouseDownOnThisTerminal) return
+    mouseDownOnThisTerminal = false
     if (settingsStore.settings.terminal.selectionAction === 'copy') {
       const text = terminal?.getSelection()
-      if (text) {
+      if (text && text !== selectionStartText) {
         navigator.clipboard.writeText(text)
       }
     }
   }
   document.addEventListener('mouseup', onDocumentMouseUp)
+  terminal.element?.addEventListener('mousedown', () => {
+    mouseDownOnThisTerminal = true
+    selectionStartText = terminal?.getSelection() || ''
+  })
+  onMouseDownGlobal = (e: MouseEvent) => {
+    if (!terminal || !terminal.element?.contains(e.target as Node)) {
+      mouseDownOnThisTerminal = false
+    }
+  }
+  document.addEventListener('mousedown', onMouseDownGlobal)
 
   // Close suggestion popup when clicking outside
   onDocumentMouseDown = (event: MouseEvent) => {
@@ -490,22 +512,32 @@ onMounted(() => {
   // Session data
   unsubscribe = EventsOn('session:data', (payload: { id: string; data: string }) => {
     if (payload.id !== props.sessionId || !terminal) return
+    // Filter ED3 (erase scrollback). For ED2 (clear screen), replace with
+    // newline scrolling + home so that current viewport content is pushed
+    // into scrollback before clearing, matching standard terminal behavior.
+    let data = payload.data.replace(/\x1b\[3J/g, '')
+    if (data.includes('\x1b[2J')) {
+      const rows = terminal.rows
+      const scrollClear = '\n'.repeat(rows) + '\x1b[H'
+      data = data.replace(/\x1b\[H\x1b\[2J/g, scrollClear)
+      data = data.replace(/\x1b\[2J/g, scrollClear)
+    }
     if (props.mode === 'sftp') {
-      const cleaned = payload.data.replace(/\x1b\]633;S[^\x07]*\x07/g, '')
+      const cleaned = data.replace(/\x1b\]633;S[^\x07]*\x07/g, '')
       if (cleaned) {
         terminal.write(cleaned)
       }
     } else {
       // Extract history commands from SSH output
       if (props.mode === 'ssh' && terminalInput) {
-        terminalInput.handleSessionData(payload.data)
+        terminalInput.handleSessionData(data)
         // Close suggestions if we entered an alternate screen app (vim, k9s, etc.)
         if (terminalInput.isInAlternateScreen()) {
           suggestions.close()
         }
       }
       const hlOn = settingsStore.settings.terminal.highlightEnabled ?? true
-      terminal.write(hlOn ? highlight(payload.data) : payload.data)
+      terminal.write(hlOn ? highlight(data) : data)
       if (props.mode === 'ssh' && props.onSessionStatus) {
         // onSessionData is handled by the consumer via EventsOn if needed
       }
@@ -707,6 +739,10 @@ onUnmounted(() => {
   if (onDocumentMouseDown) {
     document.removeEventListener('mousedown', onDocumentMouseDown)
     onDocumentMouseDown = null
+  }
+  if (onMouseDownGlobal) {
+    document.removeEventListener('mousedown', onMouseDownGlobal)
+    onMouseDownGlobal = null
   }
   window.removeEventListener('resize', onWindowResize)
   window.removeEventListener('split:resize-start', onSplitResizeStart)

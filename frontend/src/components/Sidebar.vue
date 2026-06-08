@@ -21,7 +21,46 @@
         :placeholder="t('sidebar.searchPlaceholder')"
         clearable
         @keydown="onListKeydown"
-      />
+      >
+        <template #suffix>
+          <el-dropdown trigger="click" placement="bottom-end" :teleported="false">
+            <span
+              class="filter-trigger"
+              :class="{ active: selectedTypeFilter !== 'all' }"
+              @click.stop
+            >
+              <el-icon><Filter :size="14" /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu class="type-filter-menu">
+                <el-dropdown-item
+                  :class="{ 'is-active': selectedTypeFilter === 'all' }"
+                  @click="selectedTypeFilter = 'all'"
+                >
+                  <span class="dropdown-item-content">
+                    <el-icon v-if="selectedTypeFilter === 'all'"><Check :size="14" /></el-icon>
+                    <span v-else class="check-placeholder"></span>
+                    <span>{{ t('sidebar.filterAll') }}</span>
+                  </span>
+                </el-dropdown-item>
+                <el-dropdown-item divided v-if="availableTypes.length > 0" />
+                <el-dropdown-item
+                  v-for="typeOpt in availableTypes"
+                  :key="typeOpt.value"
+                  :class="{ 'is-active': selectedTypeFilter === typeOpt.value }"
+                  @click="selectedTypeFilter = typeOpt.value"
+                >
+                  <span class="dropdown-item-content">
+                    <el-icon v-if="selectedTypeFilter === typeOpt.value"><Check :size="14" /></el-icon>
+                    <span v-else class="check-placeholder"></span>
+                    <span>{{ typeOpt.label }}</span>
+                  </span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </template>
+      </el-input>
     </div>
 
     <div class="connection-list" tabindex="0" @keydown="onListKeydown" @contextmenu.prevent="onEmptyAreaContextMenu">
@@ -301,7 +340,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { X, ChevronRight, ChevronDown } from '@lucide/vue'
+import { X, ChevronRight, ChevronDown, Filter, Check } from '@lucide/vue'
 import { ElMessageBox } from 'element-plus'
 import { useConnectionStore } from '../stores/connectionStore'
 import { useI18n } from '../i18n'
@@ -323,7 +362,52 @@ watch(showForm, (val) => {
 })
 
 const searchQuery = ref('')
+const selectedTypeFilter = ref('all')
 const focusedId = ref<string | null>(null)
+
+// ── Type filter ──
+interface TypeOption {
+  label: string
+  value: string
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  ssh: 'SSH',
+  telnet: 'Telnet',
+  mosh: 'Mosh',
+  rdp: 'RDP',
+  vnc: 'VNC',
+  spice: 'SPICE',
+  local: 'Local',
+  sftp: 'SFTP',
+  monitor: 'Monitor',
+  'database:mysql': 'MySQL',
+  'database:postgres': 'PostgreSQL',
+  'database:rqlite': 'rqlite',
+}
+
+const availableTypes = computed<TypeOption[]>(() => {
+  const types = new Set<string>()
+  for (const c of connectionStore.connections) {
+    if (c.type === 'database' && c.dbType) {
+      types.add(`database:${c.dbType}`)
+    } else {
+      types.add(c.type)
+    }
+  }
+  return [...types].sort().map(value => ({
+    value,
+    label: TYPE_LABELS[value] || value
+  }))
+})
+
+function matchTypeFilter(conn: ConnectionConfig, filter: string): boolean {
+  if (filter === 'all') return true
+  if (filter.startsWith('database:')) {
+    return conn.type === 'database' && conn.dbType === filter.slice(9)
+  }
+  return conn.type === filter
+}
 
 // ── Expand/collapse state ──
 const expandedGroups = ref<Set<string>>(new Set())
@@ -342,11 +426,14 @@ const selectedIds = ref<Set<string>>(new Set())
 // ── Search filter ──
 const filteredGrouped = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
+  const typeFilter = selectedTypeFilter.value
   const data = connectionStore.groupedConnections
-  if (!q) return data
 
-  const matchConn = (c: ConnectionConfig) =>
-    c.name.toLowerCase().includes(q) || c.host.toLowerCase().includes(q)
+  const matchConn = (c: ConnectionConfig) => {
+    const textMatch = !q || c.name.toLowerCase().includes(q) || c.host.toLowerCase().includes(q)
+    const typeMatch = matchTypeFilter(c, typeFilter)
+    return textMatch && typeMatch
+  }
 
   const filteredGroups = data.groups
     .map(entry => ({
@@ -356,8 +443,8 @@ const filteredGrouped = computed(() => {
     .filter(entry => {
       const groupNameMatch = entry.group.name.toLowerCase().includes(q)
       if (groupNameMatch) {
-        // Show all connections in group when group name matches
-        entry.connections = data.groups.find(g => g.group.id === entry.group.id)!.connections
+        // Show all connections in group when group name matches, but still apply type filter
+        entry.connections = data.groups.find(g => g.group.id === entry.group.id)!.connections.filter(matchConn)
         return true
       }
       return entry.connections.length > 0
@@ -1283,6 +1370,31 @@ onUnmounted(() => {
 .virtual-new-conn .virtual-name {
   color: var(--accent);
 }
+
+.filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.12s ease;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.filter-trigger:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.filter-trigger.active {
+  color: var(--accent);
+}
+
+.filter-trigger.active:hover {
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
 </style>
 
 <style>
@@ -1329,5 +1441,28 @@ onUnmounted(() => {
   height: 1px;
   background: var(--border-subtle);
   margin: 4px 6px;
+}
+
+.type-filter-menu .el-dropdown-menu__item {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+}
+
+.type-filter-menu .el-dropdown-menu__item.is-active {
+  color: var(--accent);
+}
+
+.dropdown-item-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.check-placeholder {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 </style>

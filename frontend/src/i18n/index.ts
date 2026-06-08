@@ -27,6 +27,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'sidebar.delete': '删除',
     'sidebar.deleteConfirm': '确定要删除选中的 {count} 个连接吗？',
     'sidebar.newConnectionFromSearch': '新建连接...',
+    'sidebar.filterAll': '全部',
 
     // Workspace
     'workspace.defaultName': '工作区',
@@ -601,6 +602,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'sidebar.delete': 'Delete',
     'sidebar.deleteConfirm': 'Delete {count} selected connection(s)?',
     'sidebar.newConnectionFromSearch': 'New Connection...',
+    'sidebar.filterAll': 'All',
 
     // Workspace
     'workspace.defaultName': 'Workspace',

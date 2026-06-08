@@ -361,6 +361,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'conn.rdpSmartSizing': '智能缩放',
     'sidebar.connectRDP': '连接 RDP',
     'sidebar.connectVNC': '连接 VNC',
+    'sidebar.connectSPICE': '连接 SPICE',
     'rdp.connecting': '正在连接到 {host}...',
     'rdp.connected': '已连接',
     'rdp.disconnected': '已断开',
@@ -380,6 +381,17 @@ const messages: Record<Locale, Record<string, string>> = {
     'vnc.scale': '自动缩放',
     'vnc.scaleOn': '开',
     'vnc.scaleOff': '关',
+
+    // SPICE
+    'spice.connecting': '正在连接到 {host}...',
+    'spice.connected': '已连接',
+    'spice.disconnected': '已断开',
+    'spice.error': '连接失败',
+    'spice.reconnect': '重新连接',
+    'spice.retry': '重试',
+    'spice.scale': '自动缩放',
+    'spice.scaleOn': '开',
+    'spice.scaleOff': '关',
 
     // Monitor
     'sidebar.connectMonitor': '服务器监控',
@@ -922,6 +934,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'conn.rdpSmartSizing': 'Smart Sizing',
     'sidebar.connectRDP': 'Connect RDP',
     'sidebar.connectVNC': 'Connect VNC',
+    'sidebar.connectSPICE': 'Connect SPICE',
     'rdp.connecting': 'Connecting to {host}...',
     'rdp.connected': 'Connected',
     'rdp.disconnected': 'Disconnected',
@@ -941,6 +954,17 @@ const messages: Record<Locale, Record<string, string>> = {
     'vnc.scale': 'Scale',
     'vnc.scaleOn': 'On',
     'vnc.scaleOff': 'Off',
+
+    // SPICE
+    'spice.connecting': 'Connecting to {host}...',
+    'spice.connected': 'Connected',
+    'spice.disconnected': 'Disconnected',
+    'spice.error': 'Connection failed',
+    'spice.reconnect': 'Reconnect',
+    'spice.retry': 'Retry',
+    'spice.scale': 'Scale',
+    'spice.scaleOn': 'On',
+    'spice.scaleOff': 'Off',
 
     // Monitor
     'sidebar.connectMonitor': 'Server Monitor',

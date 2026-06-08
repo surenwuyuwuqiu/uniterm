@@ -41,6 +41,7 @@
           <el-radio-group v-model="form.type">
             <el-radio-button label="rdp" v-if="isWindows">RDP</el-radio-button>
             <el-radio-button label="vnc">VNC</el-radio-button>
+            <el-radio-button label="spice">SPICE</el-radio-button>
           </el-radio-group>
         </template>
         <template v-if="category === 'database'">
@@ -57,7 +58,7 @@
       <el-form-item :label="t('conn.port')">
         <el-input-number v-model="form.port" :min="1" :max="65535" />
       </el-form-item>
-      <el-form-item v-if="form.type !== 'vnc' && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.user')">
+      <el-form-item v-if="form.type !== 'vnc' && form.type !== 'spice' && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.user')">
         <el-input v-model="form.user" :placeholder="t('conn.userPlaceholder')" />
       </el-form-item>
       <el-form-item v-if="form.type === 'ssh' || form.type === 'mosh'" :label="t('conn.authType')">
@@ -66,7 +67,7 @@
           <el-radio-button label="key">{{ t('conn.keyPath') }}</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      <el-form-item v-if="(form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc' || form.type === 'database' || form.type === 'mosh' || form.type === 'telnet') && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.password')">
+      <el-form-item v-if="(form.authType === 'password' || form.type === 'rdp' || form.type === 'vnc' || form.type === 'spice' || form.type === 'database' || form.type === 'mosh' || form.type === 'telnet') && !(form.type === 'database' && form.dbType === 'rqlite')" :label="t('conn.password')">
         <el-input v-model="form.password" type="password" show-password :key="passwordInputKey" />
       </el-form-item>
       <el-form-item v-if="form.authType === 'key' && (form.type === 'ssh' || form.type === 'mosh')" :label="t('conn.keyPath')">
@@ -167,7 +168,7 @@ watch(visible, (val) => {
 const isEdit = computed(() => !!props.editConfig?.id)
 
 const TERMINAL_TYPES = ['ssh', 'telnet', 'mosh']
-const REMOTE_TYPES = ['rdp', 'vnc']
+const REMOTE_TYPES = ['rdp', 'vnc', 'spice']
 
 const category = computed(() => {
   if (TERMINAL_TYPES.includes(form.type)) return 'terminal'
@@ -255,6 +256,7 @@ watch(() => form.type, (newType, oldType) => {
   if (isEdit.value) return
   if (newType === 'rdp' && !REMOTE_TYPES.includes(oldType || '')) form.port = 3389
   else if (newType === 'vnc' && !REMOTE_TYPES.includes(oldType || '')) form.port = 5900
+  else if (newType === 'spice' && !REMOTE_TYPES.includes(oldType || '')) form.port = 5900
   else if (newType === 'ssh') form.port = 22
   else if (newType === 'telnet') form.port = 23
   else if (newType === 'mosh') form.port = 22

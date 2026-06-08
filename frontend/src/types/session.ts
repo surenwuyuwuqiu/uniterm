@@ -8,7 +8,7 @@ export interface ConnectionGroup {
 export interface ConnectionConfig {
   id: string
   name: string
-  type: 'ssh' | 'telnet' | 'mosh' | 'rdp' | 'vnc' | 'database' | 'local' | 'sftp' | 'monitor'
+  type: 'ssh' | 'telnet' | 'mosh' | 'rdp' | 'vnc' | 'spice' | 'database' | 'local' | 'sftp' | 'monitor'
   host: string
   port: number
   user: string

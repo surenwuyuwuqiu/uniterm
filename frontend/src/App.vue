@@ -11,7 +11,7 @@
       @tab-dragstart="onTabDragStart"
     />
     <div class="main-content">
-      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" @connect-d-b="onConnectDB" @connect-monitor="onConnectMonitor" />
+      <Sidebar :visible="sidebarVisible" @toggle="sidebarVisible = !sidebarVisible" @connect="onConnect" @connect-sftp="onConnectSftp" @connect-rdp="onConnectRDP" @connect-vnc="onConnectVNC" @connect-spice="onConnectSPICE" @connect-d-b="onConnectDB" @connect-monitor="onConnectMonitor" />
       <div class="tab-area">
         <template v-if="activeTab">
           <KeepAlive :include="['DBTabContent', 'MonitorTabContent']">
@@ -42,6 +42,13 @@
             />
             <VNCTabContent
               v-else-if="activeTab.type === 'vnc'"
+              :key="activeTab.id"
+              :panel-id="activeTab.panelId"
+              :config="getPanelConfig(activeTab.panelId)"
+              :session-id="getPanelSessionId(activeTab.panelId)"
+            />
+            <SPICETabContent
+              v-else-if="activeTab.type === 'spice'"
               :key="activeTab.id"
               :panel-id="activeTab.panelId"
               :config="getPanelConfig(activeTab.panelId)"
@@ -94,6 +101,7 @@ import WorkspaceContent from './components/WorkspaceContent.vue'
 import SFTPTabContent from './components/SFTPTabContent.vue'
 import RDPTabContent from './components/RDPTabContent.vue'
 import VNCTabContent from './components/VNCTabContent.vue'
+import SPICETabContent from './components/SPICETabContent.vue'
 import DBTabContent from './components/DBTabContent.vue'
 import MonitorTabContent from './components/MonitorTabContent.vue'
 import ConnectionForm from './components/ConnectionForm.vue'
@@ -346,6 +354,15 @@ async function closeTab(tabId: string) {
     panelStore.disconnectVNCCache(tab.panelId)
     panelStore.removeVNCCache(tab.panelId)
   }
+  // Close SPICE session
+  if (tab && tab.type === 'spice') {
+    const p = panelStore.getPanel(tab.panelId)
+    if (p?.sessionId) {
+      try { await CloseSession(p.sessionId) } catch (_) {}
+    }
+    panelStore.disconnectSPICECache(tab.panelId)
+    panelStore.removeSPICECache(tab.panelId)
+  }
   // Close database session
   if (tab && tab.type === 'database') {
     const p = panelStore.getPanel(tab.panelId)
@@ -386,6 +403,7 @@ function onSaveOnly(config: ConnectionConfig) {
 async function onConnect(config: ConnectionConfig) {
   if (config.type === 'rdp') return onConnectRDP(config)
   if (config.type === 'vnc') return onConnectVNC(config)
+  if (config.type === 'spice') return onConnectSPICE(config)
   if (config.type === 'database') return onConnectDB(config)
   connectionStore.add(config)
 
@@ -521,6 +539,27 @@ async function onConnectVNC(config: ConnectionConfig) {
     sessionStore.initSession(info.id)
   } catch (e) {
     console.error('Failed to create VNC session:', e)
+    tabStore.closeTab(tab.id)
+    panelStore.removePanel(panel.id)
+  }
+}
+
+async function onConnectSPICE(config: ConnectionConfig) {
+  connectionStore.add(config)
+
+  const displayTitle = config.name || config.host
+
+  const panel = panelStore.createPanel(config, 'spice')
+  panel.title = displayTitle
+  const tab = tabStore.createSPICETab(displayTitle, panel.id)
+  panelStore.movePanelToTab(panel.id, tab.id)
+
+  try {
+    const info = await CreateSession('spice', config)
+    panelStore.bindSession(panel.id, info.id)
+    sessionStore.initSession(info.id)
+  } catch (e) {
+    console.error('Failed to create SPICE session:', e)
     tabStore.closeTab(tab.id)
     panelStore.removePanel(panel.id)
   }

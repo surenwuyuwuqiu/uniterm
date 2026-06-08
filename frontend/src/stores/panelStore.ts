@@ -20,6 +20,11 @@ export interface VNCCache {
   container: HTMLDivElement
 }
 
+export interface SPICECache {
+  sc: any
+  container: HTMLDivElement
+}
+
 const panelState = reactive<{
   panels: Map<string, Panel>
   transferTasks: Map<string, TransferTaskUI[]>
@@ -29,7 +34,8 @@ const panelState = reactive<{
   panels: new Map(),
   transferTasks: new Map(),
   proxyAddrs: new Map(),
-  vncCaches: new Map()
+  vncCaches: new Map(),
+  spiceCaches: new Map()
 })
 
 export const usePanelStore = defineStore('panel', () => {
@@ -128,6 +134,31 @@ export const usePanelStore = defineStore('panel', () => {
     }
   }
 
+  function setSPICECache(panelId: string, cache: SPICECache) {
+    panelState.spiceCaches.set(panelId, cache)
+  }
+
+  function getSPICECache(panelId: string): SPICECache | undefined {
+    return panelState.spiceCaches.get(panelId)
+  }
+
+  function removeSPICECache(panelId: string) {
+    const cached = panelState.spiceCaches.get(panelId)
+    if (cached) {
+      if (cached.container.parentNode) {
+        cached.container.parentNode.removeChild(cached.container)
+      }
+      panelState.spiceCaches.delete(panelId)
+    }
+  }
+
+  function disconnectSPICECache(panelId: string) {
+    const cached = panelState.spiceCaches.get(panelId)
+    if (cached) {
+      try { cached.sc?.stop() } catch (_) {}
+    }
+  }
+
   return {
     panels: panelState.panels,
     transferTasks: panelState.transferTasks,
@@ -147,6 +178,10 @@ export const usePanelStore = defineStore('panel', () => {
     setVNCCache,
     getVNCCache,
     removeVNCCache,
-    disconnectVNCCache
+    disconnectVNCCache,
+    setSPICECache,
+    getSPICECache,
+    removeSPICECache,
+    disconnectSPICECache
   }
 })

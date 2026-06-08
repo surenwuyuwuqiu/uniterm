@@ -1,5 +1,19 @@
 # Changelog
 
+## v2026.06.08-alpha
+
+- **new** SPICE remote desktop protocol support.
+- **new** Panel duplicate, rename, drag image preview, and title synchronization.
+- **new** Drag active terminal tab to adjacent tab with workspace merge.
+- **improve** SSH keepalive changed from global request to session channel request (`keepalive@openssh.com`), matching OpenSSH `ServerAliveInterval` behavior; interval adjusted from 30s to 60s, max failures from 2 to 3.
+- **improve** On Windows, prefer Git Bash over WSL and fix WSL bash argument passing.
+- **improve** Suggestion popup position fixed in multi-panel workspace; SFTP scroll behavior improved.
+- **bugfix** Fixed terminal size not updating after SSH reconnect. New sessions default to 80×24 PTY; now forces a `SessionResize` with the current terminal dimensions when reconnected, so apps like vim/k9s display at the correct size.
+- **bugfix** Fixed `clear` command destroying scrollback history. Replaces ED2 (clear screen) with newline scrolling + home, pushing viewport content into scrollback before clearing.
+- **bugfix** Fixed text highlighting disappearing after tab switch. Restored history now applies `highlight()` based on the current `highlightEnabled` setting.
+- **bugfix** Fixed copy-on-select overwriting clipboard when switching panels or returning from another app. Copy now only triggers when the mouse selection actually started inside the same terminal.
+- **bugfix** Fixed dropping panel/tab onto empty tab bar area not working in certain layouts.
+
 ## v2026.06.02-alpha
 
 - **new** Telnet and Mosh connection protocol support. Telnet provides IAC negotiation (binary mode, terminal type, window size); Mosh uses UDP-based SSP protocol for low-latency mobile connections.

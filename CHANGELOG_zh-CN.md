@@ -1,5 +1,19 @@
 # 更新日志
 
+## v2026.06.08-alpha
+
+- **new** SPICE 远程桌面协议支持。
+- **new** 面板复制、重命名、拖拽图像预览、标题同步。
+- **new** 将活动终端标签拖拽到相邻标签并合并工作区。
+- **improve** SSH keepalive 从全局请求改为 session channel 请求（`keepalive@openssh.com`），对齐 OpenSSH `ServerAliveInterval` 行为；间隔从 30s 调整为 60s，最大失败次数从 2 调整为 3。
+- **improve** Windows 上优先使用 Git Bash 而非 WSL，修复 WSL bash 参数传递问题。
+- **improve** 多面板工作区中建议弹出框位置修复；SFTP 滚动行为优化。
+- **bugfix** 修复终端重连后尺寸未更新。新 session 默认以 80×24 创建 PTY；现在重连后强制发送当前终端尺寸进行 `SessionResize`，vim/k9s 等全屏应用显示正确。
+- **bugfix** 修复 `clear` 命令清除 scrollback 历史的问题。将 ED2（清屏）替换为换行滚动+归位，清屏前先将 viewport 内容推入 scrollback。
+- **bugfix** 修复切换标签后文本高亮消失。恢复历史时根据当前 `highlightEnabled` 设置重新应用高亮。
+- **bugfix** 修复选中复制在切换面板或从其他应用返回时误覆盖剪贴板。现在只有鼠标确实在本 terminal 内开始选择时才触发复制。
+- **bugfix** 修复某些布局下将面板/标签拖放到空标签栏区域不生效的问题。
+
 ## v2026.06.02-alpha
 
 - **new** Telnet 和 Mosh 连接协议支持。Telnet 提供 IAC 协商（二进制模式、终端类型、窗口大小）；Mosh 基于 UDP 的 SSP 协议实现低延迟移动连接。

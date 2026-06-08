@@ -793,6 +793,8 @@ const menu = useTerminalMenu({
     } else {
       pasteToTerminal(text)
     }
+    // Restore focus after paste so the cursor stays active in the terminal
+    focus()
   },
   onAskAI: (text) => {
     window.dispatchEvent(new CustomEvent('ai:ask', { detail: text }))

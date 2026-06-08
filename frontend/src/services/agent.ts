@@ -118,9 +118,7 @@ function buildSystemPrompt(): string {
     : 'Unix (ls, cat, grep, df, find)'
   const shellBanner = `========================================\n当前终端 (CURRENT SHELL): ${shellName}\n终端ID (PANEL ID): ${activePanel.id}\n========================================`
 
-  const selfCheck = `⚠️ 每次回复前，你必须先大声确认以下三项：\n- 当前终端类型：${shellName}\n- 当前 Shell 路径：${shellPath || activePanel.type}\n- 本次将使用的命令语法风格：${syntaxStyle}\n\n如果说不出来，请重新阅读上下文。`
-
-  return shellBanner + '\n\n' + selfCheck + switchNotice + '\n\n' + base + '\n\n--- Current Context ---\n' + parts.join('\n') + '\n---'
+  return shellBanner + switchNotice + '\n\n' + base + '\n\n--- Current Context ---\n' + parts.join('\n') + '\n---'
 }
 
 export async function runAgent(userInput: string) {

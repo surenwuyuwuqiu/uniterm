@@ -98,14 +98,14 @@ function buildCommand(command: string, marker: string, shellPath?: string): stri
   const lower = (shellPath || '').toLowerCase()
   if (lower.includes('powershell') || lower.includes('pwsh')) {
     // PowerShell syntax
-    return `$u='${marker}';${command};Write-Output $u`
+    return `${command};Write-Output "${marker}"`
   }
   if (lower.includes('cmd')) {
     // CMD syntax
-    return `set u=${marker}&${command}&echo %u%`
+    return `${command}&echo ${marker}`
   }
   // Default: bash / sh / zsh / fish
-  return ` u='${marker}';${command};echo "$u"`
+  return ` ${command};echo "${marker}"`
 }
 
 // Simple ANSI stripper for extracting readable text from terminal output

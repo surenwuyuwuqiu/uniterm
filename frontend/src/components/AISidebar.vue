@@ -212,7 +212,7 @@ const modeButtonType = computed(() => {
   switch (aiStore.mode) {
     case 'bypass': return 'danger'
     case 'confirm_dangerous': return 'warning'
-    case 'confirm_write': return ''  // default style (info-like)
+    case 'confirm_write': return 'primary'
     case 'confirm_all': return 'success'
     default: return 'warning'
   }

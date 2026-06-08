@@ -101,7 +101,7 @@ function handleReject() {
 
 const aiStore = useAIStore()
 const { t } = useI18n()
-const inExpanded = ref(false)
+const inExpanded = ref(true)
 const outExpanded = ref(false)
 const copyLabel = ref(t('ai.copyDebug'))
 const copyMdLabel = ref(t('ai.copyMarkdown'))

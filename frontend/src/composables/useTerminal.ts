@@ -9,6 +9,7 @@ import { SessionWrite, SessionResize } from '../../wailsjs/go/main/App'
 import { EventsOn, BrowserOpenURL } from '../../wailsjs/runtime'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSessionStore } from '../stores/sessionStore'
+import { highlight } from './useHighlight'
 
 export interface UseTerminalOptions {
   onSessionData?: (data: string) => void
@@ -165,6 +166,7 @@ export function useTerminal(
   let unsubscribe: (() => void) | null = null
   let statusUnsubscribe: (() => void) | null = null
   let onDocumentMouseUp: (() => void) | null = null
+  let onMouseDownGlobal: ((e: MouseEvent) => void) | null = null
 
   let resizeTimer: ReturnType<typeof setTimeout> | null = null
   let isResizing = false
@@ -340,7 +342,10 @@ export function useTerminal(
     if (sessionId) {
       const history = sessionStore.getData(sessionId)
       if (history) {
-        terminal.write(history)
+        // Apply syntax highlighting when restoring history so it matches
+        // newly arriving lines after a tab switch.
+        const hlOn = settingsStore.settings.terminal.highlightEnabled ?? true
+        terminal.write(hlOn ? highlight(history) : history)
       }
     }
 
@@ -362,24 +367,52 @@ export function useTerminal(
       }
     })
 
-    // Selection action: copy on mouse up (document-level so it works
-    // even when the mouse is released outside the terminal element)
+    // Selection action: copy on mouse up (only when a new selection was made).
+    // Use mouseDownOnThisTerminal to ensure copy only fires when the user
+    // actually started selecting inside this terminal. Without this, clicking
+    // another panel (or returning from another app) would trigger copy from
+    // this terminal's leftover selection.
+    let selectionStartText = ''
+    let mouseDownOnThisTerminal = false
     onDocumentMouseUp = () => {
+      if (!mouseDownOnThisTerminal) return
+      mouseDownOnThisTerminal = false
       if (settingsStore.settings.terminal.selectionAction === 'copy') {
         const text = terminal?.getSelection()
-        if (text) {
+        if (text && text !== selectionStartText) {
           navigator.clipboard.writeText(text)
         }
       }
     }
     document.addEventListener('mouseup', onDocumentMouseUp)
+    terminal.element?.addEventListener('mousedown', () => {
+      mouseDownOnThisTerminal = true
+      selectionStartText = terminal?.getSelection() || ''
+    })
+    onMouseDownGlobal = (e: MouseEvent) => {
+      if (!terminal || !terminal.element?.contains(e.target as Node)) {
+        mouseDownOnThisTerminal = false
+      }
+    }
+    document.addEventListener('mousedown', onMouseDownGlobal)
 
     unsubscribe = EventsOn('session:data', (payload: { id: string; data: string }) => {
       const sid = getSessionId()
       if (payload.id === sid && terminal) {
-        terminal.write(payload.data)
+        // Filter ED3 (erase scrollback). For ED2 (clear screen), replace with
+        // newline scrolling + home so that current viewport content is pushed
+        // into scrollback before clearing, matching standard terminal behavior.
+        let data = payload.data.replace(/\x1b\[3J/g, '')
+        if (data.includes('\x1b[2J')) {
+          const rows = terminal.rows
+          const scrollClear = '\n'.repeat(rows) + '\x1b[H'
+          data = data.replace(/\x1b\[H\x1b\[2J/g, scrollClear)
+          data = data.replace(/\x1b\[2J/g, scrollClear)
+        }
+        const hlOn = settingsStore.settings.terminal.highlightEnabled ?? true
+        terminal.write(hlOn ? highlight(data) : data)
         if (options?.onSessionData) {
-          options.onSessionData(payload.data)
+          options.onSessionData(data)
         }
       }
     })
@@ -476,6 +509,10 @@ export function useTerminal(
     if (onDocumentMouseUp) {
       document.removeEventListener('mouseup', onDocumentMouseUp)
       onDocumentMouseUp = null
+    }
+    if (onMouseDownGlobal) {
+      document.removeEventListener('mousedown', onMouseDownGlobal)
+      onMouseDownGlobal = null
     }
     window.removeEventListener('resize', onWindowResize)
     window.removeEventListener('split:resize-start', onSplitResizeStart)

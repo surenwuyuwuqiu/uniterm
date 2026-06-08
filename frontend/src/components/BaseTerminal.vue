@@ -360,8 +360,19 @@ onMounted(() => {
   }
 
   // Strip OSC sequences that xterm.js generates internally (color queries etc.)
-  function filterOSC(input: string): string {
-    return input.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+  // and, in normal screen, also strip CSI responses (CPR, DA, window size,
+  // focus events) that the remote shell may echo back as garbage.
+  function filterTerminalInput(input: string, inAlternateScreen: boolean): string {
+    // OSC sequences: ESC ] ... BEL or ESC ] ... ESC \
+    let filtered = input.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+    if (inAlternateScreen) {
+      return filtered
+    }
+    // Normal screen: strip terminal-generated CSI responses.
+    // Covers CPR (R), status report (n), window/cell size (t),
+    // device attributes (c), and focus in/out (I/O).
+    filtered = filtered.replace(/\x1b\[(?:[?>][\d;]*|[\d;]*)([RntcIO])/g, '')
+    return filtered
   }
 
   // Input handling
@@ -425,6 +436,7 @@ onMounted(() => {
       }
 
       const sid = props.sessionId
+      const inAlt = terminalInput?.isInAlternateScreen() ?? false
       if (sid) {
         if (props.broadcastActive && props.workspaceId) {
           const tab = tabStore.tabs.find(t => t.id === props.workspaceId)
@@ -432,13 +444,13 @@ onMounted(() => {
             for (const pid of tab.panelIds) {
               const p = panelStore.getPanel(pid)
               if (p?.sessionId && (p.type === 'ssh' || p.type === 'local')) {
-                SessionWrite(p.sessionId, filterOSC(data))
+                SessionWrite(p.sessionId, filterTerminalInput(data, inAlt))
               }
             }
             return
           }
         }
-        SessionWrite(sid, filterOSC(data))
+        SessionWrite(sid, filterTerminalInput(data, inAlt))
       }
     } else {
       // SFTP line buffering

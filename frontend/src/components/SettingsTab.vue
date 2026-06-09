@@ -379,11 +379,20 @@
         <el-form-item :label="t('settings.modelBaseURL')">
           <el-input v-model="modelForm.baseURL" />
         </el-form-item>
-        <el-form-item :label="t('settings.modelModel')">
-          <el-input v-model="modelForm.model" />
-        </el-form-item>
         <el-form-item :label="t('settings.modelApiKey')">
           <el-input v-model="modelForm.apiKey" type="password" show-password />
+        </el-form-item>
+        <el-form-item :label="t('settings.modelModel')">
+          <div class="model-fetch-row">
+            <el-autocomplete
+              v-model="modelForm.model"
+              :fetch-suggestions="(qs, cb) => cb(qs ? modelSuggestions.filter(s => s.value.toLowerCase().includes(qs.toLowerCase())) : modelSuggestions)"
+              class="model-autocomplete"
+            />
+            <el-button size="small" :loading="modelFetching" @click="fetchModelList">
+              {{ t('settings.fetchModels') }}
+            </el-button>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -404,6 +413,7 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2, History, Search } from '@lucide/vue'
 import { ElMessage } from 'element-plus'
+import { FetchModels } from '../../wailsjs/go/main/App'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSyncStore } from '../stores/syncStore'
 import { useI18n } from '../i18n'
@@ -531,6 +541,8 @@ const categories = computed(() => {
 })
 
 const showModelForm = ref(false)
+const modelSuggestions = ref<Array<{ value: string }>>([])
+const modelFetching = ref(false)
 const editingModel = ref<AIModelConfig | null>(null)
 const modelForm = reactive({
   id: '',
@@ -542,6 +554,7 @@ const modelForm = reactive({
 
 function editModel(model: AIModelConfig) {
   editingModel.value = model
+  modelSuggestions.value = []
   Object.assign(modelForm, { ...model })
   showModelForm.value = true
 }
@@ -569,6 +582,27 @@ function resetModelForm() {
   modelForm.baseURL = ''
   modelForm.model = ''
   modelForm.apiKey = ''
+  modelSuggestions.value = []
+}
+
+async function fetchModelList() {
+  if (!modelForm.apiKey || !modelForm.baseURL) {
+    ElMessage.warning(t('settings.fetchModelsHint'))
+    return
+  }
+  modelFetching.value = true
+  modelSuggestions.value = []
+  try {
+    const models = await FetchModels(modelForm.apiKey, modelForm.baseURL)
+    modelSuggestions.value = (models || []).map(m => ({
+      value: m.display_name || m.id
+    }))
+    ElMessage.success(t('settings.fetchModelsSuccess', { count: modelSuggestions.value.length }))
+  } catch (e: any) {
+    ElMessage.error(t('settings.fetchModelsFailed'))
+  } finally {
+    modelFetching.value = false
+  }
 }
 
 function getShellLabel(path: string): string {
@@ -1012,5 +1046,14 @@ function getShellLabel(path: string): string {
   padding: 10px 14px;
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-hover);
+}
+
+.model-fetch-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.model-autocomplete {
+  flex: 1;
 }
 </style>

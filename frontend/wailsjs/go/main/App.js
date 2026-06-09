@@ -62,6 +62,10 @@ export function ExecuteStatement(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExecuteStatement'](arg1, arg2, arg3);
 }
 
+export function FetchModels(arg1, arg2) {
+  return window['go']['main']['App']['FetchModels'](arg1, arg2);
+}
+
 export function GetAppInfo() {
   return window['go']['main']['App']['GetAppInfo']();
 }

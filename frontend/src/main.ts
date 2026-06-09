@@ -7,8 +7,7 @@ import App from './App.vue'
 import './style.css'
 import { useSettingsStore } from './stores/settingsStore'
 
-const version = import.meta.env.VITE_VERSION || 'dev'
-WindowSetTitle(`uniTerm ${version}`)
+WindowSetTitle('uniTerm')
 
 const app = createApp(App)
 const pinia = createPinia()

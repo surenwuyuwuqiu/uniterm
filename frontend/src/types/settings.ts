@@ -1,5 +1,10 @@
+export const SUPPORTED_LOCALES = [
+  'zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'de', 'es', 'fr', 'ru'
+] as const
+
+export type Locale = typeof SUPPORTED_LOCALES[number]
+export type Language = Locale | 'system'
 export type Theme = 'dark' | 'deep-blue' | 'light' | 'system'
-export type Language = 'zh-CN' | 'en' | 'system'
 export type TerminalTheme = 'dark' | 'light' | 'solarized-dark' | 'solarized-light' | 'monokai'
 
 export interface TerminalSettings {
@@ -85,4 +90,16 @@ export const SELECTION_ACTIONS: { label: string; value: TerminalSettings['select
 export const RIGHT_CLICK_ACTIONS: { label: string; value: TerminalSettings['rightClickAction'] }[] = [
   { label: 'Show context menu', value: 'menu' },
   { label: 'Paste from clipboard', value: 'paste' }
+]
+
+export const LANGUAGE_OPTIONS: { value: Locale; label: string; native: string }[] = [
+  { value: 'zh-CN', label: '简体中文', native: '简体中文' },
+  { value: 'zh-TW', label: '繁體中文', native: '繁體中文' },
+  { value: 'en', label: 'English', native: 'English' },
+  { value: 'ja', label: '日本語', native: '日本語' },
+  { value: 'ko', label: '한국어', native: '한국어' },
+  { value: 'de', label: 'Deutsch', native: 'Deutsch' },
+  { value: 'es', label: 'Español', native: 'Español' },
+  { value: 'fr', label: 'Français', native: 'Français' },
+  { value: 'ru', label: 'Русский', native: 'Русский' },
 ]

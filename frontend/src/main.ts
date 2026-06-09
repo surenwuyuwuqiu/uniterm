@@ -5,13 +5,19 @@ import 'element-plus/dist/index.css'
 import { WindowSetTitle } from '../wailsjs/runtime'
 import App from './App.vue'
 import './style.css'
+import { useSettingsStore } from './stores/settingsStore'
 
 const version = import.meta.env.VITE_VERSION || 'dev'
 WindowSetTitle(`uniTerm ${version}`)
 
 const app = createApp(App)
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 app.use(ElementPlus)
+
+const settingsStore = useSettingsStore()
+await settingsStore.init()
+
 app.mount('#app')
 
 // Global context menu closer: broadcast to all menu components via window event

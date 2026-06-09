@@ -4,6 +4,7 @@ import type { AppSettings, AIModelConfig } from '../types/settings'
 import { DEFAULT_SETTINGS } from '../types/settings'
 import { SaveSettings, LoadSettings, GetAvailableShells } from '../../wailsjs/go/main/App'
 import { EventsOn } from '../../wailsjs/runtime'
+import { setLocale } from '../i18n'
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<AppSettings>({ ...DEFAULT_SETTINGS })
@@ -50,6 +51,7 @@ export const useSettingsStore = defineStore('settings', () => {
       availableShells.value = []
     }
     applyTheme()
+    setLocale(settings.value.language)
   }
 
   async function save() {
@@ -67,6 +69,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function updateLanguage(value: AppSettings['language']) {
     settings.value.language = value
+    setLocale(value)
     save()
   }
 

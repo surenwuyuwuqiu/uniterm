@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-tab" :key="settingsStore.settings.language">
+  <div class="settings-tab">
     <div class="settings-sidebar">
       <div
         v-for="cat in categories"
@@ -40,9 +40,13 @@
               <div class="setting-desc">{{ t('settings.languageDesc') }}</div>
             </div>
             <div class="setting-control">
-              <el-select v-model="settingsStore.settings.language" size="small" @change="settingsStore.save()">
-                <el-option :label="t('settings.langZhCN')" value="zh-CN" />
-                <el-option :label="t('settings.langEn')" value="en" />
+              <el-select :model-value="settingsStore.settings.language" size="small" @change="settingsStore.updateLanguage">
+                <el-option
+                  v-for="lang in LANGUAGE_OPTIONS"
+                  :key="lang.value"
+                  :label="lang.native"
+                  :value="lang.value"
+                />
                 <el-option :label="t('settings.langSystem')" value="system" />
               </el-select>
             </div>
@@ -405,7 +409,7 @@ import { useSyncStore } from '../stores/syncStore'
 import { useI18n } from '../i18n'
 import { useSuggestions } from '../composables/useSuggestions'
 import type { HistoryEntry } from '../composables/useSuggestions'
-import { TERMINAL_THEMES, FONT_OPTIONS } from '../types/settings'
+import { TERMINAL_THEMES, FONT_OPTIONS, LANGUAGE_OPTIONS } from '../types/settings'
 import type { AIModelConfig } from '../types/settings'
 import AddRepoDialog from './AddRepoDialog.vue'
 import EditRepoDialog from './EditRepoDialog.vue'

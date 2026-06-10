@@ -38,7 +38,7 @@ Connection management, workspace splits, cloud sync, themes — your terminal, y
 - **Workspace & Split Panes** — Merge terminal tabs into a workspace with horizontal or vertical splits. Drag panel edges or title bars to resize and rearrange freely.
 - **Cloud Sync** — Build your own private sync repository via GitHub, GitLab, or Gitee. All configurations (connections, AI model keys, app settings) are encrypted with AES-256-GCM before syncing. Supports automatic sync, conflict resolution, master password changes, and repository management.
 - **Themes** — Dark, Deep Blue, and Light themes with automatic system theme detection.
-- **Internationalization** — Simplified Chinese and English UI, built with a clean i18n architecture ready for more languages.
+- **Internationalization** — 9-language UI: zh-CN, zh-TW, en, ja, ko, de, es, fr, ru.
 - **Cross-Platform** — Built on Wails v2, runs natively on Windows, macOS, and Linux.
 
 ## Quick Workflows

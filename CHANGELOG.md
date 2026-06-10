@@ -1,5 +1,16 @@
 # Changelog
 
+## v2026.06.10-alpha
+
+- **new** Multilingual support. Supports 9 languages (zh-CN, zh-TW, en, ja, ko, de, es, fr, ru) with real-time switching in settings.
+- **new** AI model list sync. One-click fetch available models from the server in the model edit dialog, with autocomplete suggestions in the model input.
+- **new** Sidebar search now supports filtering by connection type (Terminal / Remote Desktop / Database), combined with text search.
+- **improve** Simplified AI command markers (echo-only), removed self-check from system prompt, expanded run confirmation panel by default.
+- **improve** Fixed AI confirm-write button to use primary color style.
+- **improve** Window title simplified, showing only "uniTerm" without version number.
+- **bugfix** Fixed terminal losing focus after paste, causing invisible cursor.
+- **bugfix** Fixed CSI response sequences being echoed as garbage text by bash on tab switch.
+
 ## v2026.06.08-alpha
 
 - **new** SPICE remote desktop protocol support.

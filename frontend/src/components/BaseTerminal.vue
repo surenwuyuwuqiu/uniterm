@@ -430,10 +430,10 @@ function resize() {
       return
     }
 
-    // Subtract scrollbar width so the canvas doesn't overlap the scrollbar.
+    const TERMINAL_PADDING = 4
     const scrollbarWidth = (terminal as any)._core?.viewport?.scrollBarWidth || 0
-    const cols = Math.floor((rect.width - scrollbarWidth) / cellWidth)
-    const rows = Math.floor(rect.height / cellHeight)
+    const cols = Math.floor((rect.width - TERMINAL_PADDING * 2 - scrollbarWidth) / cellWidth)
+    const rows = Math.floor((rect.height - TERMINAL_PADDING * 2) / cellHeight)
     const newCols = Math.max(2, cols)
     const newRows = Math.max(1, rows)
 
@@ -1380,6 +1380,8 @@ defineExpose({
   width: 100%;
   height: 100%;
   display: block;
+  box-sizing: border-box;
+  padding: 4px;
 }
 .terminal-area :deep(.xterm),
 .terminal-area :deep(.xterm-viewport) {

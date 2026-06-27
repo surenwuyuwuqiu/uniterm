@@ -123,9 +123,8 @@ function onClose() {
 }
 
 function onDblClick(e: MouseEvent) {
-  if (platform.value === 'darwin') return
   const target = e.target as HTMLElement
-  if (target.closest('button') || target.closest('.window-controls')) return
+  if (target.closest('button, input, textarea, select, a, [role="button"], .tab-item, .tab-more, .window-controls')) return
   onMaximise()
 }
 

@@ -1,6 +1,7 @@
 <template>
   <div
     class="app-header"
+    :class="`platform-${platform}`"
     @dblclick="onDblClick"
   >
     <!-- macOS: spacer for native traffic lights -->
@@ -165,6 +166,12 @@ onUnmounted(() => {
   --wails-draggable: drag;
 }
 
+.app-header.platform-darwin {
+  height: 52px;
+  padding: 0 10px;
+  gap: 8px;
+}
+
 .app-header::after {
   content: '';
   position: absolute;
@@ -188,6 +195,7 @@ onUnmounted(() => {
   min-width: 0;
   overflow: hidden;
   justify-content: flex-start;
+  align-items: center;
 }
 
 .header-tabs.tabs-centered {
@@ -198,6 +206,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 28px;
   padding: 5px 8px;
   font-family: var(--font-ui);
   font-size: 12px;
@@ -254,11 +263,16 @@ onUnmounted(() => {
 
 .mac-traffic-light-spacer {
   width: 72px;
+  height: 1px;
   flex-shrink: 0;
 }
 
 .app-header :deep(.window-controls) {
   --wails-draggable: no-drag;
+}
+
+.app-header.platform-darwin :deep(.window-controls) {
+  align-self: center;
 }
 
 </style>

@@ -286,7 +286,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 6px 12px;
+  height: 28px;
+  padding: 0 12px;
   margin: 0 1px;
   cursor: pointer;
   user-select: none;
@@ -360,10 +361,13 @@ onUnmounted(() => {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 2px 4px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
   border-radius: 3px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
 }
 .tab-ai-lock .ai-lock-icon {
   display: block;

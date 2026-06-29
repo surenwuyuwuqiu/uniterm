@@ -266,7 +266,7 @@ function onTabDrop(e: DragEvent, targetTabId: string, index: number) {
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
-  align-items: stretch;
+  align-items: center;
   scrollbar-width: none;
   min-width: 0;
 }
@@ -279,6 +279,7 @@ function onTabDrop(e: DragEvent, targetTabId: string, index: number) {
   align-items: center;
   flex-shrink: 0;
   padding: 0 4px;
+  height: 28px;
 }
 .tab-more-btn {
   display: inline-flex;

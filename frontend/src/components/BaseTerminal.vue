@@ -508,6 +508,75 @@ function filterTerminalInput(input: string, inAlternateScreen: boolean): string 
   return filtered
 }
 
+function writeTerminalInput(data: string, inAlternateScreen: boolean) {
+  const sid = props.sessionId
+  const filtered = filterTerminalInput(data, inAlternateScreen)
+  if (!sid || !filtered) return
+
+  if (props.broadcastActive && props.workspaceId) {
+    const tab = tabStore.tabs.find(t => t.id === props.workspaceId)
+    if (tab && tab.type === 'workspace') {
+      for (const pid of tab.panelIds) {
+        const p = panelStore.getPanel(pid)
+        if (p?.sessionId && (p.type === 'ssh' || p.type === 'local')) {
+          SessionWrite(p.sessionId, filtered)
+        }
+      }
+      return
+    }
+  }
+
+  SessionWrite(sid, filtered)
+}
+
+function handleTerminalKey(e: KeyboardEvent): boolean {
+  // Check global shortcuts first (Ctrl+Shift+/Alt+ combos)
+  if (e.type === 'keydown' && !onTerminalKey(e)) return false
+
+  if (e.ctrlKey && e.key === 'f' && e.type === 'keydown') {
+    openSearch()
+    return false
+  }
+
+  // Suggestion navigation (only on keydown, ignore keyup)
+  if (suggestions.isVisible() && e.type === 'keydown') {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      suggestions.selectNext()
+      return false
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      suggestions.selectPrev()
+      return false
+    }
+    if (e.key === 'Tab') {
+      const selected = suggestions.getSelectedItem()
+      if (selected) {
+        e.preventDefault()
+        applySuggestion(selected)
+        return false
+      }
+    }
+    if (e.key === 'Enter') {
+      // Only apply suggestion if user explicitly selected one with arrow keys
+      const selected = suggestions.getSelectedItem()
+      if (selected) {
+        e.preventDefault()
+        applySuggestion(selected)
+        return false
+      }
+      // No selection: let xterm handle Enter normally (terminal command execution)
+    }
+    if (e.key === 'Escape') {
+      suggestions.close()
+      return false
+    }
+  }
+
+  return true
+}
+
 let bindListeners: (() => void) | null = null
 
 onMounted(() => {
@@ -636,6 +705,8 @@ onMounted(() => {
     const sidNow = props.sessionId
     const gen = sidNow ? bumpOnDataGeneration(sidNow) : 0
 
+    keyHandlerDispose = terminal.attachCustomKeyEventHandler(handleTerminalKey)
+
     // Input handling
     onDataDispose = terminal.onData((data) => {
       // ── Stale callback guard (terminal-shared) ──
@@ -736,19 +807,7 @@ onMounted(() => {
       const sid = props.sessionId
       const inAlt = terminalInput?.isInAlternateScreen() ?? false
       if (sid) {
-        if (props.broadcastActive && props.workspaceId) {
-          const tab = tabStore.tabs.find(t => t.id === props.workspaceId)
-          if (tab && tab.type === 'workspace') {
-            for (const pid of tab.panelIds) {
-              const p = panelStore.getPanel(pid)
-              if (p?.sessionId && (p.type === 'ssh' || p.type === 'local')) {
-                SessionWrite(p.sessionId, filterTerminalInput(data, inAlt))
-              }
-            }
-            return
-          }
-        }
-        SessionWrite(sid, filterTerminalInput(data, inAlt))
+        writeTerminalInput(data, inAlt)
       }
     } else {
       // SFTP line buffering
@@ -975,55 +1034,6 @@ onMounted(() => {
     }
   }
   window.addEventListener('terminal:send-rz', onSendRz)
-
-  // Ctrl+F to open search
-  keyHandlerDispose = terminal.attachCustomKeyEventHandler((e) => {
-    // Check global shortcuts first (Ctrl+Shift+/Alt+ combos)
-    if (e.type === 'keydown' && !onTerminalKey(e)) return false
-
-    if (e.ctrlKey && e.key === 'f' && e.type === 'keydown') {
-      openSearch()
-      return false
-    }
-
-    // Suggestion navigation (only on keydown, ignore keyup)
-    if (suggestions.isVisible() && e.type === 'keydown') {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        suggestions.selectNext()
-        return false
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        suggestions.selectPrev()
-        return false
-      }
-      if (e.key === 'Tab') {
-        const selected = suggestions.getSelectedItem()
-        if (selected) {
-          e.preventDefault()
-          applySuggestion(selected)
-          return false
-        }
-      }
-      if (e.key === 'Enter') {
-        // Only apply suggestion if user explicitly selected one with arrow keys
-        const selected = suggestions.getSelectedItem()
-        if (selected) {
-          e.preventDefault()
-          applySuggestion(selected)
-          return false
-        }
-        // No selection: let xterm handle Enter normally (terminal command execution)
-      }
-      if (e.key === 'Escape') {
-        suggestions.close()
-        return false
-      }
-    }
-
-    return true
-  })
 
   bindListeners()
 

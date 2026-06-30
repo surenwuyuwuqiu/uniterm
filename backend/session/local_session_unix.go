@@ -51,7 +51,7 @@ func (s *LocalSession) Connect(config ConnectionConfig) error {
 	s.title = shellName(shell)
 
 	s.cmd = exec.Command(shell)
-	s.cmd.Env = os.Environ()
+	s.cmd.Env = ensureTerminalEnv(os.Environ())
 
 	ptyFile, err := pty.Start(s.cmd)
 	if err != nil {
@@ -181,4 +181,97 @@ func shellName(path string) string {
 		base = strings.TrimSuffix(base, ".exe")
 	}
 	return base
+}
+
+// ensureTerminalEnv guarantees the local shell starts with a usable terminal
+// environment: a UTF-8 locale and a valid TERM.
+//
+// When the app is launched from the macOS Finder/Dock (rather than a terminal),
+// it inherits no LANG/LC_* and no TERM. The PTY shell then runs in the C/POSIX
+// locale with an unknown terminal, which breaks zsh in two ways:
+//   - C locale: zsh's line editor binds every 0x80-0xFF byte to self-insert and
+//     cannot compose multibyte UTF-8 — garbled CJK/IME input.
+//   - missing TERM: zsh's ZLE has no terminfo to redraw the line, so backspace
+//     and other editing keys leave the display out of sync and appear broken.
+// bash/sh tolerate both; zsh's ZLE does not. We inject each variable only when
+// it is not already set so we never override the user's explicit configuration.
+func ensureTerminalEnv(env []string) []string {
+	cleaned := make([]string, 0, len(env)+3)
+	hasLocale := false
+	hasTerm := false
+	for _, kv := range env {
+		isLocaleKey := strings.HasPrefix(kv, "LC_ALL=") ||
+			strings.HasPrefix(kv, "LC_CTYPE=") ||
+			strings.HasPrefix(kv, "LANG=")
+		if isLocaleKey {
+			idx := strings.IndexByte(kv, '=')
+			if idx >= 0 && kv[idx+1:] != "" {
+				hasLocale = true
+			} else {
+				// Drop empty locale entries so they can't shadow the value
+				// we inject below (libc may honor the first duplicate key).
+				continue
+			}
+		}
+		if strings.HasPrefix(kv, "TERM=") {
+			if kv != "TERM=" {
+				hasTerm = true
+			} else {
+				continue
+			}
+		}
+		cleaned = append(cleaned, kv)
+	}
+	if !hasLocale {
+		locale := preferredUTF8Locale()
+		cleaned = append(cleaned, "LANG="+locale, "LC_CTYPE="+locale)
+	}
+	if !hasTerm {
+		cleaned = append(cleaned, "TERM=xterm-256color")
+	}
+	return cleaned
+}
+
+// preferredUTF8Locale returns a UTF-8 locale to use for the local shell,
+// preferring the user's system language when a matching UTF-8 locale exists and
+// falling back to the universally available en_US.UTF-8.
+func preferredUTF8Locale() string {
+	const fallback = "en_US.UTF-8"
+	if runtime.GOOS != "darwin" {
+		return fallback
+	}
+	out, err := exec.Command("defaults", "read", "-g", "AppleLocale").Output()
+	if err != nil {
+		return fallback
+	}
+	region := strings.TrimSpace(string(out))
+	// AppleLocale may carry a script subtag (e.g. zh_Hans_CN); reduce to
+	// language_region which is what UTF-8 locales are named after.
+	parts := strings.Split(region, "_")
+	if len(parts) >= 3 {
+		region = parts[0] + "_" + parts[len(parts)-1]
+	}
+	if region == "" {
+		return fallback
+	}
+	candidate := region + ".UTF-8"
+	if localeAvailable(candidate) {
+		return candidate
+	}
+	return fallback
+}
+
+// localeAvailable reports whether `locale -a` lists the given locale.
+func localeAvailable(name string) bool {
+	out, err := exec.Command("locale", "-a").Output()
+	if err != nil {
+		return false
+	}
+	target := strings.ToLower(strings.ReplaceAll(name, "-", ""))
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.ToLower(strings.ReplaceAll(strings.TrimSpace(line), "-", "")) == target {
+			return true
+		}
+	}
+	return false
 }

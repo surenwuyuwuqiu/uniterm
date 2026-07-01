@@ -1065,8 +1065,9 @@ onActivated(() => {
   // setting isActive = true. The session:data handler gates on
   // isActive, so new data would race with the gap replay and
   // advance writtenChunks, making the gap undetectable.
-  // Uses chunk index (not byte offset) so sessionStore trimming
-  // doesn't invalidate the tracking position.
+  // Uses a monotonic sequence number (getChunkCount), not an array
+  // index, so front-trimming of the sessionStore buffer during a
+  // long background session doesn't invalidate the tracking position.
   if (props.sessionId) {
     const total = sessionStore.getChunkCount(props.sessionId)
     if (total > writtenChunks) {

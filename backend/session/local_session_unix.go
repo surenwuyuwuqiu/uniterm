@@ -50,7 +50,7 @@ func (s *LocalSession) Connect(config ConnectionConfig) error {
 
 	s.title = shellName(shell)
 
-	s.cmd = exec.Command(shell)
+	s.cmd = exec.Command(shell, loginShellArgs(shell)...)
 	s.cmd.Env = ensureTerminalEnv(os.Environ())
 
 	ptyFile, err := pty.Start(s.cmd)
@@ -181,6 +181,37 @@ func shellName(path string) string {
 		base = strings.TrimSuffix(base, ".exe")
 	}
 	return base
+}
+
+// loginShellArgs returns the arguments needed to start the shell as a login
+// shell on macOS.
+//
+// When the app is launched from the macOS Finder/Dock, the process inherits a
+// minimal PATH (roughly /usr/bin:/bin:/usr/sbin:/sbin). A plain interactive
+// shell does not restore it, so tools in /usr/local/bin, /opt/homebrew/bin,
+// etc. are "command not found". Terminal.app and iTerm avoid this by starting
+// login shells: on macOS the login shell sources /etc/zprofile (or
+// /etc/profile), which runs path_helper to rebuild PATH from /etc/paths and
+// /etc/paths.d, and then the user's ~/.zprofile / ~/.bash_profile.
+//
+// This is scoped to macOS. Linux terminal emulators conventionally launch
+// non-login interactive shells and the GUI session already exports a full
+// PATH, so we leave that behavior unchanged there.
+//
+// bash/zsh/sh accept -l; fish uses --login. csh/tcsh also accept -l. Unknown
+// shells get no argument to avoid passing a flag they might reject.
+func loginShellArgs(shellPath string) []string {
+	if runtime.GOOS != "darwin" {
+		return nil
+	}
+	switch shellName(shellPath) {
+	case "bash", "zsh", "sh", "dash", "ksh", "mksh", "csh", "tcsh":
+		return []string{"-l"}
+	case "fish":
+		return []string{"--login"}
+	default:
+		return nil
+	}
 }
 
 // ensureTerminalEnv guarantees the local shell starts with a usable terminal

@@ -15,17 +15,37 @@ export interface WatchResult {
   timedOut: boolean
 }
 
+// Split terminal output into display lines. Splits on newlines and, within a
+// line, keeps only the text after the last carriage return so progress-bar
+// style redraws (which overwrite the line with bare \r) collapse to their
+// final state — the same way the text appears on screen.
+function toDisplayLines(clean: string): string[] {
+  return clean.split(/\r?\n/).map((line) => {
+    const cr = line.lastIndexOf('\r')
+    return cr >= 0 ? line.slice(cr + 1) : line
+  })
+}
+
+// Watch session output and resolve when the command finishes.
+//
+// Completion is detected by the shell prompt reappearing: `promptLine` is the
+// prompt captured immediately before the command was sent, and once that exact
+// line shows up again at the bottom of the output the shell is back at the
+// prompt and the command is done. No marker is injected into the shell, so the
+// terminal shows nothing extra.
+//
+// When `promptLine` is empty (prompt could not be captured, or the prompt is
+// dynamic and never reappears verbatim) detection is skipped entirely and the
+// call resolves on timeout — the command already carries its own timeout.
 export function watchOutput(
   sessionId: string,
-  marker: string,
+  promptLine: string,
   timeoutMs: number
 ): { promise: Promise<WatchResult>; cleanup: () => void } {
   let timeoutId: ReturnType<typeof setTimeout>
   let unsubscribe: (() => void) | null = null
   let resolved = false
   let output = ''
-  let lastScanPos = 0
-  let markerSeen = false
 
   const cleanup = () => {
     clearTimeout(timeoutId)
@@ -38,21 +58,20 @@ export function watchOutput(
       if (payload.id !== sessionId || resolved) return
 
       output += payload.data
-      const clean = stripAnsi(output).trim()
+      if (!promptLine) return
 
-      const scanStart = Math.max(0, lastScanPos - marker.length)
-      lastScanPos = clean.length
-      let searchIdx = scanStart
-      while ((searchIdx = clean.indexOf(marker, searchIdx)) !== -1) {
-        searchIdx += marker.length
-        if (!markerSeen) {
-          markerSeen = true
-          continue
-        }
+      const lines = toDisplayLines(stripAnsi(output))
+      // Locate the last non-blank display line.
+      let last = lines.length - 1
+      while (last >= 0 && lines[last].trimEnd() === '') last--
+      // Require at least the echoed command line before the prompt, so the
+      // reappearing prompt — not the initial state — is what triggers.
+      if (last < 1) return
+
+      if (lines[last].trimEnd() === promptLine) {
         cleanup()
-        const result = clean.slice(0, searchIdx - marker.length).trim()
+        const result = lines.slice(0, last).join('\n').trim()
         resolve({ output: result, timedOut: false })
-        return
       }
     })
 
@@ -120,6 +139,20 @@ function getShellNewline(shellPath?: string): string {
   }
 }
 
+// Read the current prompt line from the terminal buffer. Called right before a
+// command is sent, when the cursor sits on the (freshly drawn) prompt with no
+// input yet, so the cursor line's text is exactly the prompt string. Returns ''
+// when unavailable, which disables prompt detection for that command.
+function capturePromptLine(sessionId: string): string {
+  const managed = getManagedTerminal(sessionId)
+  const terminal = managed?.terminal
+  if (!terminal) return ''
+  const buffer = terminal.buffer.active
+  const line = buffer.getLine(buffer.baseY + buffer.cursorY)
+  if (!line) return ''
+  return line.translateToString(true).trimEnd()
+}
+
 export async function executeCommand(
   command: string,
   timeoutMs: number = 60000,
@@ -127,13 +160,13 @@ export async function executeCommand(
   tailLines: number = 300
 ): Promise<ExecuteResult> {
   const { sessionId, shellPath } = resolveActiveSession()
-  const marker = `__AI_DONE_${Date.now()}_${Math.random().toString(36).slice(2, 8)}__`
-  const fullCommand = buildCommand(command, marker, shellPath)
+  const promptLine = capturePromptLine(sessionId)
+  const fullCommand = buildCommand(command, shellPath)
   const newline = getShellNewline(shellPath)
 
   await SessionWrite(sessionId, fullCommand + newline)
 
-  const { promise } = watchOutput(sessionId, marker, timeoutMs)
+  const { promise } = watchOutput(sessionId, promptLine, timeoutMs)
   const result = await promise
 
   if (result.timedOut) {
@@ -314,18 +347,18 @@ export async function sendTerminalKey(
   return { output: '(input sent)' }
 }
 
-function buildCommand(command: string, marker: string, shellPath?: string): string {
+// Build the string sent to the shell. No completion marker is appended — the
+// AI executor detects completion by watching for the shell prompt to reappear
+// (see watchOutput). This keeps the terminal clean and, for POSIX shells,
+// avoids corrupting multi-line input such as here-documents. A single leading
+// space keeps the command out of shell history (HISTCONTROL=ignorespace).
+function buildCommand(command: string, shellPath?: string): string {
   const lower = (shellPath || '').toLowerCase()
-  if (lower.includes('powershell') || lower.includes('pwsh')) {
-    // PowerShell syntax — use newline to keep here-string terminators ("@ / '@) intact
-    return `${command}\nWrite-Output "${marker}"`
+  if (lower.includes('powershell') || lower.includes('pwsh') || lower.includes('cmd')) {
+    return command
   }
-  if (lower.includes('cmd')) {
-    // CMD syntax
-    return `${command}&echo ${marker}`
-  }
-  // Default: bash / sh / zsh / fish — leading spaces keep both out of shell history
-  return ` ${command}\n echo "${marker}"`
+  // bash / sh / zsh / fish
+  return ` ${command}`
 }
 
 // Simple ANSI stripper for extracting readable text from terminal output

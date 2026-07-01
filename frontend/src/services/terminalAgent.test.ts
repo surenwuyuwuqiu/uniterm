@@ -15,6 +15,25 @@ vi.mock('../../wailsjs/go/main/App', () => ({
   SessionWrite: mockSessionWrite,
 }))
 
+// ---- mock terminal manager (prompt-line capture) ----
+const PROMPT = '[root@node140 ~]#'
+const mockGetManagedTerminal = vi.fn(() => ({
+  terminal: {
+    buffer: {
+      active: {
+        baseY: 0,
+        cursorY: 0,
+        getLine: (_n: number) => ({
+          translateToString: (_trim?: boolean) => PROMPT,
+        }),
+      },
+    },
+  },
+}))
+vi.mock('../services/terminalManager', () => ({
+  getManagedTerminal: (...args: any[]) => mockGetManagedTerminal(...(args as [])),
+}))
+
 // ---- mock pinia stores ----
 const mockPanel = {
   sessionId: 'test-session-id',
@@ -49,9 +68,6 @@ import { EventsOn } from '../../wailsjs/runtime'
 
 // ---- helpers ----
 const MOCK_TIMESTAMP = 1700000000000
-// Math.random = 0 => toString(36) = "0" => slice(2,8) = "" => ""
-// Marker = __AI_DONE_ + timestamp + _ + random + __ = __AI_DONE_1700000000000___
-const MOCK_MARKER = `__AI_DONE_${MOCK_TIMESTAMP}_${''}__`
 
 function fakeData(sessionId: string, data: string) {
   return { id: sessionId, data }
@@ -152,30 +168,65 @@ describe('watchOutput', () => {
   })
 
   it('returns promise and cleanup', () => {
-    const result = watchOutput('session-1', '__MARK__', 1000)
+    const result = watchOutput('session-1', PROMPT, 1000)
     expect(result.promise).toBeInstanceOf(Promise)
     expect(typeof result.cleanup).toBe('function')
   })
 
-  it('emits with events and resolves on second marker', async () => {
+  it('resolves when the prompt line reappears after the command', async () => {
     let capturedCallback: ((payload: { id: string; data: string }) => void) | null = null
     vi.mocked(EventsOn).mockImplementation((_eventName, callback) => {
       capturedCallback = callback
       return () => { }
     })
 
-    const { promise } = watchOutput('s1', '__M__', 5000)
+    const { promise } = watchOutput('s1', PROMPT, 5000)
 
-    // first marker
-    capturedCallback!(fakeData('s1', 'some output\n__M__'))
-
-    // Wait a tick, then send second marker
-    await new Promise(r => setTimeout(r, 10))
-    capturedCallback!(fakeData('s1', 'more output\n__M__'))
+    // Echoed command line, then output, then the prompt returns.
+    capturedCallback!(fakeData('s1', `${PROMPT} echo hi\nhi\n${PROMPT} `))
 
     const result: WatchResult = await promise
     expect(result.timedOut).toBe(false)
-    expect(result.output).toContain('some output')
+    expect(result.output).toContain('hi')
+  })
+
+  it('does not resolve on the initial prompt alone', async () => {
+    vi.useFakeTimers()
+    let capturedCallback: ((payload: { id: string; data: string }) => void) | null = null
+    vi.mocked(EventsOn).mockImplementation((_eventName, callback) => {
+      capturedCallback = callback
+      return () => { }
+    })
+
+    const { promise } = watchOutput('s1', PROMPT, 1000)
+
+    // Only the prompt so far (no echoed command line before it) → keep waiting.
+    capturedCallback!(fakeData('s1', `${PROMPT} `))
+    vi.advanceTimersByTime(1000)
+
+    const result: WatchResult = await promise
+    expect(result.timedOut).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it('never resolves early when promptLine is empty (timeout only)', async () => {
+    vi.useFakeTimers()
+    let capturedCallback: ((payload: { id: string; data: string }) => void) | null = null
+    vi.mocked(EventsOn).mockImplementation((_eventName, callback) => {
+      capturedCallback = callback
+      return () => { }
+    })
+
+    const { promise } = watchOutput('s1', '', 1000)
+
+    // Even output that looks like a prompt must not trigger detection.
+    capturedCallback!(fakeData('s1', `${PROMPT} echo hi\nhi\n${PROMPT} `))
+    vi.advanceTimersByTime(1000)
+
+    const result: WatchResult = await promise
+    expect(result.timedOut).toBe(true)
+    expect(result.output).toContain('hi')
+    vi.useRealTimers()
   })
 
   it('times out after timeoutMs', async () => {
@@ -186,7 +237,7 @@ describe('watchOutput', () => {
       return () => { }
     })
 
-    const { promise } = watchOutput('s1', '__M__', 1000)
+    const { promise } = watchOutput('s1', PROMPT, 1000)
 
     capturedCallback!(fakeData('s1', 'partial output'))
     vi.advanceTimersByTime(1000)
@@ -205,7 +256,7 @@ describe('watchOutput', () => {
       return () => { }
     })
 
-    const { promise } = watchOutput('s1', '__M__', 1000)
+    const { promise } = watchOutput('s1', PROMPT, 1000)
 
     capturedCallback!(fakeData('s2', 'wrong session data'))
     vi.advanceTimersByTime(1000)
@@ -221,7 +272,7 @@ describe('watchOutput', () => {
       return () => { }
     })
 
-    const { promise, cleanup } = watchOutput('s1', '__M__', 1000)
+    const { promise, cleanup } = watchOutput('s1', PROMPT, 1000)
     cleanup()
 
     // Should not resolve/resolve with undefined after cleanup
@@ -253,7 +304,7 @@ describe('executeCommand', () => {
     await expect(executeCommand('ls')).rejects.toThrow('No active terminal session')
   })
 
-  it('writes command with marker to session', async () => {
+  it('sends the command with no injected marker', async () => {
     const restore = withMockedTime()
 
     let capturedCallback: ((payload: { id: string; data: string }) => void) | null = null
@@ -264,18 +315,19 @@ describe('executeCommand', () => {
 
     const cmdPromise = executeCommand('echo hello')
 
-    // Should have written to session
+    // Should have written to session — command only, no marker echo appended.
     expect(mockSessionWrite).toHaveBeenCalledOnce()
     const writtenArg = mockSessionWrite.mock.calls[0][1]
     expect(writtenArg).toContain('echo hello')
-    expect(writtenArg).toContain('echo "')
+    expect(writtenArg).not.toContain('__AI_DONE_')
+    expect(writtenArg).not.toContain('echo "')
 
     // Wait for async EventsOn to fire (inside Promise constructor = microtask)
     await Promise.resolve()
     expect(capturedCallback).not.toBeNull()
 
-    // Send output containing the marker twice (first seen = markerSeen=true, second = resolve)
-    capturedCallback!(fakeData('test-session-id', `output before\n${MOCK_MARKER}\nmore output\n${MOCK_MARKER}`))
+    // Prompt reappears after the echoed command + output → completion.
+    capturedCallback!(fakeData('test-session-id', `${PROMPT} echo hello\nhello\n${PROMPT} `))
 
     const result = await cmdPromise
     expect(result.exitCode).toBe(0)
@@ -326,14 +378,15 @@ describe('executeCommand', () => {
     const lines = Array.from({ length: 10 }, (_, i) => `line${i + 1}`)
     const output = lines.join('\n')
 
-    const cmdPromise = executeCommand('some-cmd', 5000, 2, 3)
+    // headLines=3 so the head keeps the echoed command line + line1 + line2.
+    const cmdPromise = executeCommand('some-cmd', 5000, 3, 3)
 
     // Wait for async EventsOn to capture the callback
     await Promise.resolve()
     expect(capturedCallback).not.toBeNull()
 
-    // Send output with two markers to trigger resolution
-    capturedCallback!(fakeData('test-session-id', output + '\n' + MOCK_MARKER + '\n' + output + '\n' + MOCK_MARKER))
+    // Echoed command + long output + returning prompt triggers completion.
+    capturedCallback!(fakeData('test-session-id', `${PROMPT} some-cmd\n` + output + `\n${PROMPT} `))
 
     const result: ExecuteResult = await cmdPromise
     expect(result.exitCode).toBe(0)

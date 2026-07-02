@@ -470,6 +470,7 @@ body::before {
 .btn-sm.btn-icon {
   width: 24px;
   height: 24px;
+  padding: 0;
 }
 
 /* Ghost hover-tint modifiers for a row of mixed-purpose icon actions

@@ -666,7 +666,7 @@ watch(searchQuery, (q) => {
 
 .qc-item-cmd {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-family: var(--font-mono, 'Consolas', 'Courier New', monospace);
   white-space: nowrap;
   overflow: hidden;

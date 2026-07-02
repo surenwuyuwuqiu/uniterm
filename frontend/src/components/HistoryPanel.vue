@@ -301,7 +301,7 @@ watch(searchQuery, () => {
   flex: 1;
   font-family: var(--font-mono, 'Consolas', 'Courier New', monospace);
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

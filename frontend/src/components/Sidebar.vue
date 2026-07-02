@@ -1487,7 +1487,7 @@ defineExpose({ focusSearch })
 }
 
 .sidebar-tab.active {
-  color: var(--accent-color);
+  color: var(--accent);
   background: var(--accent-subtle);
 }
 
@@ -1725,7 +1725,7 @@ defineExpose({ focusSearch })
 }
 
 .conn-context-menu .menu-item.danger:hover {
-  background: rgba(248, 113, 113, 0.1);
+  background: var(--error-subtle);
   color: var(--error);
 }
 
@@ -1773,7 +1773,7 @@ defineExpose({ focusSearch })
   position: fixed;
   z-index: 10001;
   background: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
   box-shadow: var(--shadow-lg);
   padding: 4px;

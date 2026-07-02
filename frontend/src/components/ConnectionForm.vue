@@ -763,15 +763,15 @@ function onConnect() {
   margin-bottom: 4px;
   cursor: pointer;
   user-select: none;
-  color: var(--text-secondary, #909399);
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 500;
-  border-bottom: 1px solid var(--border-subtle, #e4e7ed);
+  border-bottom: 1px solid var(--border-subtle);
   transition: color 0.15s;
 }
 
 .advanced-toggle:hover {
-  color: var(--accent, #409eff);
+  color: var(--accent);
 }
 
 .advanced-arrow {

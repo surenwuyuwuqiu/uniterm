@@ -955,7 +955,6 @@ export namespace store {
 	    autoCheckUpdate?: boolean;
 	    sftpBookmarks: SFTPBookmarks;
 	    customTerminalThemes: CustomTerminalTheme[];
-	    uiOpacity?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
@@ -971,7 +970,6 @@ export namespace store {
 	        this.autoCheckUpdate = source["autoCheckUpdate"];
 	        this.sftpBookmarks = this.convertValues(source["sftpBookmarks"], SFTPBookmarks);
 	        this.customTerminalThemes = this.convertValues(source["customTerminalThemes"], CustomTerminalTheme);
-	        this.uiOpacity = source["uiOpacity"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

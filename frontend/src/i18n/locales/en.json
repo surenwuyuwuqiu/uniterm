@@ -679,8 +679,6 @@
   "startTab.emptyGroup": "No connections in this group",
   "startTab.backToStart": "Start Page",
   "startTab.connectionsCount": "{count} connection(s)",
-  "settings.uiOpacity": "Window Opacity",
-  "settings.uiOpacityDesc": "Adjust the app's background thinness (does not show the desktop through it)",
   "theme.editTitle": "Edit Theme",
   "theme.newTitle": "New Theme",
   "theme.namePlaceholder": "Theme name",

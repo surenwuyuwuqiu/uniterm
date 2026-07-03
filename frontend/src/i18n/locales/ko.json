@@ -678,8 +678,6 @@
   "startTab.emptyGroup": "이 그룹에 연결이 없습니다",
   "startTab.backToStart": "시작 페이지",
   "startTab.connectionsCount": "연결 {count}개",
-  "settings.uiOpacity": "창 투명도",
-  "settings.uiOpacityDesc": "앱 배경의 투명 정도를 조정합니다 (바탕화면이 비치지는 않습니다)",
   "theme.editTitle": "테마 편집",
   "theme.newTitle": "새 테마",
   "theme.namePlaceholder": "테마 이름",

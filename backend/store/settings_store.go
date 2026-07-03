@@ -8,8 +8,7 @@ import (
 
 const settingsFileName = "settings.json"
 
-func boolPtr(b bool) *bool          { return &b }
-func float64Ptr(f float64) *float64 { return &f }
+func boolPtr(b bool) *bool { return &b }
 
 type TerminalSettings struct {
 	Theme            string `json:"theme"`
@@ -95,7 +94,6 @@ type AppSettings struct {
 	AutoCheckUpdate      *bool                 `json:"autoCheckUpdate"`
 	SFTPBookmarks        SFTPBookmarks         `json:"sftpBookmarks"`
 	CustomTerminalThemes []CustomTerminalTheme `json:"customTerminalThemes"`
-	UIOpacity            *float64              `json:"uiOpacity"`
 }
 
 type SFTPBookmarks struct {
@@ -185,11 +183,6 @@ func (s *SettingsStore) Load() (AppSettings, error) {
 		settings.AutoCheckUpdate = boolPtr(true)
 		needsSave = true
 	}
-	// Default uiOpacity to 1.0 (fully opaque) if not present
-	if settings.UIOpacity == nil {
-		settings.UIOpacity = float64Ptr(1.0)
-		needsSave = true
-	}
 	if needsSave {
 		jsonData, _ := json.MarshalIndent(settings, "", "  ")
 		_ = os.WriteFile(s.filePath(), jsonData, 0600)
@@ -230,7 +223,6 @@ func defaultSettings() AppSettings {
 			RemotePaths: []string{},
 		},
 		CustomTerminalThemes: []CustomTerminalTheme{},
-		UIOpacity:            float64Ptr(1.0),
 	}
 }
 

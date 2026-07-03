@@ -678,8 +678,6 @@
   "startTab.emptyGroup": "このグループに接続がありません",
   "startTab.backToStart": "スタートページ",
   "startTab.connectionsCount": "{count} 件の接続",
-  "settings.uiOpacity": "ウィンドウの不透明度",
-  "settings.uiOpacityDesc": "アプリ背景の透け具合を調整します（デスクトップは透けません）",
   "theme.editTitle": "テーマを編集",
   "theme.newTitle": "新しいテーマ",
   "theme.namePlaceholder": "テーマ名",

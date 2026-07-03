@@ -51,23 +51,6 @@
               </el-select>
             </div>
           </div>
-
-          <div class="setting-card">
-            <div class="setting-info">
-              <div class="setting-title">{{ t('settings.uiOpacity') }}</div>
-              <div class="setting-desc">{{ t('settings.uiOpacityDesc') }}</div>
-            </div>
-            <div class="setting-control">
-              <el-slider
-                v-model="uiOpacityPercent"
-                :min="50"
-                :max="100"
-                :step="5"
-                :format-tooltip="(v: number) => v + '%'"
-                @change="onUIOpacityChange"
-              />
-            </div>
-          </div>
         </div>
       </div>
 
@@ -519,16 +502,6 @@ const settingsStore = useSettingsStore()
 const syncStore = useSyncStore()
 const updateCheck = useUpdateCheck()
 const { t } = useI18n()
-
-// el-slider works in whole percent for a nicer UX; settingsStore stores the
-// 0.5-1 fraction that --ui-opacity/rgba() consume directly.
-const uiOpacityPercent = ref(Math.round((settingsStore.settings.uiOpacity ?? 1) * 100))
-watch(() => settingsStore.settings.uiOpacity, (v) => {
-  uiOpacityPercent.value = Math.round((v ?? 1) * 100)
-})
-function onUIOpacityChange(percent: number) {
-  settingsStore.updateUIOpacity(percent / 100)
-}
 
 function openEditRepo() {
   syncStore.showEditRepo = true

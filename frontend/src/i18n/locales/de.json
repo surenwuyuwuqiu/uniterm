@@ -678,8 +678,6 @@
   "startTab.emptyGroup": "Keine Verbindungen in dieser Gruppe",
   "startTab.backToStart": "Startseite",
   "startTab.connectionsCount": "{count} Verbindung(en)",
-  "settings.uiOpacity": "Fenstertransparenz",
-  "settings.uiOpacityDesc": "Passt die Deckkraft des App-Hintergrunds an (der Desktop scheint nicht durch)",
   "theme.editTitle": "Theme bearbeiten",
   "theme.newTitle": "Neues Theme",
   "theme.namePlaceholder": "Theme-Name",

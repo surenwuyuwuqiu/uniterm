@@ -678,8 +678,6 @@
   "startTab.emptyGroup": "此分組尚無連線",
   "startTab.backToStart": "開始頁",
   "startTab.connectionsCount": "{count} 個連線",
-  "settings.uiOpacity": "視窗透明度",
-  "settings.uiOpacityDesc": "調整應用背景的通透程度（不會透出桌面背景）",
   "theme.editTitle": "編輯主題",
   "theme.newTitle": "新增主題",
   "theme.namePlaceholder": "主題名稱",

@@ -3,18 +3,8 @@ import { ref, computed, watch } from 'vue'
 import type { AppSettings, AIModelConfig, CustomTerminalTheme } from '../types/settings'
 import { DEFAULT_SETTINGS, DEFAULT_KEYBOARD } from '../types/settings'
 import { SaveSettings, LoadSettings, GetAvailableShells } from '../../wailsjs/go/main/App'
-import { EventsOn, WindowSetBackgroundColour } from '../../wailsjs/runtime'
+import { EventsOn } from '../../wailsjs/runtime'
 import { setLocale } from '../i18n'
-
-// Matches each theme's --bg-base-rgb in style.css. Kept in sync manually
-// since the native Wails window background can't read CSS variables - it
-// must be told the actual colour so it doesn't show through as a stray
-// tint once the app's own background goes translucent via --ui-opacity.
-const THEME_BG_RGB: Record<string, [number, number, number]> = {
-  dark: [20, 23, 29],
-  'deep-blue': [11, 17, 30],
-  light: [255, 255, 255]
-}
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<AppSettings>({ ...DEFAULT_SETTINGS })
@@ -42,24 +32,6 @@ export const useSettingsStore = defineStore('settings', () => {
       document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light'
     } else {
       document.documentElement.dataset.theme = theme
-    }
-    applyUIOpacity()
-  }
-
-  function applyUIOpacity() {
-    const opacity = settings.value.uiOpacity ?? 1
-    document.documentElement.style.setProperty('--ui-opacity', String(opacity))
-
-    // Tell the native Wails window what colour to show through once the
-    // app's own background goes translucent - CSS variables aren't visible
-    // to the native layer, so this has to be resolved and pushed explicitly.
-    const effectiveTheme = document.documentElement.dataset.theme || 'dark'
-    const [r, g, b] = THEME_BG_RGB[effectiveTheme] ?? THEME_BG_RGB.dark
-    const alpha = Math.round(opacity * 255)
-    try {
-      WindowSetBackgroundColour(r, g, b, alpha)
-    } catch {
-      // not running inside the Wails desktop shell (e.g. plain browser dev)
     }
   }
 
@@ -92,11 +64,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function updateTheme(value: AppSettings['theme']) {
     settings.value.theme = value
-    save()
-  }
-
-  function updateUIOpacity(value: number) {
-    settings.value.uiOpacity = value
     save()
   }
 
@@ -190,7 +157,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Apply theme when it changes
   watch(() => settings.value.theme, applyTheme)
-  watch(() => settings.value.uiOpacity, applyUIOpacity)
 
   // Listen for system color scheme changes
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -225,7 +191,6 @@ export const useSettingsStore = defineStore('settings', () => {
     updateTheme,
     updateLanguage,
     updateTerminal,
-    updateUIOpacity,
     addModel,
     updateModel,
     removeModel,
@@ -263,7 +228,6 @@ function mergeSettings(loaded: AppSettings): AppSettings {
       localPaths: loaded.sftpBookmarks?.localPaths || [],
       remotePaths: loaded.sftpBookmarks?.remotePaths || []
     },
-    customTerminalThemes: loaded.customTerminalThemes || [],
-    uiOpacity: loaded.uiOpacity ?? DEFAULT_SETTINGS.uiOpacity
+    customTerminalThemes: loaded.customTerminalThemes || []
   }
 }

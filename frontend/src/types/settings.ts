@@ -137,7 +137,6 @@ export interface AppSettings {
   autoCheckUpdate: boolean
   sftpBookmarks: SFTPBookmarks
   customTerminalThemes: CustomTerminalTheme[]
-  uiOpacity: number
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -172,8 +171,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     localPaths: [],
     remotePaths: []
   },
-  customTerminalThemes: [],
-  uiOpacity: 1
+  customTerminalThemes: []
 }
 
 export interface TerminalThemeEntry { label: string; value: string; type: 'dark' | 'light' }

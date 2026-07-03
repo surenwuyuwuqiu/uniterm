@@ -678,8 +678,6 @@
   "startTab.emptyGroup": "В этой группе нет подключений",
   "startTab.backToStart": "Главная страница",
   "startTab.connectionsCount": "{count} подключений(я)",
-  "settings.uiOpacity": "Прозрачность окна",
-  "settings.uiOpacityDesc": "Настройка прозрачности фона приложения (рабочий стол не просвечивает)",
   "theme.editTitle": "Редактировать тему",
   "theme.newTitle": "Новая тема",
   "theme.namePlaceholder": "Название темы",

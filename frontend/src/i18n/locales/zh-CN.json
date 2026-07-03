@@ -679,8 +679,6 @@
   "startTab.emptyGroup": "此分组暂无连接",
   "startTab.backToStart": "开始页",
   "startTab.connectionsCount": "{count} 个连接",
-  "settings.uiOpacity": "窗口透明度",
-  "settings.uiOpacityDesc": "调整应用背景的通透程度（不会透出桌面背景）",
   "theme.editTitle": "编辑主题",
   "theme.newTitle": "新建主题",
   "theme.namePlaceholder": "主题名称",

@@ -56,7 +56,7 @@ func parseFont(path string) (string, bool, error) {
 	}
 
 	var nameOffset, nameLen uint32
-	var postOffset, hheaOffset, hmtxOffset uint32
+	var postOffset, hheaOffset, hmtxOffset, os2Offset uint32
 
 	for i := 0; i < numTables; i++ {
 		off := tableDirOffset + 12 + i*16
@@ -77,11 +77,28 @@ func parseFont(path string) (string, bool, error) {
 			hheaOffset = tableOffset
 		case "hmtx":
 			hmtxOffset = tableOffset
+		case "OS/2":
+			os2Offset = tableOffset
 		}
 	}
 
 	if nameOffset == 0 {
 		return "", false, fmt.Errorf("name table not found")
+	}
+
+	// Symbol/dingbat fonts (Webdings, Wingdings, ZapfDingbats, ...) map every
+	// character slot to an unrelated pictogram rather than actual letterforms,
+	// so they are never a sensible terminal font even when their glyphs
+	// happen to share a uniform advance width (which is what fooled the hmtx
+	// heuristic below into treating Webdings as monospace). The OS/2 table's
+	// sFamilyClass high byte uses the standard IBM font classification, where
+	// class 12 (0x0C) is reserved for "Symbolic" — this is the same field
+	// Windows itself uses to separate symbol fonts out of its font pickers.
+	if os2Offset != 0 && int(os2Offset)+32 <= len(data) {
+		familyClass := u16(data, int(os2Offset)+30)
+		if familyClass>>8 == 12 {
+			return "", false, nil
+		}
 	}
 
 	// The post table's isFixedPitch flag is set by whoever authored the

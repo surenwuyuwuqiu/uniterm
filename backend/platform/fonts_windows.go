@@ -11,12 +11,56 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+// getSystemFonts enumerates monospaced font families from both the
+// machine-wide registry/font store and the per-user one. Windows 10 1809+
+// allows installing a font without admin rights ("Install for me only" /
+// double-click a .ttf preview and hit Install as a standard user), which
+// writes to HKCU + %LOCALAPPDATA%\Microsoft\Windows\Fonts instead of HKLM +
+// C:\Windows\Fonts. Other apps see such fonts via the GDI/DirectWrite system
+// font enumeration APIs, which cover both scopes; our hand-rolled registry
+// walk needs to check both explicitly or it silently misses user-installed
+// fonts (https://github.com/ys-ll/uniterm/issues/145).
 func getSystemFonts() ([]string, error) {
-	key, err := registry.OpenKey(
-		registry.LOCAL_MACHINE,
-		`SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts`,
-		registry.QUERY_VALUE,
-	)
+	var families []string
+	var firstErr error
+
+	if fam, err := readFontFamilies(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts`, `C:\Windows\Fonts`); err != nil {
+		firstErr = err
+	} else {
+		families = append(families, fam...)
+	}
+
+	// Per-user scope is optional: on systems/setups where nothing was ever
+	// installed at user scope this key simply doesn't exist, which is normal
+	// and not reported as an error as long as the machine-wide scan above
+	// found something.
+	if userFontDir := userFontsDir(); userFontDir != "" {
+		if fam, err := readFontFamilies(registry.CURRENT_USER, `Software\Microsoft\Windows NT\CurrentVersion\Fonts`, userFontDir); err == nil {
+			families = append(families, fam...)
+		}
+	}
+
+	if len(families) == 0 && firstErr != nil {
+		return nil, firstErr
+	}
+	return families, nil
+}
+
+// userFontsDir returns the per-user font install directory, or "" if
+// %LOCALAPPDATA% isn't set (unexpected, but avoids a bogus relative path).
+func userFontsDir() string {
+	local := os.Getenv("LOCALAPPDATA")
+	if local == "" {
+		return ""
+	}
+	return filepath.Join(local, "Microsoft", "Windows", "Fonts")
+}
+
+// readFontFamilies reads one Fonts registry key (HKLM or HKCU) and resolves
+// each value against fontDir, returning the unique monospaced family names
+// found in that scope.
+func readFontFamilies(root registry.Key, keyPath, fontDir string) ([]string, error) {
+	key, err := registry.OpenKey(root, keyPath, registry.QUERY_VALUE)
 	if err != nil {
 		return nil, fmt.Errorf("open registry: %w", err)
 	}
@@ -27,7 +71,6 @@ func getSystemFonts() ([]string, error) {
 		return nil, fmt.Errorf("read value names: %w", err)
 	}
 
-	fontDir := `C:\Windows\Fonts`
 	var families []string
 	seen := make(map[string]bool)
 

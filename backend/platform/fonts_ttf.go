@@ -56,7 +56,7 @@ func parseFont(path string) (string, bool, error) {
 	}
 
 	var nameOffset, nameLen uint32
-	var postOffset, hheaOffset, hmtxOffset, os2Offset uint32
+	var postOffset, hheaOffset, hmtxOffset, os2Offset, cmapOffset uint32
 
 	for i := 0; i < numTables; i++ {
 		off := tableDirOffset + 12 + i*16
@@ -79,6 +79,8 @@ func parseFont(path string) (string, bool, error) {
 			hmtxOffset = tableOffset
 		case "OS/2":
 			os2Offset = tableOffset
+		case "cmap":
+			cmapOffset = tableOffset
 		}
 	}
 
@@ -86,19 +88,32 @@ func parseFont(path string) (string, bool, error) {
 		return "", false, fmt.Errorf("name table not found")
 	}
 
-	// Symbol/dingbat fonts (Webdings, Wingdings, ZapfDingbats, ...) map every
-	// character slot to an unrelated pictogram rather than actual letterforms,
-	// so they are never a sensible terminal font even when their glyphs
-	// happen to share a uniform advance width (which is what fooled the hmtx
-	// heuristic below into treating Webdings as monospace). The OS/2 table's
-	// sFamilyClass high byte uses the standard IBM font classification, where
-	// class 12 (0x0C) is reserved for "Symbolic" — this is the same field
-	// Windows itself uses to separate symbol fonts out of its font pickers.
+	// Symbol/icon fonts (Webdings, Wingdings, ZapfDingbats, SAP's SAPIcons/
+	// SAPGUI-Icons, Font Awesome, ...) map character slots to pictograms
+	// rather than actual letterforms, so they are never a sensible terminal
+	// font even when their glyphs happen to share a uniform advance width
+	// (which is what fooled the hmtx heuristic below into treating Webdings
+	// as monospace). Two independent, complementary signals catch this:
+	//
+	//  1. The OS/2 table's sFamilyClass high byte uses the standard IBM font
+	//     classification, where class 12 (0x0C) is reserved for "Symbolic" —
+	//     the same field Windows itself uses to keep symbol fonts out of its
+	//     own font pickers. Covers classic Mac/Windows dingbat fonts.
+	//  2. A cmap subtable registered as (platform 3, encoding 0) is the
+	//     decades-old Windows convention a font uses specifically to mark
+	//     itself as a "Symbol" font (vs. encoding 1, "Unicode BMP", used by
+	//     real text fonts). Many third-party icon fonts (SAPIcons and
+	//     similar in-house icon sets) never bother setting sFamilyClass
+	//     correctly but still follow this cmap convention to render at all
+	//     on Windows, so this catches what signal 1 misses.
 	if os2Offset != 0 && int(os2Offset)+32 <= len(data) {
 		familyClass := u16(data, int(os2Offset)+30)
 		if familyClass>>8 == 12 {
 			return "", false, nil
 		}
+	}
+	if cmapOffset != 0 && hasWindowsSymbolCmap(data, int(cmapOffset)) {
+		return "", false, nil
 	}
 
 	// The post table's isFixedPitch flag is set by whoever authored the
@@ -121,6 +136,32 @@ func parseFont(path string) (string, bool, error) {
 	// Read font family name from name table (Name ID 1)
 	family := parseNameTable(data, int(nameOffset), int(nameLen))
 	return family, true, nil
+}
+
+// hasWindowsSymbolCmap reports whether the font's cmap table registers a
+// (platform 3, encoding 0) subtable — the "Windows Symbol" encoding a font
+// declares to identify itself as a symbol/icon/dingbat font rather than a
+// text font using the standard (platform 3, encoding 1) Unicode BMP mapping.
+func hasWindowsSymbolCmap(data []byte, cmapOffset int) bool {
+	if cmapOffset+4 > len(data) {
+		return false
+	}
+	numTables := int(u16(data, cmapOffset+2))
+	if numTables <= 0 || numTables > 100 {
+		return false
+	}
+	for i := 0; i < numTables; i++ {
+		recOff := cmapOffset + 4 + i*8
+		if recOff+8 > len(data) {
+			break
+		}
+		platformID := u16(data, recOff)
+		encodingID := u16(data, recOff+2)
+		if platformID == 3 && encodingID == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // looksMonospaceByMetrics inspects hmtx glyph advance widths and reports

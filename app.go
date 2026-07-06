@@ -67,6 +67,10 @@ func (a *App) startup(ctx context.Context) {
 		fmt.Printf("WARN: log.Init failed: %v\n", err)
 	}
 
+	// On macOS, disable the system press-and-hold accent picker for this app so
+	// that holding a key repeats input in the terminal (see app_darwin.go).
+	a.configureMacKeyRepeat()
+
 	a.sessionManager = session.NewSessionManager()
 	a.tunnelService = session.NewTunnelService()
 

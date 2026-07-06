@@ -293,6 +293,7 @@
   "settings.modelName": "名稱",
   "settings.modelBaseURL": "Base URL",
   "settings.modelModel": "模型",
+  "settings.modelModelPlaceholder": "選擇或輸入模型名稱",
   "settings.modelApiKey": "API Key",
   "settings.modelUserAgent": "User-Agent",
   "settings.modelProtocol": "協議",

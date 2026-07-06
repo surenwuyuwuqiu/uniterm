@@ -293,6 +293,7 @@
   "settings.modelName": "Nom",
   "settings.modelBaseURL": "URL de base",
   "settings.modelModel": "Modèle",
+  "settings.modelModelPlaceholder": "Sélectionnez ou saisissez un nom de modèle",
   "settings.modelApiKey": "API Key",
   "settings.modelUserAgent": "User-Agent",
   "settings.modelProtocol": "Protocole",

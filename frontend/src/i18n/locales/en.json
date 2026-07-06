@@ -296,6 +296,7 @@
   "settings.modelName": "Name",
   "settings.modelBaseURL": "Base URL",
   "settings.modelModel": "Model",
+  "settings.modelModelPlaceholder": "Select or enter a model name",
   "settings.modelApiKey": "API Key",
   "settings.modelUserAgent": "User-Agent",
   "settings.modelProtocol": "Protocol",

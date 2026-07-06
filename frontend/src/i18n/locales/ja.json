@@ -293,6 +293,7 @@
   "settings.modelName": "名前",
   "settings.modelBaseURL": "Base URL",
   "settings.modelModel": "モデル",
+  "settings.modelModelPlaceholder": "モデル名を選択または入力",
   "settings.modelApiKey": "API Key",
   "settings.modelUserAgent": "User-Agent",
   "settings.modelProtocol": "プロトコル",

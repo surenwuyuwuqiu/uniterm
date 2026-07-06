@@ -456,11 +456,22 @@
         </el-form-item>
         <el-form-item :label="t('settings.modelModel')">
           <div class="model-fetch-row">
-            <el-autocomplete
+            <el-select
               v-model="modelForm.model"
-              :fetch-suggestions="(qs, cb) => cb(qs ? modelSuggestions.filter(s => s.value.toLowerCase().includes(qs.toLowerCase())) : modelSuggestions)"
               class="model-autocomplete"
-            />
+              filterable
+              allow-create
+              default-first-option
+              :reserve-keyword="false"
+              :placeholder="t('settings.modelModelPlaceholder')"
+            >
+              <el-option
+                v-for="s in modelSelectOptions"
+                :key="s.value"
+                :label="s.value"
+                :value="s.value"
+              />
+            </el-select>
             <el-button :loading="modelFetching" @click="fetchModelList">
               {{ t('settings.fetchModels') }}
             </el-button>
@@ -702,6 +713,18 @@ const categories = computed(() => {
 
 const showModelForm = ref(false)
 const modelSuggestions = ref<Array<{ value: string }>>([])
+// Always surface the currently-set model as an option so el-select renders it
+// when editing an existing model (before any fetch) — el-select won't display a
+// bound value that has no matching option, and allow-create only creates
+// options for values typed during the session, not a pre-set v-model.
+const modelSelectOptions = computed(() => {
+  const opts = modelSuggestions.value.slice()
+  const cur = modelForm.model?.trim()
+  if (cur && !opts.some(o => o.value === cur)) {
+    opts.unshift({ value: cur })
+  }
+  return opts
+})
 const modelFetching = ref(false)
 const testingConnection = ref(false)
 const testResult = ref<boolean | null>(null)

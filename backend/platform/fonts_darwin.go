@@ -27,9 +27,11 @@ func macFontDirs() []string {
 	return dirs
 }
 
-// getSystemFonts enumerates monospaced font families by walking the standard
-// macOS font directories directly and parsing each TTF/OTF/TTC file's name
-// table, the same binary format handled on Windows (see fonts_ttf.go).
+// getSystemFonts enumerates font families by walking the standard macOS font
+// directories directly and parsing each TTF/OTF/TTC file's name table, the same
+// binary format handled on Windows (see fonts_ttf.go). It returns every family
+// found together with its isFixedPitch flag; GetFontFamilies decides which ones
+// end up in the picker (all monospaced families, plus installed presets).
 //
 // This intentionally does not shell out to `fc-list` (fontconfig): macOS does
 // not ship fontconfig by default, so on a stock machine that binary doesn't
@@ -37,8 +39,8 @@ func macFontDirs() []string {
 // frontend's tiny hardcoded FONT_OPTIONS list — which is exactly what caused
 // a user-installed font (in ~/Library/Fonts) to never show up in the picker
 // even though other apps could see and use it fine.
-func getSystemFonts() ([]string, error) {
-	var families []string
+func getSystemFonts() ([]fontFamily, error) {
+	var families []fontFamily
 	seen := make(map[string]bool)
 	var firstErr error
 	scanned := false
@@ -67,14 +69,14 @@ func getSystemFonts() ([]string, error) {
 
 			path := filepath.Join(dir, entry.Name())
 			family, isMono, err := parseFont(path)
-			if err != nil || !isMono || family == "" {
+			if err != nil || family == "" {
 				continue
 			}
 			if seen[family] {
 				continue
 			}
 			seen[family] = true
-			families = append(families, family)
+			families = append(families, fontFamily{Name: family, IsMono: isMono})
 		}
 	}
 

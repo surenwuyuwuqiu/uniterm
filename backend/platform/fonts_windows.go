@@ -11,17 +11,18 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// getSystemFonts enumerates monospaced font families from both the
-// machine-wide registry/font store and the per-user one. Windows 10 1809+
-// allows installing a font without admin rights ("Install for me only" /
+// getSystemFonts enumerates font families from both the machine-wide
+// registry/font store and the per-user one, returning each family with its
+// isFixedPitch flag (GetFontFamilies decides the final picker list). Windows 10
+// 1809+ allows installing a font without admin rights ("Install for me only" /
 // double-click a .ttf preview and hit Install as a standard user), which
 // writes to HKCU + %LOCALAPPDATA%\Microsoft\Windows\Fonts instead of HKLM +
 // C:\Windows\Fonts. Other apps see such fonts via the GDI/DirectWrite system
 // font enumeration APIs, which cover both scopes; our hand-rolled registry
 // walk needs to check both explicitly or it silently misses user-installed
 // fonts (https://github.com/ys-ll/uniterm/issues/145).
-func getSystemFonts() ([]string, error) {
-	var families []string
+func getSystemFonts() ([]fontFamily, error) {
+	var families []fontFamily
 	var firstErr error
 
 	if fam, err := readFontFamilies(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts`, `C:\Windows\Fonts`); err != nil {
@@ -57,9 +58,9 @@ func userFontsDir() string {
 }
 
 // readFontFamilies reads one Fonts registry key (HKLM or HKCU) and resolves
-// each value against fontDir, returning the unique monospaced family names
-// found in that scope.
-func readFontFamilies(root registry.Key, keyPath, fontDir string) ([]string, error) {
+// each value against fontDir, returning the family names found in that scope
+// together with their isFixedPitch flag.
+func readFontFamilies(root registry.Key, keyPath, fontDir string) ([]fontFamily, error) {
 	key, err := registry.OpenKey(root, keyPath, registry.QUERY_VALUE)
 	if err != nil {
 		return nil, fmt.Errorf("open registry: %w", err)
@@ -71,7 +72,7 @@ func readFontFamilies(root registry.Key, keyPath, fontDir string) ([]string, err
 		return nil, fmt.Errorf("read value names: %w", err)
 	}
 
-	var families []string
+	var families []fontFamily
 	seen := make(map[string]bool)
 
 	for _, name := range names {
@@ -86,14 +87,14 @@ func readFontFamilies(root registry.Key, keyPath, fontDir string) ([]string, err
 		}
 
 		family, isMono, err := parseFont(path)
-		if err != nil || !isMono || family == "" {
+		if err != nil || family == "" {
 			continue
 		}
 		if seen[family] {
 			continue
 		}
 		seen[family] = true
-		families = append(families, family)
+		families = append(families, fontFamily{Name: family, IsMono: isMono})
 	}
 
 	return families, nil

@@ -517,6 +517,7 @@ import { useUpdateCheck } from '../composables/useUpdateCheck'
 import { useI18n, locale } from '../i18n'
 import { BrowserOpenURL } from '../../wailsjs/runtime'
 import { FONT_OPTIONS, LANGUAGE_OPTIONS, DEFAULT_KEYBOARD, SHORTCUT_LABELS, USER_AGENT_PRESETS } from '../types/settings'
+import { formatFontFamily } from '../utils/formatFontFamily'
 import type { AIModelConfig, ShortcutAction, KeyBinding, KeyboardSettings } from '../types/settings'
 import { useTerminalThemeOptions } from '../composables/useTerminalThemeOptions'
 import { uninstallGlobalListener, installGlobalListener } from '../composables/useKeyboardShortcuts'
@@ -583,7 +584,7 @@ onMounted(async () => {
   try {
     const fonts = await GetSystemFonts()
     if (fonts && fonts.length > 0) {
-      systemFonts.value = fonts.map(f => ({ label: f, value: f }))
+      systemFonts.value = fonts.map(f => ({ label: f, value: formatFontFamily(f) }))
     }
   } catch {
     // Fall back to FONT_OPTIONS

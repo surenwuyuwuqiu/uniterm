@@ -472,6 +472,7 @@ import CustomThemeEditor from './CustomThemeEditor.vue'
 import type { ConnectionConfig, ConnectionGroup } from '../types/session'
 import { parseQuickConnect, formatConnSubtitle } from '../utils/quickConnect'
 import { FONT_OPTIONS, LANGUAGE_OPTIONS } from '../types/settings'
+import { formatFontFamily } from '../utils/formatFontFamily'
 import { useTerminalThemeOptions } from '../composables/useTerminalThemeOptions'
 import { GetSystemFonts } from '../../wailsjs/go/main/App'
 
@@ -1452,7 +1453,7 @@ onMounted(async () => {
   try {
     const fonts = await GetSystemFonts()
     if (fonts && fonts.length > 0) {
-      systemFonts.value = fonts.map(f => ({ label: f, value: f }))
+      systemFonts.value = fonts.map(f => ({ label: f, value: formatFontFamily(f) }))
     }
   } catch {
     // Fall back to FONT_OPTIONS

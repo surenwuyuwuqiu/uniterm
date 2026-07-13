@@ -1,6 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { Ref } from 'vue'
 import { useSettingsStore } from '../stores/settingsStore'
+import { ClipboardGetText } from '../../wailsjs/runtime/runtime'
 
 export interface UseTerminalMenuOptions {
   getSelection: () => string
@@ -82,7 +83,9 @@ export function useTerminalMenu(options: UseTerminalMenuOptions): UseTerminalMen
 
   async function pasteFromClipboard() {
     try {
-      const text = await navigator.clipboard.readText()
+      // Wails clipboard, not navigator.clipboard.readText() — the latter pops
+      // a system "Paste" confirmation on macOS WKWebView.
+      const text = await ClipboardGetText()
       if (text) {
         await options.onPaste(text)
       }

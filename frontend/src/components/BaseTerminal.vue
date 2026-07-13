@@ -79,7 +79,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import { SessionWrite, SessionResize, SessionEndZmodem } from '../../wailsjs/go/main/App'
 import { WriteFileBase64, SaveFileDialog, FrontendLog, WriteTempFile } from '../../wailsjs/go/main/App'
-import { EventsOn, BrowserOpenURL } from '../../wailsjs/runtime'
+import { EventsOn, BrowserOpenURL, ClipboardGetText } from '../../wailsjs/runtime'
 import { useSettingsStore } from '../stores/settingsStore'
 import { highlight } from '../composables/useHighlight'
 import { onTerminalKey } from '../composables/useKeyboardShortcuts'
@@ -616,6 +616,17 @@ function handleTerminalKey(e: KeyboardEvent): boolean {
     return false
   }
 
+  // Cmd/Ctrl+V: paste via Wails clipboard (xterm's DOM paste is unreliable in WKWebView).
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'v' || e.key === 'V') && e.type === 'keydown') {
+    e.preventDefault()
+    if (props.mode === 'ssh' || props.mode === 'local') {
+      ClipboardGetText().then(text => {
+        if (text) pasteToSession(text)
+      }).catch(() => {})
+    }
+    return false
+  }
+
   // Ctrl+Shift+C: copy terminal selection to clipboard
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'c' || e.key === 'C') && e.type === 'keydown') {
     const sel = terminal?.getSelection()
@@ -987,9 +998,9 @@ onMounted(() => {
     if (action !== 'paste') return
     event.preventDefault()
     event.stopPropagation()
-    navigator.clipboard.readText().then(text => {
+    ClipboardGetText().then(text => {
       if (text && props.sessionId) {
-        SessionWrite(props.sessionId, text)
+        pasteToSession(text)
       }
     }).catch(() => {})
   }
@@ -1445,6 +1456,17 @@ function pasteToTerminal(text: string) {
   }
 }
 
+// Wrap in bracketed-paste markers when the app enabled the mode, so vim etc.
+// don't re-indent each pasted line.
+function bracketPaste(text: string): string {
+  const sid = props.sessionId
+  const managed = sid ? getManagedTerminal(sid) : undefined
+  if (managed?.terminal.modes.bracketedPasteMode) {
+    return '\x1b[200~' + text + '\x1b[201~'
+  }
+  return text
+}
+
 async function pasteToSession(text: string) {
   if (props.mode === 'ssh' || props.mode === 'local') {
     const sid = props.sessionId
@@ -1452,7 +1474,7 @@ async function pasteToSession(text: string) {
       // Normalize line endings: \r\n -> \r to prevent extra newlines
       // when pasting into editors like vim (Windows clipboard often has \r\n)
       const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '')
-      SessionWrite(sid, normalized)
+      SessionWrite(sid, bracketPaste(normalized))
     }
   }
 }
@@ -1468,7 +1490,9 @@ const menu = useTerminalMenu({
           for (const pid of tab.panelIds) {
             const p = panelStore.getPanel(pid)
             if (p?.sessionId && (p.type === 'ssh' || p.type === 'local')) {
-              SessionWrite(p.sessionId, filtered)
+              // Bracket per target session — each has its own paste mode.
+              const wrap = getManagedTerminal(p.sessionId)?.terminal.modes.bracketedPasteMode
+              SessionWrite(p.sessionId, wrap ? '\x1b[200~' + filtered + '\x1b[201~' : filtered)
             }
           }
         }

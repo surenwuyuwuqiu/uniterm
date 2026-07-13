@@ -63,7 +63,7 @@ func (ts *TunnelService) StartTunnel(t Tunnel, resolve ConnResolver) TunnelState
 
 	// Watch the exit client: keepalive actively closes a dead chain, and Wait
 	// unblocks when the connection drops, so we can flip the tunnel to error.
-	go tunnelKeepAlive(exit, quit)
+	go tunnelKeepAlive(exit, quit, "tunnel="+t.ID)
 	go func() {
 		exit.Wait()
 		select {

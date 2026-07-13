@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/ys-ll/uniterm/backend/log"
 )
 
 // tunnelEntry holds the SSH client and listener for a single tunnel.
@@ -132,7 +134,7 @@ func (ts *TunnelService) Start(sessionID string, sshConfig ConnectionConfig, tar
 		listener:  listener,
 		quit:      quit,
 	}
-	go tunnelKeepAlive(client, quit)
+	go tunnelKeepAlive(client, quit, "session="+sessionID)
 
 	return localPort, nil
 }
@@ -141,7 +143,7 @@ func (ts *TunnelService) Start(sessionID string, sshConfig ConnectionConfig, tar
 // global keepalive request (same cadence/threshold as SSHSession's) and
 // closes the connection if the remote stops responding, so a dead jump-host
 // hop doesn't linger silently while the forwarded session on top of it hangs.
-func tunnelKeepAlive(client *ssh.Client, quit chan struct{}) {
+func tunnelKeepAlive(client *ssh.Client, quit chan struct{}, label string) {
 	ticker := time.NewTicker(sshKeepAliveInterval)
 	defer ticker.Stop()
 
@@ -172,6 +174,7 @@ func tunnelKeepAlive(client *ssh.Client, quit chan struct{}) {
 			}
 
 			if failures >= sshKeepAliveMaxFail {
+				log.Writef("tunnel keepalive: closing jump-host client after %d failures (%s) — sessions riding this tunnel will get EOF", failures, label)
 				client.Close()
 				return
 			}

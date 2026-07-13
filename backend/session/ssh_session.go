@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -15,6 +16,8 @@ import (
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/encoding/traditionalchinese"
 	"golang.org/x/text/transform"
+
+	"github.com/ys-ll/uniterm/backend/log"
 )
 
 const (
@@ -24,8 +27,12 @@ const (
 	// idle-reading in an editor (e.g. vim in normal mode) with no traffic
 	// flowing between keystrokes.
 	sshKeepAliveInterval = 20 * time.Second
-	sshKeepAliveTimeout  = 5 * time.Second
-	sshKeepAliveMaxFail  = 3
+	// Timeout for a single keepalive request. Kept generous: a jump host or
+	// target that is merely slow to answer keepalive@openssh.com under load
+	// must not be mistaken for a dead connection (a too-aggressive 5s value
+	// falsely closed healthy tunnels, see issue #242).
+	sshKeepAliveTimeout = 15 * time.Second
+	sshKeepAliveMaxFail = 4
 )
 
 type SSHSession struct {
@@ -43,6 +50,13 @@ type SSHSession struct {
 	enc            encoding.Encoding // input(write) codec; nil = utf-8 passthrough
 	decoder        *encoding.Decoder // persistent streaming decoder for output(read)
 	decodeLeftover []byte            // trailing partial multibyte bytes between reads
+
+	// Keepalive diagnostics (see startKeepAlive / disconnect logs).
+	kaFailures   atomic.Int32 // consecutive keepalive failures at last tick
+	kaLastErr    atomic.Value // string: last keepalive error ("" if ok)
+	kaLastOKUnix atomic.Int64 // unix ns of last successful keepalive
+	lastRecv     atomic.Value // []byte: tail of most recent server output (diagnostics)
+	lastSent     atomic.Value // []byte: most recent input sent to server (diagnostics)
 }
 
 func NewSSHSession(id string) *SSHSession {
@@ -240,7 +254,10 @@ func (s *SSHSession) Connect(config ConnectionConfig) error {
 	}
 
 	go func() {
-		_ = session.Wait()
+		werr := session.Wait()
+		last, _ := s.lastRecv.Load().([]byte)
+		sent, _ := s.lastSent.Load().([]byte)
+		log.Writef("ssh disconnect: session.Wait returned (%v), %s lastRecv=%s lastSent=%s", werr, s.kaDiag(), tailHex(last, 64), tailHex(sent, 32))
 		s.Disconnect()
 	}()
 
@@ -289,10 +306,12 @@ func (s *SSHSession) readLoop() {
 		if n > 0 {
 			s.RecordReadActivity()
 			data := append([]byte(nil), buf[:n]...)
+			s.lastRecv.Store(append([]byte(nil), data...))
 			s.offerExpectOutput(data)
 			if s.IsZmodemMode() {
 				s.emitBinary(data)
 			} else if looksLikeZmodemHeader(data) {
+				log.Writef("ssh: zmodem header detected in output, switching to binary mode (may be a false positive on vim/TUI output)")
 				s.SetZmodemMode(true)
 				s.emitBinary(data)
 			} else {
@@ -301,14 +320,44 @@ func (s *SSHSession) readLoop() {
 		}
 		if err != nil {
 			if err != io.EOF {
+				log.Writef("ssh disconnect: read error: %v, %s", err, s.kaDiag())
 				s.emitData([]byte(fmt.Sprintf("\r\n\x1b[31m[read error: %v]\x1b[0m\r\n", err)))
 			} else {
+				last, _ := s.lastRecv.Load().([]byte)
+				sent, _ := s.lastSent.Load().([]byte)
+				log.Writef("ssh disconnect: remote closed (EOF), %s lastRecv=%s lastSent=%s", s.kaDiag(), tailHex(last, 64), tailHex(sent, 32))
 				s.emitData([]byte("\r\n\x1b[31mConnection closed by remote host. Press Enter to reconnect.\x1b[0m\r\n"))
 			}
 			s.Disconnect()
 			return
 		}
 	}
+}
+
+// tailHex returns up to the last max bytes of b as hex, for disconnect
+// diagnostics (what the server sent right before closing).
+func tailHex(b []byte, max int) string {
+	if len(b) > max {
+		b = b[len(b)-max:]
+	}
+	return fmt.Sprintf("% x", b)
+}
+
+// kaDiag formats keepalive/idle state for disconnect diagnostics: how long
+// since the last byte from the server, the last-keepalive outcome, and the
+// consecutive-failure count. A long idle with healthy keepalives points to a
+// server-side idle timeout that ignores global keepalive requests.
+func (s *SSHSession) kaDiag() string {
+	lastErr, _ := s.kaLastErr.Load().(string)
+	if lastErr == "" {
+		lastErr = "ok"
+	}
+	okAgo := "never"
+	if ns := s.kaLastOKUnix.Load(); ns != 0 {
+		okAgo = time.Since(time.Unix(0, ns)).Truncate(time.Second).String()
+	}
+	return fmt.Sprintf("idle=%v lastKeepalive=%s lastOK=%s ago failures=%d",
+		s.idleSince().Truncate(time.Second), lastErr, okAgo, s.kaFailures.Load())
 }
 
 func (s *SSHSession) offerExpectOutput(data []byte) {
@@ -411,14 +460,20 @@ func (s *SSHSession) startKeepAlive() {
 			case err := <-done:
 				if err != nil {
 					failures++
+					s.kaLastErr.Store(err.Error())
 				} else {
 					failures = 0
+					s.kaLastErr.Store("")
+					s.kaLastOKUnix.Store(time.Now().UnixNano())
 				}
 			case <-time.After(sshKeepAliveTimeout):
 				failures++
+				s.kaLastErr.Store("timeout")
 			}
+			s.kaFailures.Store(int32(failures))
 
 			if failures >= sshKeepAliveMaxFail {
+				log.Writef("ssh disconnect: keepalive timeout, %s", s.kaDiag())
 				s.emitData([]byte("\r\n\x1b[31mConnection lost. Press Enter to reconnect.\x1b[0m\r\n"))
 				s.Disconnect()
 				return
@@ -442,7 +497,9 @@ func (s *SSHSession) Write(data []byte) error {
 	if s.stdin == nil {
 		return fmt.Errorf("not connected")
 	}
-	_, err := s.stdin.Write(s.encodeInput(data))
+	enc := s.encodeInput(data)
+	s.lastSent.Store(append([]byte(nil), enc...))
+	_, err := s.stdin.Write(enc)
 	return err
 }
 
@@ -467,6 +524,7 @@ func (s *SSHSession) Disconnect() error {
 func (s *SSHSession) Resize(cols, rows int) error {
 	// Always save the desired size so it can be applied after Connect finishes.
 	s.SetPendingSize(cols, rows)
+	log.Writef("ssh resize: cols=%d rows=%d", cols, rows)
 	if s.session == nil {
 		return fmt.Errorf("session not connected")
 	}

@@ -570,18 +570,25 @@ function onSplitResizeEnd() {
 }
 
 // Strip OSC sequences that xterm.js generates internally (color queries etc.)
-// and, in normal screen, also strip CSI responses (CPR, DA, window size,
-// focus events) that the remote shell may echo back as garbage.
+// and CSI *responses* it auto-generates when the remote app queries the
+// terminal (CPR cursor-position, DSR status, DA device-attributes, cell/window
+// size). These are xterm.js talking back to a query — echoing them to the
+// remote as if they were user input corrupts the app: a stray `ESC[2;2R`
+// arriving mid-render makes some remote vims exit, closing the channel (issue
+// #242). This must happen in the alternate screen too — vim/less/tmux are
+// exactly the apps that emit `ESC[6n` and friends. Focus in/out (I/O) is left
+// intact in the alternate screen because full-screen apps legitimately want
+// FocusGained/FocusLost.
 function filterTerminalInput(input: string, inAlternateScreen: boolean): string {
   // OSC sequences: ESC ] ... BEL or ESC ] ... ESC \
   let filtered = input.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+  // Terminal query responses — strip in both normal and alternate screens.
+  filtered = filtered.replace(/\x1b\[(?:[?>][\d;]*|[\d;]*)([Rntc])/g, '')
   if (inAlternateScreen) {
     return filtered
   }
-  // Normal screen: strip terminal-generated CSI responses.
-  // Covers CPR (R), status report (n), window/cell size (t),
-  // device attributes (c), and focus in/out (I/O).
-  filtered = filtered.replace(/\x1b\[(?:[?>][\d;]*|[\d;]*)([RntcIO])/g, '')
+  // Normal screen only: also strip focus in/out, which a shell doesn't want.
+  filtered = filtered.replace(/\x1b\[(?:[?>][\d;]*|[\d;]*)([IO])/g, '')
   return filtered
 }
 
@@ -1045,9 +1052,16 @@ onMounted(() => {
         zmodemService.consume(payload.data)
         return
       }
-      // zmodem HEX header: *** <ZDLE> B hex_digits
-      const ZMODEM_HEX_RE = /\*{2,}(?:\x18)?[ABC][0-9a-fA-F]{10,}/
+      // Real ZMODEM headers always contain the ZDLE control byte (0x18)
+      // before the frame type: `**` (ZPAD ZPAD) `\x18` (ZDLE) `[ABC]` then
+      // hex digits. Requiring the 0x18 avoids false positives on ordinary
+      // terminal output — e.g. vim rendering a file whose content happens to
+      // contain `**B<hex>` — which previously flipped the session into binary
+      // ZMODEM mode and made the sentry write protocol bytes back to the
+      // server, crashing the remote shell (issue #242).
+      const ZMODEM_HEX_RE = /\*{2,}\x18[ABC][0-9a-fA-F]{10,}/
       if (ZMODEM_HEX_RE.test(payload.data)) {
+        console.debug('[zmodem] header detected, entering transfer mode')
         isZmodemStarting = true
         if (zmodemStartTimer) clearTimeout(zmodemStartTimer)
         zmodemStartTimer = setTimeout(() => {

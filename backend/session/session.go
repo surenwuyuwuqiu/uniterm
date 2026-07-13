@@ -217,42 +217,37 @@ func (s *baseSession) emitBinary(data []byte) {
 	}
 }
 
+// looksLikeZmodemHeader reports whether data contains a ZMODEM frame header.
+// A real header is ZPAD ZPAD ZDLE frame-type: `**` `\x18` `[A-C]`. The ZDLE
+// (0x18) control byte is mandatory and effectively never appears in ordinary
+// terminal output, so requiring it avoids false positives — e.g. vim rendering
+// a file whose content contains `**` followed by a long hex string, which used
+// to trip a looser heuristic and flip the session into binary mode, crashing
+// the remote shell (issue #242).
 func looksLikeZmodemHeader(data []byte) bool {
-	for i := 0; i < len(data); i++ {
-		if data[i] != '*' {
-			continue
-		}
-		if i+1 >= len(data) || data[i+1] != '*' {
-			continue
-		}
-
-		if i+3 < len(data) && data[i+2] == 0x18 && data[i+3] >= 'A' && data[i+3] <= 'C' {
-			return true
-		}
-
-		hexCount := 0
-		for j := i + 2; j < len(data); j++ {
-			if isHexDigit(data[j]) {
-				hexCount++
-			} else {
-				break
-			}
-		}
-		if hexCount >= 14 {
+	for i := 0; i+3 < len(data); i++ {
+		if data[i] == '*' && data[i+1] == '*' && data[i+2] == 0x18 &&
+			data[i+3] >= 'A' && data[i+3] <= 'C' {
 			return true
 		}
 	}
 	return false
 }
 
-func isHexDigit(c byte) bool {
-	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-}
-
 // RecordReadActivity updates the last-read timestamp for idle detection.
 // Each session's readLoop should call this whenever data is received.
 func (s *baseSession) RecordReadActivity() {
 	s.lastReadTime.Store(time.Now().UnixNano())
+}
+
+// idleSince reports how long since the last read activity. Returns -1 if no
+// read has ever been recorded. Used for disconnect diagnostics.
+func (s *baseSession) idleSince() time.Duration {
+	ns := s.lastReadTime.Load()
+	if ns == 0 {
+		return -1
+	}
+	return time.Since(time.Unix(0, ns))
 }
 
 // waitIdle blocks until no read activity has occurred for the given idle

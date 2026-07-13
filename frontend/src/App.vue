@@ -167,7 +167,7 @@ import { useQuickCommandStore } from './stores/quickCommandStore'
 import { useTunnelStore } from './stores/tunnelStore'
 import { useUpdateCheck } from './composables/useUpdateCheck'
 import { loadKeybindings, installGlobalListener, uninstallGlobalListener } from './composables/useKeyboardShortcuts'
-import type { ShortcutAction } from '../types/settings'
+import type { ShortcutAction } from './types/settings'
 import { useI18n } from './i18n'
 import { CreateSession, CloseSession, RDPHide, RDPShow, RDPSetPosition, RDPSetFocus, LoadLocalState, SaveLocalState, RecordRecentConnection } from '../wailsjs/go/main/App'
 import { EventsOn } from '../wailsjs/runtime'
@@ -616,6 +616,7 @@ const actionHandlers: Record<ShortcutAction, () => void> = {
   },
   navigatePrev: () => navigatePanel(-1),
   navigateNext: () => navigatePanel(1),
+  openSettings: () => openSettings(),
   duplicateSession: async () => {
     const pid = tabStore.getActivePanelId()
     if (!pid) return

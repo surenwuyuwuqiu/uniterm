@@ -570,7 +570,7 @@
 import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2, Globe, Keyboard, Plus, BookOpen } from '@lucide/vue'
 import { msg } from '../services/message'
-import { FetchModels, ChatCompletion, GetSystemFonts } from '../../wailsjs/go/main/App'
+import { FetchModels, ChatCompletion, GetPlatform, GetSystemFonts } from '../../wailsjs/go/main/App'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSyncStore } from '../stores/syncStore'
 import { useUpdateCheck } from '../composables/useUpdateCheck'
@@ -591,6 +591,8 @@ const settingsStore = useSettingsStore()
 const syncStore = useSyncStore()
 const updateCheck = useUpdateCheck()
 const { t } = useI18n()
+const platform = ref('')
+const isMac = computed(() => platform.value === 'darwin')
 
 function openEditRepo() {
   syncStore.showEditRepo = true
@@ -642,6 +644,11 @@ function openThemeEditor(sourceThemeId?: string) {
 
 onMounted(async () => {
   try {
+    platform.value = await GetPlatform()
+  } catch {
+    platform.value = ''
+  }
+  try {
     const fonts = await GetSystemFonts()
     if (fonts && fonts.length > 0) {
       systemFonts.value = fonts.map(f => ({ label: f, value: formatFontFamily(f) }))
@@ -666,6 +673,7 @@ function bindingDisplay(action: ShortcutAction): string {
   if (!b) return ''
   const parts: string[] = []
   if (b.ctrl) parts.push('Ctrl')
+  if (b.meta) parts.push(isMac.value ? 'Cmd' : 'Meta')
   if (b.shift) parts.push('Shift')
   if (b.alt) parts.push('Alt')
   parts.push(b.key)
@@ -677,6 +685,7 @@ function isDefaultBinding(action: ShortcutAction): boolean {
   const def = DEFAULT_KEYBOARD[action]
   if (!current || !def) return true
   return current.ctrl === def.ctrl && current.shift === def.shift
+    && (current.meta || false) === (def.meta || false)
     && current.alt === def.alt && current.key === def.key
 }
 
@@ -713,7 +722,7 @@ function stopRebind() {
 function clearBinding(action: ShortcutAction) {
   settingsStore.settings.keyboard = {
     ...settingsStore.settings.keyboard,
-    [action]: { ctrl: false, shift: false, alt: false, key: '' }
+    [action]: { ctrl: false, meta: false, shift: false, alt: false, key: '' }
   }
   settingsStore.save()
   stopRebind()
@@ -728,7 +737,8 @@ function onRebindKeydown(e: KeyboardEvent) {
   if (key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta') return
 
   const binding: KeyBinding = {
-    ctrl: e.ctrlKey || e.metaKey,
+    ctrl: e.ctrlKey,
+    meta: e.metaKey,
     shift: e.shiftKey,
     alt: e.altKey,
     key: key.toLowerCase(),
@@ -747,15 +757,18 @@ function onRebindKeydown(e: KeyboardEvent) {
 }
 
 function findConflict(binding: KeyBinding): ShortcutAction | null {
-  const targetKey = `${binding.ctrl ? 'ctrl+' : ''}${binding.shift ? 'shift+' : ''}${binding.alt ? 'alt+' : ''}${binding.key.toLowerCase()}`
+  const targetKey = bindingKey(binding)
   const kb = settingsStore.settings.keyboard
   for (const [action, b] of Object.entries(kb) as [ShortcutAction, KeyBinding][]) {
     if (action === rebindingAction.value) continue
     if (!b.key) continue
-    const key = `${b.ctrl ? 'ctrl+' : ''}${b.shift ? 'shift+' : ''}${b.alt ? 'alt+' : ''}${b.key.toLowerCase()}`
-    if (key === targetKey) return action
+    if (bindingKey(b) === targetKey) return action
   }
   return null
+}
+
+function bindingKey(binding: KeyBinding): string {
+  return `${binding.ctrl ? 'ctrl+' : ''}${binding.meta ? 'meta+' : ''}${binding.shift ? 'shift+' : ''}${binding.alt ? 'alt+' : ''}${binding.key.toLowerCase()}`
 }
 
 function onRebindBlur() {

@@ -3,8 +3,10 @@ import type { KeyboardSettings, KeyBinding, ShortcutAction } from '../types/sett
 type ActionHandlers = Record<ShortcutAction, () => void>
 
 function bindingKey(b: KeyBinding): string {
+  if (!b.key) return ''
   let k = ''
   if (b.ctrl) k += 'ctrl+'
+  if (b.meta) k += 'meta+'
   if (b.shift) k += 'shift+'
   if (b.alt) k += 'alt+'
   k += b.key.toLowerCase()
@@ -13,7 +15,8 @@ function bindingKey(b: KeyBinding): string {
 
 function normalize(e: KeyboardEvent): string {
   const parts: string[] = []
-  if (e.ctrlKey || e.metaKey) parts.push('ctrl')
+  if (e.ctrlKey) parts.push('ctrl')
+  if (e.metaKey) parts.push('meta')
   if (e.shiftKey) parts.push('shift')
   if (e.altKey) parts.push('alt')
   parts.push(e.key.toLowerCase())
@@ -30,9 +33,13 @@ export function loadKeybindings(bindings: KeyboardSettings, handlers: ActionHand
   actionKeyMap.clear()
   for (const [action, b] of Object.entries(bindings) as [ShortcutAction, KeyBinding][]) {
     const key = bindingKey(b)
+    if (!key) continue
     const handler = handlers[action]
     if (handler) {
       shortcutMap.set(key, handler)
+      if (!b.meta && b.ctrl) {
+        shortcutMap.set(key.replace(/^ctrl\+/, 'meta+'), handler)
+      }
       actionKeyMap.set(action, key)
     }
   }

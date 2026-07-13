@@ -82,6 +82,7 @@ type AISettings struct {
 
 type KeyBinding struct {
 	Ctrl  bool   `json:"ctrl"`
+	Meta  bool   `json:"meta"`
 	Shift bool   `json:"shift"`
 	Alt   bool   `json:"alt"`
 	Key   string `json:"key"`
@@ -243,6 +244,6 @@ func defaultKeyboard() map[string]KeyBinding {
 		"closePanel":       {Ctrl: true, Shift: true, Alt: false, Key: "q"},
 		"navigatePrev":     {Ctrl: false, Shift: false, Alt: true, Key: "arrowleft"},
 		"navigateNext":     {Ctrl: false, Shift: false, Alt: true, Key: "arrowright"},
-		"openSettings":     {Ctrl: true, Shift: true, Alt: false, Key: "c"},
+		"openSettings":     {Ctrl: false, Meta: true, Shift: false, Alt: false, Key: ","},
 	}
 }

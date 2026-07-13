@@ -86,9 +86,11 @@ export type ShortcutAction =
   | 'navigatePrev' | 'navigateNext'
   | 'duplicateSession'
   | 'terminalSearch'
+  | 'openSettings'
 
 export interface KeyBinding {
   ctrl: boolean
+  meta?: boolean
   shift: boolean
   alt: boolean
   key: string
@@ -109,6 +111,7 @@ export const SHORTCUT_LABELS: Record<ShortcutAction, string> = {
   lockAI: 'shortcut.lockAI',
   duplicateSession: 'shortcut.duplicateSession',
   terminalSearch: 'shortcut.terminalSearch',
+  openSettings: 'shortcut.openSettings',
 }
 
 export const DEFAULT_KEYBOARD: KeyboardSettings = {
@@ -124,6 +127,7 @@ export const DEFAULT_KEYBOARD: KeyboardSettings = {
   lockAI: { ctrl: true, shift: true, alt: false, key: 'l' },
   duplicateSession: { ctrl: true, shift: true, alt: false, key: 'd' },
   terminalSearch: { ctrl: true, shift: false, alt: false, key: 'f' },
+  openSettings: { ctrl: false, meta: true, shift: false, alt: false, key: ',' },
 }
 
 export interface SFTPBookmarks {

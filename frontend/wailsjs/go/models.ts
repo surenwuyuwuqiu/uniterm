@@ -1092,6 +1092,7 @@ export namespace store {
 	}
 	export class KeyBinding {
 	    ctrl: boolean;
+	    meta: boolean;
 	    shift: boolean;
 	    alt: boolean;
 	    key: string;
@@ -1103,6 +1104,7 @@ export namespace store {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ctrl = source["ctrl"];
+	        this.meta = source["meta"];
 	        this.shift = source["shift"];
 	        this.alt = source["alt"];
 	        this.key = source["key"];

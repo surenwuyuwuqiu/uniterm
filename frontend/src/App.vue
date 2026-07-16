@@ -170,7 +170,7 @@ import { loadKeybindings, installGlobalListener, uninstallGlobalListener } from 
 import type { ShortcutAction } from './types/settings'
 import { useI18n } from './i18n'
 import { CreateSession, CloseSession, RDPHide, RDPShow, RDPSetPosition, RDPSetFocus, LoadLocalState, SaveLocalState, RecordRecentConnection } from '../wailsjs/go/main/App'
-import { EventsOn } from '../wailsjs/runtime'
+import { EventsOn, ClipboardGetText } from '../wailsjs/runtime'
 import { msg } from './services/message'
 import type { ConnectionConfig } from './types/session'
 import { parseQuickConnect } from './utils/quickConnect'
@@ -368,7 +368,7 @@ async function ensureCredentials(config: ConnectionConfig): Promise<ConnectionCo
   return config
 }
 
-let inputMenuTarget: HTMLInputElement | HTMLTextAreaElement | null = null
+let inputMenuTarget: HTMLInputElement | HTMLTextAreaElement | HTMLElement | null = null
 
 function closeInputMenu() {
   inputMenuVisible.value = false
@@ -377,7 +377,7 @@ function closeInputMenu() {
 
 function onInputContextMenu(e: Event) {
   const { x, y, target } = (e as CustomEvent).detail as {
-    x: number; y: number; target: HTMLInputElement | HTMLTextAreaElement
+    x: number; y: number; target: HTMLElement
   }
   window.dispatchEvent(new CustomEvent('global:close-context-menus'))
   inputMenuTarget = target
@@ -395,38 +395,55 @@ function fitMenuPosition(x: number, y: number, menuW: number, menuH: number) {
 }
 
 function inputMenuCut() {
-  if (inputMenuTarget) {
-    navigator.clipboard.writeText(getInputSelection(inputMenuTarget))
-    setInputSelection(inputMenuTarget, '')
-    inputMenuTarget.dispatchEvent(new Event('input', { bubbles: true }))
-  }
+  const el = inputMenuTarget
   closeInputMenu()
+  if (!el) return
+  const sel = getInputSelection(el)
+  navigator.clipboard.writeText(sel)
+  if (el.isContentEditable) {
+    const s = window.getSelection()
+    if (s && s.rangeCount > 0) { s.getRangeAt(0).deleteContents() }
+  } else {
+    setInputSelection(el as HTMLInputElement | HTMLTextAreaElement, '')
+  }
+  el.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
 function inputMenuCopy() {
-  if (inputMenuTarget) {
-    navigator.clipboard.writeText(getInputSelection(inputMenuTarget))
-  }
+  const el = inputMenuTarget
   closeInputMenu()
+  if (!el) return
+  navigator.clipboard.writeText(getInputSelection(el))
 }
 
 function inputMenuPaste() {
-  if (inputMenuTarget) {
-    navigator.clipboard.readText().then(text => {
-      setInputSelection(inputMenuTarget, text)
-      inputMenuTarget?.dispatchEvent(new Event('input', { bubbles: true }))
-    }).catch(() => {})
+  const el = inputMenuTarget
+  closeInputMenu()
+  if (!el) return
+  ClipboardGetText().then(text => {
+    if (el.isContentEditable) {
+      insertTextAtContentEditable(el, text)
+    } else {
+      setInputSelection(el as HTMLInputElement | HTMLTextAreaElement, text)
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  }).catch(() => {})
+}
+
+function inputMenuSelectAll() {
+  const el = inputMenuTarget
+  if (el && 'select' in el) {
+    (el as HTMLInputElement | HTMLTextAreaElement).select()
   }
   closeInputMenu()
 }
 
-function inputMenuSelectAll() {
-  inputMenuTarget?.select()
-  closeInputMenu()
-}
-
-function getInputSelection(el: HTMLInputElement | HTMLTextAreaElement): string {
-  return el.value.substring(el.selectionStart ?? 0, el.selectionEnd ?? 0)
+function getInputSelection(el: HTMLElement): string {
+  if (el.isContentEditable) {
+    return window.getSelection()?.toString() || ''
+  }
+  const input = el as HTMLInputElement | HTMLTextAreaElement
+  return input.value.substring(input.selectionStart ?? 0, input.selectionEnd ?? 0)
 }
 
 function setInputSelection(el: HTMLInputElement | HTMLTextAreaElement, text: string) {
@@ -436,6 +453,21 @@ function setInputSelection(el: HTMLInputElement | HTMLTextAreaElement, text: str
   const pos = start + text.length
   el.setSelectionRange(pos, pos)
   el.focus()
+}
+
+function insertTextAtContentEditable(el: HTMLElement, text: string) {
+  el.focus()
+  const sel = window.getSelection()
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0)
+    range.deleteContents()
+    range.insertNode(document.createTextNode(text))
+    range.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(range)
+  } else {
+    el.textContent += text
+  }
 }
 
 function onWheel(e: WheelEvent) {
@@ -448,6 +480,51 @@ function onWheel(e: WheelEvent) {
       ts.fontSize = next
       settingsStore.save()
     }
+  }
+}
+
+// WKWebView doesn't forward Cmd/Ctrl+A/C/V on input/textarea/contenteditable.
+function onEditShortcut(e: KeyboardEvent) {
+  if (e.defaultPrevented) return
+  const target = e.target as HTMLElement
+  const tag = target.tagName
+  const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable
+  if (!isEditable) return
+  const mod = e.metaKey || e.ctrlKey
+  if (!mod || e.shiftKey || e.altKey) return
+
+  if (e.key === 'a' || e.key === 'A') {
+    e.preventDefault()
+    if (target.isContentEditable) {
+      const el = target
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+    } else {
+      (target as HTMLInputElement | HTMLTextAreaElement).select()
+    }
+    return
+  }
+
+  if (e.key === 'c' || e.key === 'C') {
+    e.preventDefault()
+    const sel = getInputSelection(target)
+    navigator.clipboard.writeText(sel).catch(() => {})
+    return
+  }
+
+  if (e.key === 'v' || e.key === 'V') {
+    e.preventDefault()
+    ClipboardGetText().then(text => {
+      if (target.isContentEditable) {
+        insertTextAtContentEditable(target, text)
+      } else {
+        setInputSelection(target as HTMLInputElement | HTMLTextAreaElement, text)
+      }
+      target.dispatchEvent(new Event('input', { bubbles: true }))
+    }).catch(() => {})
   }
 }
 
@@ -479,6 +556,8 @@ onMounted(async () => {
   window.addEventListener('global:close-context-menus', closeInputMenu)
   document.addEventListener('click', closeInputMenu)
   document.addEventListener('wheel', onWheel, { passive: false })
+  // WKWebView doesn't forward Cmd+A/C/V on input/textarea/contenteditable — handle globally.
+  document.addEventListener('keydown', onEditShortcut)
   // Keyboard shortcuts — load once on mount, watch for settings changes
   applyKeybindings()
   installGlobalListener()

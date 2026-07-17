@@ -244,6 +244,6 @@ func defaultKeyboard() map[string]KeyBinding {
 		"closePanel":       {Ctrl: true, Shift: true, Alt: false, Key: "q"},
 		"navigatePrev":     {Ctrl: false, Shift: false, Alt: true, Key: "arrowleft"},
 		"navigateNext":     {Ctrl: false, Shift: false, Alt: true, Key: "arrowright"},
-		"openSettings":     {Ctrl: false, Meta: true, Shift: false, Alt: false, Key: ","},
+		"openSettings":     {Ctrl: true, Shift: false, Alt: false, Key: ","},
 	}
 }

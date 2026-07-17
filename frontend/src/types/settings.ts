@@ -128,7 +128,7 @@ export const DEFAULT_KEYBOARD: KeyboardSettings = {
   lockAI: { ctrl: true, shift: true, alt: false, key: 'l' },
   duplicateSession: { ctrl: true, shift: true, alt: false, key: 'd' },
   terminalSearch: { ctrl: true, shift: false, alt: false, key: 'f' },
-  openSettings: { ctrl: false, meta: true, shift: false, alt: false, key: ',' },
+  openSettings: { ctrl: true, shift: false, alt: false, key: ',' },
 }
 
 export interface SFTPBookmarks {

@@ -50,7 +50,11 @@ export function focusActivePanelTerminal() {
  * Returns a teardown function.
  */
 export function installTerminalFocusRestore(): () => void {
-  const INTERACTIVE_SEL = 'input, textarea, select, button, a, [role="button"], [contenteditable="true"], .xterm-helper-textarea'
+  // Element Plus renders its select/dropdown trigger as a plain <div>
+  // (.el-select__wrapper) and teleports the option list to <body> as
+  // .el-popper — neither is a native control, so list them explicitly or the
+  // focus guard steals focus back to the terminal and the dropdown never opens.
+  const INTERACTIVE_SEL = 'input, textarea, select, button, a, [role="button"], [role="combobox"], [contenteditable="true"], .xterm-helper-textarea, .el-select__wrapper, .el-input__wrapper, .el-popper'
 
   // Walk ancestors looking for the --wails-draggable custom property so we
   // can tell a frameless-window drag region apart from ordinary chrome. Any

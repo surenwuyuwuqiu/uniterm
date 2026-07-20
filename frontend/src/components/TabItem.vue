@@ -68,6 +68,9 @@
         @click.stop
       >
         <div v-if="canDuplicate" class="menu-item" @click="duplicateTab">{{ t('tab.duplicate') }}</div>
+        <div v-if="tab.type === 'terminal'" class="menu-item" @click="toggleAiLock">
+          {{ isAILocked ? t('terminal.aiLocked') : t('terminal.lockAI') }}
+        </div>
         <div v-if="tab.type === 'terminal' && panelStore.getPanel(tab.panelId)?.type === 'ssh'" class="menu-item" @click="openSftp">{{ t('sidebar.connectSftp') }}</div>
         <div v-if="tab.type === 'terminal' && panelStore.getPanel(tab.panelId)?.type === 'ssh'" class="menu-item" @click="uploadFileRz">{{ t('terminal.uploadFileRz') }}</div>
         <div v-if="tab.type === 'terminal' && panelStore.getPanel(tab.panelId)?.type === 'ssh'" class="menu-item" @click="openMonitor">{{ t('sidebar.connectMonitor') }}</div>
@@ -80,9 +83,6 @@
         <div v-if="tab.type === 'terminal'" class="menu-item" @click="triggerSearch">{{ t('terminal.searchText') }}</div>
         <div v-if="tab.type === 'terminal'" class="menu-item" @click="triggerExport">{{ t('terminal.export') }}</div>
         <div v-if="tab.type === 'terminal'" class="menu-item" @click="startEdit">{{ t('tab.rename') }}</div>
-        <div v-if="tab.type === 'terminal'" class="menu-item" @click="toggleAiLock">
-          {{ isAILocked ? t('terminal.aiLocked') : t('terminal.lockAI') }}
-        </div>
         <div v-if="tab.type === 'terminal'" class="menu-divider" />
         <div v-if="tab.type !== 'start' && tab.type !== 'settings'" class="menu-item" @click="toggleLock">
           {{ tab.locked ? t('tab.unlock') : t('tab.lock') }}

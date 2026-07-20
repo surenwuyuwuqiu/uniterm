@@ -29,6 +29,7 @@
       class="tab-drop-indicator tab-drop-indicator-end"
     ></div>
     <button
+      v-if="!showMore"
       class="tab-add-btn"
       :title="t('startTab.defaultName')"
       @click="onAddStartTab"
@@ -54,6 +55,13 @@
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+    <button
+      class="tab-add-btn"
+      :title="t('startTab.defaultName')"
+      @click="onAddStartTab"
+    >
+      <Plus :size="14" />
+    </button>
   </div>
 </template>
 

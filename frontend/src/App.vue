@@ -170,8 +170,8 @@ import { loadKeybindings, installGlobalListener, uninstallGlobalListener } from 
 import { focusPanelTerminal, installTerminalFocusRestore } from './composables/useFocusTerminal'
 import type { ShortcutAction } from './types/settings'
 import { useI18n } from './i18n'
-import { CreateSession, CloseSession, RDPHide, RDPShow, RDPSetPosition, RDPSetFocus, LoadLocalState, SaveLocalState, RecordRecentConnection } from '../wailsjs/go/main/App'
-import { EventsOn, ClipboardGetText } from '../wailsjs/runtime'
+import { CreateSession, CloseSession, RDPHide, RDPShow, RDPSetPosition, RDPSetFocus, LoadLocalState, SaveLocalState, RecordRecentConnection, GetPlatform } from '../wailsjs/go/main/App'
+import { EventsOn, ClipboardGetText, Quit } from '../wailsjs/runtime'
 import { msg } from './services/message'
 import type { ConnectionConfig } from './types/session'
 import { parseQuickConnect } from './utils/quickConnect'
@@ -547,6 +547,24 @@ function onEditShortcut(e: KeyboardEvent) {
   }
 }
 
+// macOS-only system shortcuts (issue #339): Cmd+Q quits, Cmd+W closes the
+// active tab. Guarded by isMac so Windows/Linux never see this behaviour —
+// there Ctrl+Q/W stay free for the terminal and the existing keybindings.
+let isMac = false
+function onMacSystemShortcut(e: KeyboardEvent) {
+  if (!isMac || e.defaultPrevented) return
+  if (!e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+  const key = e.key.toLowerCase()
+  if (key === 'q') {
+    e.preventDefault()
+    Quit()
+  } else if (key === 'w') {
+    e.preventDefault()
+    const t = tabStore.activeTab
+    if (t) closeTab(t.id)
+  }
+}
+
 onMounted(async () => {
   connectionStore.load()
   aiStore.init()
@@ -577,6 +595,9 @@ onMounted(async () => {
   document.addEventListener('wheel', onWheel, { passive: false })
   // WKWebView doesn't forward Cmd+A/C/V on input/textarea/contenteditable — handle globally.
   document.addEventListener('keydown', onEditShortcut)
+  // macOS system shortcuts (Cmd+Q / Cmd+W) — only armed on darwin.
+  try { isMac = (await GetPlatform()) === 'darwin' } catch { isMac = false }
+  if (isMac) document.addEventListener('keydown', onMacSystemShortcut, true)
   // Keyboard shortcuts — load once on mount, watch for settings changes
   applyKeybindings()
   installGlobalListener()
@@ -741,6 +762,7 @@ onUnmounted(() => {
   window.removeEventListener('global:close-context-menus', closeInputMenu)
   document.removeEventListener('click', closeInputMenu)
   document.removeEventListener('wheel', onWheel)
+  document.removeEventListener('keydown', onMacSystemShortcut, true)
   // RDP overlay tracking
   window.removeEventListener('rdp:overlay-push', RDPHideForOverlay)
   window.removeEventListener('rdp:overlay-pop', RDPShowForOverlay)

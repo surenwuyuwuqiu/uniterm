@@ -523,6 +523,12 @@ onUnmounted(() => {
   gap: 6px;
   margin-right: 4px;
   font-weight: 500;
+  transition: margin-right 0.12s ease;
+}
+/* On hover the floating more (…) button overlays the name's tail; reserve
+   room so the label stays fully visible instead of being covered. */
+.tab-item:hover .tab-name {
+  margin-right: 24px;
 }
 .tab-disconnected {
   opacity: 0.5;

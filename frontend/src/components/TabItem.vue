@@ -391,12 +391,18 @@ async function duplicateTab() {
 }
 
 // The session-type argument to CreateSession isn't always panel.config.type:
-// database panels split into mysql/postgres/redis/mongodb by dbType.
+// - database panels split into mysql/postgres/redis/mongodb by dbType;
+// - a file-transfer (sftp) tab shares the SSH connection, so its config.type
+//   is 'ssh' but the session must be created as 'sftp' (ftp/smb/webdav/s3
+//   already carry a matching config.type).
 function resolveSessionType(tabType: string, config: any): string {
   if (tabType === 'database' || tabType === 'mongodb' || tabType === 'redis') {
     if (config?.dbType === 'redis') return 'redis'
     if (config?.dbType === 'mongodb') return 'mongodb'
     return 'database'
+  }
+  if (tabType === 'sftp') {
+    return config?.type === 'ssh' ? 'sftp' : config?.type
   }
   return config?.type
 }

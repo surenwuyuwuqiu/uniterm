@@ -832,6 +832,14 @@ body.drag-active .zone {
   -webkit-user-select: text;
 }
 
+/* Copyable message (msg.copyable): opt out of the frameless-window drag region
+   so mouse-down selects text instead of dragging the window on macOS. */
+.msg-copyable,
+.msg-copyable .el-message__content {
+  --wails-draggable: no-drag;
+  cursor: text;
+}
+
 /* Link hover tooltip */
 .xterm-link-tooltip {
   position: absolute;

@@ -440,7 +440,7 @@ async function toggleOutputLog() {
       const prev = outputLogPath.value
       outputLogPath.value = ''
       panelStore.setOutputLog(panel.id, { enabled: false, path: '' })
-      msg.info(t('session.logStopped', { path: prev }))
+      msg.copyable(t('session.logStopped', { path: prev }), 'info')
       return
     }
     const path = await EnableSessionOutputLog(panel.id, '')
@@ -451,7 +451,7 @@ async function toggleOutputLog() {
     isOutputLogOn.value = true
     outputLogPath.value = path
     panelStore.setOutputLog(panel.id, { enabled: true, path })
-    msg.success(t('session.logStarted', { path }))
+    msg.copyable(t('session.logStarted', { path }), 'success')
   } catch (e: any) {
     msg.error(t('session.logFailed', { error: String(e?.message ?? e) }))
   }

@@ -89,6 +89,13 @@ export function installTerminalFocusRestore(): () => void {
       if (now instanceof HTMLElement && now.classList.contains('xterm-helper-textarea')) {
         return // browser kept us on the terminal, nothing to do
       }
+      // Focus legitimately moved to an editable field (e.g. the tab-rename
+      // input, opened from a menu item that isn't in INTERACTIVE_SEL) — don't
+      // yank it back to the terminal, or renaming can never take focus.
+      if (now instanceof HTMLElement &&
+          (now.tagName === 'INPUT' || now.tagName === 'TEXTAREA' || now.isContentEditable)) {
+        return
+      }
       if (capturedPanelId) {
         focusPanelTerminal(capturedPanelId)
       } else {

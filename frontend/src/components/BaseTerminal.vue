@@ -498,6 +498,12 @@ function write(data: string) {
 }
 
 function focus() {
+  // Don't steal focus while the user is typing in an input (e.g. renaming a
+  // tab); a stray session:status event would otherwise blur the rename box.
+  const el = document.activeElement
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable)) {
+    return
+  }
   terminal?.focus()
 }
 

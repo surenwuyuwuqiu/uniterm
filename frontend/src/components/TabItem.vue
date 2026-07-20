@@ -30,19 +30,10 @@
       />
       <span v-else-if="!isActive && hasNotification && !tab.locked" class="tab-notification-dot" />
     </span>
-    <button
-      v-if="tab.type === 'terminal'"
-      class="tab-ai-lock"
-      :class="{ locked: isAILocked }"
-      @click.stop="$emit('toggleAiLock', tab.panelId)"
-      :title="isAILocked ? t('terminal.aiLocked') : t('terminal.lockAI')"
-    >
-      <Sparkles :size="14" />
-    </button>
     <span
-      v-else-if="tab.type === 'workspace' && isAILocked"
-      class="tab-ai-lock locked"
-      title="AI locked to a panel in this workspace"
+      v-if="isAILocked"
+      class="tab-ai-lock-indicator"
+      :title="t('terminal.aiLocked')"
     >
       <Sparkles :size="14" />
     </span>
@@ -89,6 +80,9 @@
         <div v-if="tab.type === 'terminal'" class="menu-item" @click="triggerSearch">{{ t('terminal.searchText') }}</div>
         <div v-if="tab.type === 'terminal'" class="menu-item" @click="triggerExport">{{ t('terminal.export') }}</div>
         <div v-if="tab.type === 'terminal'" class="menu-item" @click="startEdit">{{ t('tab.rename') }}</div>
+        <div v-if="tab.type === 'terminal'" class="menu-item" @click="toggleAiLock">
+          {{ isAILocked ? t('terminal.aiLocked') : t('terminal.lockAI') }}
+        </div>
         <div v-if="tab.type === 'terminal'" class="menu-divider" />
         <div v-if="tab.type !== 'start' && tab.type !== 'settings'" class="menu-item" @click="toggleLock">
           {{ tab.locked ? t('tab.unlock') : t('tab.lock') }}
@@ -321,6 +315,13 @@ function toggleLock() {
   closeContextMenu()
 }
 
+function toggleAiLock() {
+  if (props.tab.type === 'terminal') {
+    emit('toggleAiLock', props.tab.panelId)
+  }
+  closeContextMenu()
+}
+
 function closeTab() {
   emit('close', props.tab.id)
   closeContextMenu()
@@ -521,14 +522,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-right: 4px;
+  /* Always reserve room for the floating more (…) button so hovering never
+     widens the tab (no layout shift) and the button never covers the name. */
+  margin-right: 20px;
   font-weight: 500;
-  transition: margin-right 0.12s ease;
-}
-/* On hover the floating more (…) button overlays the name's tail; reserve
-   room so the label stays fully visible instead of being covered. */
-.tab-item:hover .tab-name {
-  margin-right: 24px;
 }
 .tab-disconnected {
   opacity: 0.5;
@@ -587,39 +584,12 @@ onUnmounted(() => {
   width: 120px;
   outline: none;
 }
-.tab-ai-lock {
-  position: absolute;
-  left: 30px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--bg-hover);
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border-radius: 3px;
-  display: none;
+.tab-ai-lock-indicator {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-.tab-item:hover .tab-ai-lock {
-  display: inline-flex;
-}
-.tab-ai-lock.locked {
-  position: static;
-  transform: none;
-  display: inline-flex;
-  background: transparent;
-  color: var(--warning);
   margin-right: 2px;
-}
-.tab-ai-lock:hover {
-  color: var(--text-primary);
-}
-.tab-ai-lock.locked:hover {
   color: var(--warning);
 }
 .tab-close {

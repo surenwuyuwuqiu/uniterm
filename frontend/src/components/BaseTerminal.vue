@@ -116,6 +116,8 @@ const props = defineProps<{
   panelId?: string
 }>()
 
+const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent)
+
 const settingsStore = useSettingsStore()
 const sessionStore = useSessionStore()
 const tabStore = useTabStore()
@@ -626,13 +628,14 @@ function handleTerminalKey(e: KeyboardEvent): boolean {
   // Check global shortcuts first (Ctrl+Shift+/Alt+ combos)
   if (e.type === 'keydown' && !onTerminalKey(e)) return false
 
-  // Cmd/Ctrl+V: paste via Wails clipboard (xterm's DOM paste is unreliable in WKWebView).
-  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'v' || e.key === 'V') && e.type === 'keydown') {
-    // In alternate-screen apps (vim, k9s, htop, less…) pass Ctrl+V through so
-    // remote apps can use it as a binding (e.g. vim visual block).
-    if (terminalInput?.isInAlternateScreen()) {
-      return true
-    }
+  // Paste via Wails clipboard (xterm's DOM paste is unreliable in WKWebView).
+  // Bind to the platform's paste shortcut only — Cmd+V on macOS, Ctrl+Shift+V
+  // elsewhere. Plain Ctrl+V is never intercepted, so it passes through to the
+  // terminal app (vim visual block, bash literal-next…) on every platform.
+  const pasteCombo = isMac
+    ? (e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey)
+    : (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey)
+  if (pasteCombo && (e.key === 'v' || e.key === 'V') && e.type === 'keydown') {
     e.preventDefault()
     if (props.mode === 'ssh' || props.mode === 'local') {
       ClipboardGetText().then(text => {

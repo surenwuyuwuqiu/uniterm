@@ -32,6 +32,16 @@ document.addEventListener('contextmenu', () => {
 
 document.addEventListener('contextmenu', (e) => {
   const target = e.target as HTMLElement
+  // Read-only log-path toast: offer copy/select-all on its plain text.
+  const copyable = target.closest('.msg-copyable') as HTMLElement | null
+  if (copyable) {
+    e.preventDefault()
+    const content = (copyable.querySelector('.el-message__content') as HTMLElement) || copyable
+    window.dispatchEvent(new CustomEvent('input:contextmenu', {
+      detail: { x: e.clientX, y: e.clientY, target: content, readonly: true }
+    }))
+    return
+  }
   const tag = target.tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) {
     e.preventDefault()

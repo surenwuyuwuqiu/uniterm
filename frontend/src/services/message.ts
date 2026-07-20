@@ -12,7 +12,8 @@ export const msg = {
   // back to the DOM instead of initiating a window drag on macOS frameless
   // windows. CSS customClass alone isn't enough — the mousedown lands on a
   // text node inside .el-message__content and Wails walks up to find no-drag;
-  // an inline style on the immediate parent is the most reliable target.
+  // an inline style on the immediate parent is the most reliable target. The
+  // msg-copyable class lets the focus guard and right-click menu target it.
   copyable(m: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') {
     const safe = m.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     ElMessage({
@@ -22,6 +23,7 @@ export const msg = {
       showClose: true,
       duration: 0,
       offset: 56,
+      customClass: 'msg-copyable',
     })
   },
 }

@@ -114,9 +114,9 @@
       :style="{ left: inputMenuPos.x + 'px', top: inputMenuPos.y + 'px' }"
       @click.stop
     >
-      <div class="input-menu-item" @click="inputMenuCut">{{ t('input.cut') }}</div>
+      <div v-if="!inputMenuReadonly" class="input-menu-item" @click="inputMenuCut">{{ t('input.cut') }}</div>
       <div class="input-menu-item" @click="inputMenuCopy">{{ t('input.copy') }}</div>
-      <div class="input-menu-item" @click="inputMenuPaste">{{ t('input.paste') }}</div>
+      <div v-if="!inputMenuReadonly" class="input-menu-item" @click="inputMenuPaste">{{ t('input.paste') }}</div>
       <div class="input-menu-item" @click="inputMenuSelectAll">{{ t('input.selectAll') }}</div>
     </div>
 
@@ -267,6 +267,7 @@ const aiSidebarRef = ref<any>(null)
 // Input context menu state
 const inputMenuVisible = ref(false)
 const inputMenuPos = ref({ x: 0, y: 0 })
+const inputMenuReadonly = ref(false)
 
 // ── Credential prompt ──────────────────────────────────────────
 const credentialVisible = ref(false)
@@ -378,11 +379,12 @@ function closeInputMenu() {
 }
 
 function onInputContextMenu(e: Event) {
-  const { x, y, target } = (e as CustomEvent).detail as {
-    x: number; y: number; target: HTMLElement
+  const { x, y, target, readonly } = (e as CustomEvent).detail as {
+    x: number; y: number; target: HTMLElement; readonly?: boolean
   }
   window.dispatchEvent(new CustomEvent('global:close-context-menus'))
   inputMenuTarget = target
+  inputMenuReadonly.value = !!readonly
   const pos = fitMenuPosition(x, y, 120, 140)
   inputMenuPos.value = { x: parseInt(pos.left), y: parseInt(pos.top) }
   inputMenuVisible.value = true
@@ -413,8 +415,16 @@ function inputMenuCut() {
 
 function inputMenuCopy() {
   const el = inputMenuTarget
+  const readonly = inputMenuReadonly.value
   closeInputMenu()
   if (!el) return
+  // Read-only plain element (log-path toast): copy the live selection if any,
+  // otherwise the whole text.
+  if (readonly) {
+    const sel = window.getSelection()?.toString()
+    navigator.clipboard.writeText(sel || el.textContent || '')
+    return
+  }
   navigator.clipboard.writeText(getInputSelection(el))
 }
 
@@ -434,7 +444,14 @@ function inputMenuPaste() {
 
 function inputMenuSelectAll() {
   const el = inputMenuTarget
-  if (el && 'select' in el) {
+  const readonly = inputMenuReadonly.value
+  if (el && readonly) {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+  } else if (el && 'select' in el) {
     (el as HTMLInputElement | HTMLTextAreaElement).select()
   }
   closeInputMenu()

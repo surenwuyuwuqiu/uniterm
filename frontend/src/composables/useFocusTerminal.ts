@@ -54,7 +54,9 @@ export function installTerminalFocusRestore(): () => void {
   // (.el-select__wrapper) and teleports the option list to <body> as
   // .el-popper — neither is a native control, so list them explicitly or the
   // focus guard steals focus back to the terminal and the dropdown never opens.
-  const INTERACTIVE_SEL = 'input, textarea, select, button, a, [role="button"], [role="combobox"], [contenteditable="true"], .xterm-helper-textarea, .el-select__wrapper, .el-input__wrapper, .el-popper'
+  // .msg-copyable is the log-path toast: leaving it alone keeps a text selection
+  // alive so it can be copied instead of being cleared by a terminal refocus.
+  const INTERACTIVE_SEL = 'input, textarea, select, button, a, [role="button"], [role="combobox"], [contenteditable="true"], .xterm-helper-textarea, .el-select__wrapper, .el-input__wrapper, .el-popper, .msg-copyable'
 
   // Walk ancestors looking for the --wails-draggable custom property so we
   // can tell a frameless-window drag region apart from ordinary chrome. Any

@@ -209,6 +209,11 @@ func (s *RedisSession) SwitchDB(idx int) error {
 
 // ScanKeys scans keys matching pattern with cursor-based pagination.
 // Returns key metadata (name, type, TTL) via pipeline batching.
+//
+// A single SCAN iteration inspects ~count slots but may return far fewer
+// (or zero) matching keys even when matches exist later in the keyspace.
+// Keep iterating until the page is reasonably full or the cursor wraps,
+// so a sparse MATCH does not render as a misleading empty page.
 func (s *RedisSession) ScanKeys(pattern string, cursor uint64, count int64) (*ScanResult, error) {
 	if count <= 0 {
 		count = 100
@@ -218,9 +223,18 @@ func (s *RedisSession) ScanKeys(pattern string, cursor uint64, count int64) (*Sc
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	keys, nextCursor, err := client.Scan(ctx, cursor, pattern, count).Result()
-	if err != nil {
-		return nil, fmt.Errorf("scan: %w", err)
+	var keys []string
+	nextCursor := cursor
+	for {
+		batch, c, err := client.Scan(ctx, nextCursor, pattern, count).Result()
+		if err != nil {
+			return nil, fmt.Errorf("scan: %w", err)
+		}
+		keys = append(keys, batch...)
+		nextCursor = c
+		if nextCursor == 0 || int64(len(keys)) >= count || ctx.Err() != nil {
+			break
+		}
 	}
 
 	result := &ScanResult{
@@ -241,7 +255,7 @@ func (s *RedisSession) ScanKeys(pattern string, cursor uint64, count int64) (*Sc
 		typeCmds[i] = pipe.Type(ctx, key)
 		ttlCmds[i] = pipe.TTL(ctx, key)
 	}
-	_, err = pipe.Exec(ctx)
+	_, err := pipe.Exec(ctx)
 	if err != nil && err != redis.Nil {
 		return nil, fmt.Errorf("scan pipeline: %w", err)
 	}

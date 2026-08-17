@@ -386,10 +386,20 @@ function onNewKeyTypeChange() {
 }
 
 // --- Key scanning ---
+
+// Plain text (no glob metachars) is treated as a substring search: "pod"
+// scans as "*pod*". Patterns that already contain * ? [ are sent as-is.
+function effectivePattern(): string {
+  const p = scanPattern.value.trim()
+  if (!p || p === '*') return '*'
+  if (/[*?[]/.test(p)) return p
+  return `*${p}*`
+}
+
 async function doScan(cursor: number) {
   loading.value = true
   try {
-    const result: ScanResult = await RedisScanKeys(props.sessionId, scanPattern.value, cursor, pageSize.value)
+    const result: ScanResult = await RedisScanKeys(props.sessionId, effectivePattern(), cursor, pageSize.value)
     keys.value = (result.keys || []).sort((a, b) => a.name.localeCompare(b.name))
     nextCursor.value = result.cursor
     hasMore.value = result.cursor !== 0

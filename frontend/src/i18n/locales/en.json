@@ -438,6 +438,8 @@
   "settings.modelModelPlaceholder": "Select or enter a model name",
   "settings.modelApiKey": "API Key",
   "settings.modelUserAgent": "User-Agent",
+  "settings.modelProxyPlaceholder": "No proxy (direct connection)",
+  "settings.modelProxyDesc": "Proxy used to reach this model API; pick from saved proxies below",
   "settings.modelProtocol": "Protocol",
   "settings.cancel": "Cancel",
   "settings.save": "Save",

@@ -438,6 +438,8 @@
   "settings.modelModelPlaceholder": "Выберите или введите имя модели",
   "settings.modelApiKey": "API-ключ",
   "settings.modelUserAgent": "User-Agent",
+  "settings.modelProxyPlaceholder": "Без прокси (напрямую)",
+  "settings.modelProxyDesc": "Прокси для доступа к API модели; выберите из сохранённых",
   "settings.modelProtocol": "Протокол",
   "settings.cancel": "Отмена",
   "settings.save": "Сохранить",

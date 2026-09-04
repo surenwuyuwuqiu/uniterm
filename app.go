@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -2532,7 +2533,7 @@ func (a *App) GetRecentConnections() []string {
 // ChatCompletion streams the Anthropic API response via SSE, emitting Wails
 // events for each token while collecting the full message. It returns the
 // complete message JSON when the stream ends (backward-compatible).
-func (a *App) ChatCompletion(apiKey, baseURL, model string, requestJSON string, protocol string, userAgent string) (string, error) {
+func (a *App) ChatCompletion(apiKey, baseURL, model string, requestJSON string, protocol string, userAgent string, proxyID string) (string, error) {
 	// Parse the incoming request body (always Anthropic format from frontend)
 	var reqBody map[string]interface{}
 	if err := json.Unmarshal([]byte(requestJSON), &reqBody); err != nil {
@@ -2543,13 +2544,66 @@ func (a *App) ChatCompletion(apiKey, baseURL, model string, requestJSON string, 
 		userAgent = "uniTerm"
 	}
 
+	proxy, err := a.llmProxyFor(proxyID)
+	if err != nil {
+		return "", err
+	}
+
 	switch protocol {
 	case "openai":
-		return a.chatCompletionOpenAI(apiKey, baseURL, model, reqBody, userAgent)
+		return a.chatCompletionOpenAI(apiKey, baseURL, model, reqBody, userAgent, proxy)
 	case "responses":
-		return a.chatCompletionResponses(apiKey, baseURL, model, reqBody, userAgent)
+		return a.chatCompletionResponses(apiKey, baseURL, model, reqBody, userAgent, proxy)
 	}
-	return a.chatCompletionAnthropic(apiKey, baseURL, model, reqBody, userAgent)
+	return a.chatCompletionAnthropic(apiKey, baseURL, model, reqBody, userAgent, proxy)
+}
+
+// llmProxyFor resolves a saved-proxy reference into the SocksProxy used as an
+// HTTP CONNECT proxy for LLM-bound requests. Empty ID = direct connection.
+func (a *App) llmProxyFor(proxyID string) (*session.SocksProxy, error) {
+	if proxyID == "" {
+		return nil, nil
+	}
+	resolve, err := a.proxyResolver()
+	if err != nil {
+		return nil, err
+	}
+	p, ok := resolve(proxyID)
+	if !ok {
+		return nil, fmt.Errorf("referenced proxy not found or disabled: %s", proxyID)
+	}
+	return &p, nil
+}
+
+// llmHTTPClientFor returns an *http.Client whose transport routes through the
+// given upstream proxy (HTTP CONNECT for https URLs). proxy nil = shared
+// direct client (F-208 connection reuse only applies to the direct path).
+func (a *App) llmHTTPClientFor(proxy *session.SocksProxy) *http.Client {
+	if proxy == nil {
+		return a.llmHTTPClient()
+	}
+	tr := &http.Transport{
+		Proxy: func(*http.Request) (*url.URL, error) {
+			return proxyTransportURL(proxy)
+		},
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   8,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+		ExpectContinueTimeout: 2 * time.Second,
+	}
+	return &http.Client{Transport: tr}
+}
+
+// proxyTransportURL renders a saved SOCKS5/HTTP proxy as a proxy URL for
+// http.Transport. http.Transport natively speaks SOCKS5 via the socks5 scheme.
+func proxyTransportURL(p *session.SocksProxy) (*url.URL, error) {
+	u := &url.URL{Scheme: p.Kind, Host: net.JoinHostPort(p.Host, strconv.Itoa(p.Port))}
+	if p.User != "" {
+		u.User = url.UserPassword(p.User, p.Pass)
+	}
+	return u, nil
 }
 
 // F-306: typed SSE envelope for Anthropic Messages events. Variant
@@ -2613,7 +2667,7 @@ type aiDoneEvent struct {
 }
 
 // chatCompletionAnthropic handles the native Anthropic Messages API with SSE streaming.
-func (a *App) chatCompletionAnthropic(apiKey, baseURL, model string, reqBody map[string]interface{}, userAgent string) (string, error) {
+func (a *App) chatCompletionAnthropic(apiKey, baseURL, model string, reqBody map[string]interface{}, userAgent string, proxy *session.SocksProxy) (string, error) {
 	reqBody["stream"] = true
 
 	modifiedJSON, err := json.Marshal(reqBody)
@@ -2652,7 +2706,7 @@ func (a *App) chatCompletionAnthropic(apiKey, baseURL, model string, reqBody map
 	req.Header.Set("anthropic-beta", "prompt-caching-2024-07-31")
 	req.Header.Set("User-Agent", userAgent)
 
-	client := &http.Client{Timeout: 0}
+	client := a.llmHTTPClientFor(proxy)
 	res, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -2957,7 +3011,7 @@ type openaiStreamEvent struct {
 // chatCompletionOpenAI converts the Anthropic-format request to OpenAI,
 // calls the OpenAI Chat Completions API with SSE streaming, and converts
 // the response back to Anthropic format so the frontend sees no difference.
-func (a *App) chatCompletionOpenAI(apiKey, baseURL, model string, reqBody map[string]interface{}, userAgent string) (string, error) {
+func (a *App) chatCompletionOpenAI(apiKey, baseURL, model string, reqBody map[string]interface{}, userAgent string, proxy *session.SocksProxy) (string, error) {
 	url := strings.TrimRight(baseURL, "/") + "/chat/completions"
 
 	// --- Build OpenAI-format request body ---
@@ -3027,7 +3081,7 @@ func (a *App) chatCompletionOpenAI(apiKey, baseURL, model string, reqBody map[st
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("User-Agent", userAgent)
 
-	client := a.llmHTTPClient()
+	client := a.llmHTTPClientFor(proxy)
 	res, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -3407,7 +3461,7 @@ type responsesStreamEvent struct {
 // Responses API, calls /responses with SSE streaming, and converts the response
 // events back to Anthropic-format events so the frontend sees no difference.
 // Stateless: full history is sent as `input` each turn; reasoning items are ignored.
-func (a *App) chatCompletionResponses(apiKey, baseURL, model string, reqBody map[string]interface{}, userAgent string) (string, error) {
+func (a *App) chatCompletionResponses(apiKey, baseURL, model string, reqBody map[string]interface{}, userAgent string, proxy *session.SocksProxy) (string, error) {
 	url := strings.TrimRight(baseURL, "/") + "/responses"
 
 	// --- Build Responses-format request body ---
@@ -3473,7 +3527,7 @@ func (a *App) chatCompletionResponses(apiKey, baseURL, model string, reqBody map
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("User-Agent", userAgent)
 
-	client := a.llmHTTPClient()
+	client := a.llmHTTPClientFor(proxy)
 	res, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -3709,7 +3763,7 @@ type ModelInfo struct {
 // OpenAI-compatible /models endpoint with a Bearer token; anthropic hits
 // /v1/models with the x-api-key + anthropic-version headers, mirroring
 // chatCompletionAnthropic's URL and auth handling.
-func (a *App) FetchModels(apiKey, baseURL, protocol string) ([]ModelInfo, error) {
+func (a *App) FetchModels(apiKey, baseURL, protocol string, proxyID string) ([]ModelInfo, error) {
 	base := strings.TrimRight(baseURL, "/")
 
 	var url string
@@ -3739,10 +3793,14 @@ func (a *App) FetchModels(apiKey, baseURL, protocol string) ([]ModelInfo, error)
 	// F-208: share the same transport as the LLM clients so the model
 	// list call also benefits from the keep-alive pool; the request
 	// itself carries its own 10s deadline via the per-request context.
+	proxy, err := a.llmProxyFor(proxyID)
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req = req.WithContext(ctx)
-	res, err := a.llmHTTPClient().Do(req)
+	res, err := a.llmHTTPClientFor(proxy).Do(req)
 	if err != nil {
 		return nil, err
 	}

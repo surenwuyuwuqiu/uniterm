@@ -438,6 +438,8 @@
   "settings.modelModelPlaceholder": "モデル名を選択または入力",
   "settings.modelApiKey": "API キー",
   "settings.modelUserAgent": "ユーザーエージェント",
+  "settings.modelProxyPlaceholder": "プロキシを使用しない（直接接続）",
+  "settings.modelProxyDesc": "このモデルAPIへの接続に使うプロキシ。保存済みプロキシから選択",
   "settings.modelProtocol": "プロトコル",
   "settings.cancel": "キャンセル",
   "settings.save": "保存",

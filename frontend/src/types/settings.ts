@@ -109,6 +109,9 @@ export interface AIModelConfig {
   model: string
   protocol: 'anthropic' | 'openai' | 'responses'
   userAgent?: string
+  // Reference to a saved outbound proxy (proxies.json) for all traffic to
+  // this model's baseURL. Empty/undefined = direct connection.
+  proxyId?: string
 }
 
 export const USER_AGENT_PRESETS: { label: string; value: string }[] = [

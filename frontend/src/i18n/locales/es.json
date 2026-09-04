@@ -438,6 +438,8 @@
   "settings.modelModelPlaceholder": "Selecciona o escribe un nombre de modelo",
   "settings.modelApiKey": "Clave de API",
   "settings.modelUserAgent": "User-Agent",
+  "settings.modelProxyPlaceholder": "Sin proxy (conexión directa)",
+  "settings.modelProxyDesc": "Proxy para acceder a la API del modelo; elija de los guardados",
   "settings.modelProtocol": "Protocolo",
   "settings.cancel": "Cancelar",
   "settings.save": "Guardar",

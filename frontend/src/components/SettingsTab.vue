@@ -976,6 +976,17 @@
         <el-form-item :label="t('settings.modelApiKey')">
           <el-input v-model="modelForm.apiKey" type="password" show-password />
         </el-form-item>
+        <el-form-item :label="t('conn.proxy')">
+          <el-select v-model="modelForm.proxyId" clearable filterable style="width: 100%" :placeholder="t('settings.modelProxyPlaceholder')">
+            <el-option
+              v-for="p in proxyStore.proxies"
+              :key="p.id"
+              :label="`${p.name} (${p.kind} ${p.host}:${p.port})`"
+              :value="p.id"
+              :disabled="p.enabled === false"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="t('settings.modelModel')">
           <div class="model-fetch-row">
             <el-select
@@ -1619,6 +1630,7 @@ const modelForm = reactive({
   apiKey: '',
   protocol: 'anthropic' as 'anthropic' | 'openai' | 'responses',
   userAgent: 'uniTerm' as string,
+  proxyId: '' as string,
 })
 
 function openNewModelForm() {
@@ -1649,7 +1661,8 @@ function saveModel() {
       model: modelForm.model,
       apiKey: modelForm.apiKey,
       protocol: modelForm.protocol,
-      userAgent: modelForm.userAgent || undefined
+      userAgent: modelForm.userAgent || undefined,
+      proxyId: modelForm.proxyId || undefined
     })
   }
   showModelForm.value = false
@@ -1665,6 +1678,7 @@ function resetModelForm() {
   modelForm.apiKey = ''
   modelForm.protocol = 'anthropic'
   modelForm.userAgent = 'uniTerm'
+  modelForm.proxyId = ''
   modelSuggestions.value = []
 }
 
@@ -1676,7 +1690,7 @@ async function fetchModelList() {
   modelFetching.value = true
   modelSuggestions.value = []
   try {
-    const models = await FetchModels(modelForm.apiKey, modelForm.baseURL, modelForm.protocol)
+    const models = await FetchModels(modelForm.apiKey, modelForm.baseURL, modelForm.protocol, modelForm.proxyId || '')
     modelSuggestions.value = (models || []).map(m => ({
       value: m.display_name || m.id
     }))
@@ -1709,7 +1723,8 @@ async function testConnection() {
       modelForm.model,
       testMsg,
       modelForm.protocol,
-      modelForm.userAgent || ''
+      modelForm.userAgent || '',
+      modelForm.proxyId || ''
     )
     testResult.value = true
     msg.success(t('settings.testSuccess'))

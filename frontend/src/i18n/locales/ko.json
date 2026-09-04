@@ -438,6 +438,8 @@
   "settings.modelModelPlaceholder": "모델 이름 선택 또는 입력",
   "settings.modelApiKey": "API 키",
   "settings.modelUserAgent": "User-Agent",
+  "settings.modelProxyPlaceholder": "프록시 사용 안 함 (직접 연결)",
+  "settings.modelProxyDesc": "이 모델 API 접근에 사용할 프록시, 저장된 프록시에서 선택",
   "settings.modelProtocol": "프로토콜",
   "settings.cancel": "취소",
   "settings.save": "저장",

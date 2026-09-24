@@ -1709,5 +1709,17 @@
   "mcp.deny": "Deny",
   "mcp.denyWithReason": "Deny with reason",
   "mcp.deniedDefaultReason": "The user denied this operation",
-  "settings.mcpToolFiles": "File transfers (upload/download/read)"
+  "settings.mcpToolFiles": "File transfers (upload/download/read)",
+  "mcp.setupTitle": "Connect an AI client",
+  "mcp.tokenOnceWarning": "The token is shown only once at creation and cannot be viewed again. Copy it now.",
+  "mcp.bearerToken": "Bearer token",
+  "mcp.claudeHint": "Run in any project directory:",
+  "mcp.codexHint": "Append to ~/.codex/config.toml:",
+  "mcp.kimiHint": "Run in any project directory:",
+  "mcp.geminiHint": "Append to the mcpServers field of ~/.gemini/settings.json:",
+  "common.copy": "Copy",
+  "common.copied": "Copied",
+  "common.done": "Done",
+  "mcp.regenerate": "Regenerate",
+  "mcp.regenerateHint": "The plaintext of token {name} can no longer be viewed (only a hash is stored). Regenerating invalidates the old token immediately; client configs must be updated."
 }

@@ -1709,5 +1709,17 @@
   "mcp.deny": "拒绝",
   "mcp.denyWithReason": "拒绝并说明",
   "mcp.deniedDefaultReason": "用户拒绝了此操作",
-  "settings.mcpToolFiles": "文件传输（上传/下载/读文件）"
+  "settings.mcpToolFiles": "文件传输（上传/下载/读文件）",
+  "mcp.setupTitle": "接入 AI 客户端",
+  "mcp.tokenOnceWarning": "令牌仅在生成时显示一次，关闭后无法再次查看。请立即复制保存。",
+  "mcp.bearerToken": "Bearer 令牌",
+  "mcp.claudeHint": "在任意项目目录执行：",
+  "mcp.codexHint": "追加到 ~/.codex/config.toml：",
+  "mcp.kimiHint": "在任意项目目录执行：",
+  "mcp.geminiHint": "追加到 ~/.gemini/settings.json 的 mcpServers 字段：",
+  "common.copy": "复制",
+  "common.copied": "已复制",
+  "common.done": "完成",
+  "mcp.regenerate": "重新生成",
+  "mcp.regenerateHint": "令牌 {name} 的明文已不可查看(仅存储哈希)。重新生成将使旧令牌立即失效,需在客户端更新配置。"
 }

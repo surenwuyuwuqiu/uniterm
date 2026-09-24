@@ -1260,38 +1260,25 @@
               <span class="model-name">{{ name }}</span>
             </div>
             <div class="model-actions">
+              <el-button link @click="reopenSetup(name)">
+                <el-icon><Copy :size="'0.875rem'" /></el-icon>
+              </el-button>
               <el-button link type="danger" @click="revokeToken(name)">
                 <el-icon><Trash2 :size="'0.875rem'" /></el-icon>
               </el-button>
             </div>
           </div>
-
-          <div v-if="mcpTokenCreated" class="setting-card mcp-token-once">
-            <div class="setting-info">
-              <div class="setting-title">{{ t('settings.mcpTokenOnce') }}</div>
-              <div class="mcp-token-value">
-                <code>{{ mcpTokenCreated }}</code>
-                <el-button link @click="copyToken(mcpTokenCreated)"><Copy :size="'0.875rem'" /></el-button>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="mcp.enabled && mcpTokenCreated" class="setting-card">
-            <div class="setting-info">
-              <div class="setting-title">{{ t('settings.mcpConnectCmds') }}</div>
-              <div class="setting-desc">{{ t('settings.mcpConnectCmdsDesc') }}</div>
-              <div v-for="c in mcpClientCommands" :key="c.name" class="mcp-cmd">
-                <label>{{ c.name }}</label>
-                <div class="mcp-cmd-row">
-                  <code>{{ c.cmd }}</code>
-                  <el-button link @click="copyToken(c.cmd)"><Copy :size="'0.875rem'" /></el-button>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
+
+    <!-- MCP token setup wizard (one-time token + per-client configs) -->
+    <MCPSetupDialog
+      v-model:visible="mcpSetupVisible"
+      :token="mcpTokenCreated"
+      :port="mcpStatus.port || mcpPort"
+      @close="onMcpSetupClose"
+    />
 
     <!-- Model Form Dialog -->
     <el-dialog append-to-body v-model="showModelForm" :title="editingModel ? t('settings.editModel') : t('settings.newModel')" width="25rem">
@@ -1463,9 +1450,9 @@ import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
 import SkillsManager from './SkillsManager.vue'
 import CommandsManager from './CommandsManager.vue'
 import type { AIModelConfig, ShortcutAction, KeyBinding, KeyboardSettings } from '../types/settings'
-import { mcpClientConfigs, DEFAULT_MCP_SETTINGS } from '../types/mcp'
+import { DEFAULT_MCP_SETTINGS } from '../types/mcp'
 import type { MCPStatus } from '../types/mcp'
-import { writeClipboard } from '../composables/useClipboardWrite'
+import MCPSetupDialog from './MCPSetupDialog.vue'
 import { useTerminalThemeOptions } from '../composables/useTerminalThemeOptions'
 import { uninstallGlobalListener, installGlobalListener, formatKeyBinding, digitModifierCollides, digitModifierFlagsEqual, TAB_DEFAULT_FLAGS, PANEL_DEFAULT_FLAGS, setRebinding } from '../composables/useKeyboardShortcuts'
 import AddRepoDialog from './AddRepoDialog.vue'
@@ -1725,16 +1712,15 @@ onUnmounted(() => {
 // ── MCP server (external AI agents) ─────────────────────────────
 // Settings round-trip through settingsStore.settings.mcp (Go struct
 // AppSettings.MCP); tokens live in mcp.json via the app bindings.
+// Token creation opens the setup wizard dialog (token + per-client
+// onboarding snippets) instead of expanding blocks inline.
 const mcp = reactive({ ...DEFAULT_MCP_SETTINGS, tools: { ...DEFAULT_MCP_SETTINGS.tools } })
 const mcpPort = ref(DEFAULT_MCP_SETTINGS.port || 61207)
 const mcpStatus = ref<MCPStatus>({ running: false, port: 0 })
 const mcpTokens = ref<string[]>([])
 const newTokenName = ref('')
 const mcpTokenCreated = ref('')
-const mcpClientCommands = computed(() =>
-  mcpTokenCreated.value && mcpStatus.value.running
-    ? mcpClientConfigs(mcpStatus.value.port, mcpTokenCreated.value)
-    : [])
+const mcpSetupVisible = ref(false)
 
 // Mirror persisted settings into the reactive form once loaded.
 watch(() => settingsStore.settings.mcp, (v) => {
@@ -1768,10 +1754,27 @@ async function generateToken() {
     const token = await GenerateMCPToken(name)
     mcpTokenCreated.value = token
     newTokenName.value = ''
+    mcpSetupVisible.value = true
     refreshMcpState()
   } catch (e: any) {
     msg.error(backendErrorText(e))
   }
+}
+
+// A token's plaintext exists only until the setup dialog closes; the wizard
+// cannot be reopened for an old token (hash-only storage) — regenerate it.
+function reopenSetup(name: string) {
+  newTokenName.value = name
+  ElMessageBox.confirm(
+    t('mcp.regenerateHint', { name }),
+    t('settings.mcpTokens'),
+    { confirmButtonText: t('mcp.regenerate'), cancelButtonText: t('common.cancel'), type: 'warning' },
+  ).then(() => generateToken()).catch(() => {})
+}
+
+function onMcpSetupClose() {
+  mcpSetupVisible.value = false
+  mcpTokenCreated.value = ''
 }
 
 async function revokeToken(name: string) {
@@ -1782,11 +1785,6 @@ async function revokeToken(name: string) {
   } catch (e: any) {
     msg.error(backendErrorText(e))
   }
-}
-
-async function copyToken(text: string) {
-  await writeClipboard(text)
-  ElMessage.success(t('common.copySuccess') || 'Copied')
 }
 
 onMounted(refreshMcpState)
@@ -2884,46 +2882,6 @@ async function onToggleSystemTitleBar(v: boolean) {
 .mcp-token-icon {
   margin-right: 0.5rem;
   color: var(--text-muted);
-}
-.mcp-token-once .mcp-token-value {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-.mcp-token-once code {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
-  background: var(--el-fill-color-dark);
-  border-radius: 4px;
-  word-break: break-all;
-  flex: 1;
-}
-.mcp-cmd {
-  margin-top: 0.75rem;
-}
-.mcp-cmd label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 500;
-  margin-bottom: 0.25rem;
-  color: var(--text-primary);
-}
-.mcp-cmd-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-.mcp-cmd-row code {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  padding: 0.375rem 0.5rem;
-  background: var(--el-fill-color-dark);
-  border-radius: 4px;
-  word-break: break-all;
-  white-space: pre-wrap;
-  flex: 1;
 }
 
 .about-content {

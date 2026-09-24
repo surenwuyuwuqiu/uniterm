@@ -1199,7 +1199,7 @@
               <div v-if="mcpStatus.running" class="setting-desc mcp-running">{{ t('settings.mcpRunningOn', { port: mcpStatus.port }) }}</div>
               <div v-else-if="mcp.enabled" class="setting-desc mcp-running mcp-error">{{ t('settings.mcpNotRunning') }}</div>
             </div>
-            <div class="setting-control">
+            <div class="setting-control switch-control">
               <el-switch v-model="mcp.enabled" @change="saveMcp()" />
             </div>
           </div>
@@ -2773,6 +2773,14 @@ async function onToggleSystemTitleBar(v: boolean) {
 .setting-control {
   flex-shrink: 0;
   min-width: 13.125rem;
+}
+
+/* Switch-only cards (e.g. the MCP enable toggle) hug the right edge
+   instead of honoring the wide select-oriented min-width. */
+.setting-control.switch-control {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* Keep the external-editor combobox the same width as the other select

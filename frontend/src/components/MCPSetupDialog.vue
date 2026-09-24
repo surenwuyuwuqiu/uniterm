@@ -3,7 +3,8 @@
     :model-value="visible"
     @update:model-value="() => emit('close')"
     :title="t('mcp.setupTitle')"
-    width="34rem"
+    width="46rem"
+    top="6vh"
     :close-on-click-modal="false"
   >
     <div class="mcp-setup">
@@ -164,6 +165,26 @@ async function copy(key: string, text: string) {
   flex-direction: column;
   gap: 0.875rem;
 }
+/* Seven client tabs: let the tab strip wrap to two rows instead of
+   scrolling/overflow, and drop the bottom border so the wrapped second
+   row doesn't look detached. */
+.mcp-setup :deep(.el-tabs__nav-wrap) {
+  overflow: visible;
+}
+.mcp-setup :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+.mcp-setup :deep(.el-tabs__nav-scroll) {
+  overflow: visible;
+}
+.mcp-setup :deep(.el-tabs__nav) {
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.mcp-setup :deep(.el-tabs__item) {
+  padding: 0 0.5rem;
+}
 .mcp-setup-once {
   border-radius: 6px;
 }
@@ -190,7 +211,8 @@ async function copy(key: string, text: string) {
   color: var(--text-primary);
   border: 1px solid var(--border-color, var(--el-border-color));
   border-radius: 4px;
-  word-break: break-all;
+  white-space: nowrap;
+  overflow-x: auto;
   user-select: all;
 }
 .mcp-setup-hint {

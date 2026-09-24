@@ -139,8 +139,9 @@ func (s *Server) toolUploadFile(ctx context.Context, req *mcp.CallToolRequest, i
 	if !ok {
 		return nil, uploadOut{}, fmt.Errorf("session %s not found or not an SSH session", in.SessionID)
 	}
-	// Transfer approval: files leaving the machine.
-	if err := s.requestApproval(ctx, req, in.SessionID, "upload "+in.LocalPath+" → "+in.RemotePath); err != nil {
+	// Transfers follow the same policy matrix as exec, graded as write-level
+	// risk (they move files across the trust boundary).
+	if err := s.gateExec(ctx, req, in.SessionID, "upload "+in.LocalPath+" → "+in.RemotePath, RiskWrite); err != nil {
 		return nil, uploadOut{}, err
 	}
 	n, err := fe.MCPWriteFile(resolved, in.RemotePath)
@@ -163,7 +164,7 @@ func (s *Server) toolDownloadFile(ctx context.Context, req *mcp.CallToolRequest,
 	if !ok {
 		return nil, downloadOut{}, fmt.Errorf("session %s not found or not an SSH session", in.SessionID)
 	}
-	if err := s.requestApproval(ctx, req, in.SessionID, "download "+in.RemotePath+" → "+in.LocalPath); err != nil {
+	if err := s.gateExec(ctx, req, in.SessionID, "download "+in.RemotePath+" → "+in.LocalPath, RiskWrite); err != nil {
 		return nil, downloadOut{}, err
 	}
 	n, err := fe.MCPReadRemoteToFile(in.RemotePath, resolved)

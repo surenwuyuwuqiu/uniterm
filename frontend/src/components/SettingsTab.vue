@@ -1186,6 +1186,109 @@
             </div>
           </div>
         </div>
+
+        <!-- MCP server (external AI agents) -->
+        <h2 class="section-title">{{ t('settings.mcpSection') }}</h2>
+        <p class="section-desc">{{ t('settings.mcpSectionDesc') }}</p>
+
+        <div class="settings-group">
+          <div class="setting-card">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.mcpEnabled') }}</div>
+              <div class="setting-desc">{{ t('settings.mcpEnabledDesc') }}</div>
+              <div v-if="mcpStatus.running" class="setting-desc mcp-running">{{ t('settings.mcpRunningOn', { port: mcpStatus.port }) }}</div>
+              <div v-else-if="mcp.enabled" class="setting-desc mcp-running mcp-error">{{ t('settings.mcpNotRunning') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-switch v-model="mcp.enabled" @change="saveMcp()" />
+            </div>
+          </div>
+
+          <div v-if="mcp.enabled" class="setting-card">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.mcpPort') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-input-number v-model="mcpPort" :min="1" :max="65535" @change="saveMcp()" />
+            </div>
+          </div>
+
+          <div v-if="mcp.enabled" class="setting-card">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.mcpPolicy') }}</div>
+              <div class="setting-desc">{{ t('settings.mcpPolicyDesc') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-select v-model="mcp.policy" @change="saveMcp()">
+                <el-option :label="t('settings.mcpPolicyConfirmAll')" value="confirm_all" />
+                <el-option :label="t('settings.mcpPolicyConfirmWrite')" value="confirm_write" />
+                <el-option :label="t('settings.mcpPolicyConfirmDangerous')" value="confirm_dangerous" />
+                <el-option :label="t('settings.mcpPolicyBypass')" value="bypass" />
+              </el-select>
+            </div>
+          </div>
+
+          <div v-if="mcp.enabled" class="setting-card">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.mcpTools') }}</div>
+              <div class="setting-desc">{{ t('settings.mcpToolsDesc') }}</div>
+            </div>
+            <div class="setting-control">
+              <el-checkbox v-model="mcp.tools.exec" :label="t('settings.mcpToolExec')" @change="saveMcp()" />
+            </div>
+          </div>
+
+          <div v-if="mcp.enabled" class="setting-card">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.mcpTokens') }}</div>
+              <div class="setting-desc">{{ t('settings.mcpTokensDesc') }}</div>
+            </div>
+            <div class="setting-control mcp-token-controls">
+              <el-input v-model="newTokenName" :placeholder="t('settings.mcpTokenName')" style="width: 10rem" />
+              <el-button @click="generateToken">{{ t('settings.mcpGenerateToken') }}</el-button>
+            </div>
+          </div>
+
+          <div
+            v-for="name in mcpTokens"
+            :key="name"
+            class="model-card"
+          >
+            <div class="model-main">
+              <el-icon class="mcp-token-icon"><Key :size="'0.875rem'" /></el-icon>
+              <span class="model-name">{{ name }}</span>
+            </div>
+            <div class="model-actions">
+              <el-button link type="danger" @click="revokeToken(name)">
+                <el-icon><Trash2 :size="'0.875rem'" /></el-icon>
+              </el-button>
+            </div>
+          </div>
+
+          <div v-if="mcpTokenCreated" class="setting-card mcp-token-once">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.mcpTokenOnce') }}</div>
+              <div class="mcp-token-value">
+                <code>{{ mcpTokenCreated }}</code>
+                <el-button link @click="copyToken(mcpTokenCreated)"><Copy :size="'0.875rem'" /></el-button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="mcp.enabled && mcpTokenCreated" class="setting-card">
+            <div class="setting-info">
+              <div class="setting-title">{{ t('settings.mcpConnectCmds') }}</div>
+              <div class="setting-desc">{{ t('settings.mcpConnectCmdsDesc') }}</div>
+              <div v-for="c in mcpClientCommands" :key="c.name" class="mcp-cmd">
+                <label>{{ c.name }}</label>
+                <div class="mcp-cmd-row">
+                  <code>{{ c.cmd }}</code>
+                  <el-button link @click="copyToken(c.cmd)"><Copy :size="'0.875rem'" /></el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1343,9 +1446,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed, onMounted, onUnmounted } from 'vue'
-import { Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2, Globe, Keyboard, Plus, BookOpen, Wrench, FolderOpen, Key, Network, ArrowRightLeft, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { Settings, Monitor, MessageCircleMore, Info, RefreshCw, Pencil, Trash2, Globe, Keyboard, Plus, BookOpen, Wrench, FolderOpen, Key, Network, ArrowRightLeft, ChevronLeft, ChevronRight, Copy } from '@lucide/vue'
 import { msg } from '../services/message'
-import { FetchModels, ChatCompletion, GetPlatform, GetAllFonts, GetDefaultSessionLogDir, OpenDirectoryDialog, OpenFileDialogFiltered, SetBackgroundImage, ClearBackgroundImage, GetBackgroundImage, RelaunchApp, ListExternalEditors } from '../../bindings/github.com/ys-ll/uniterm/app'
+import { FetchModels, ChatCompletion, GetPlatform, GetAllFonts, GetDefaultSessionLogDir, OpenDirectoryDialog, OpenFileDialogFiltered, SetBackgroundImage, ClearBackgroundImage, GetBackgroundImage, RelaunchApp, ListExternalEditors, GenerateMCPToken, RevokeMCPToken, ListMCPTokens, GetMCPStatus } from '../../bindings/github.com/ys-ll/uniterm/app'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useSyncStore } from '../stores/syncStore'
 import { useLocalStateStore } from '../stores/localStateStore'
@@ -1359,6 +1462,9 @@ import { getShellLabel as getShellLabelBase } from '../utils/shellLabel'
 import SkillsManager from './SkillsManager.vue'
 import CommandsManager from './CommandsManager.vue'
 import type { AIModelConfig, ShortcutAction, KeyBinding, KeyboardSettings } from '../types/settings'
+import { mcpClientConfigs, DEFAULT_MCP_SETTINGS } from '../types/mcp'
+import type { MCPStatus } from '../types/mcp'
+import { writeClipboard } from '../composables/useClipboardWrite'
 import { useTerminalThemeOptions } from '../composables/useTerminalThemeOptions'
 import { uninstallGlobalListener, installGlobalListener, formatKeyBinding, digitModifierCollides, digitModifierFlagsEqual, TAB_DEFAULT_FLAGS, PANEL_DEFAULT_FLAGS, setRebinding } from '../composables/useKeyboardShortcuts'
 import AddRepoDialog from './AddRepoDialog.vue'
@@ -1614,6 +1720,75 @@ onUnmounted(() => {
   sidebarResizeObserver?.disconnect()
   sidebarResizeObserver = null
 })
+
+// ── MCP server (external AI agents) ─────────────────────────────
+// Settings round-trip through settingsStore.settings.mcp (Go struct
+// AppSettings.MCP); tokens live in mcp.json via the app bindings.
+const mcp = reactive({ ...DEFAULT_MCP_SETTINGS, tools: { ...DEFAULT_MCP_SETTINGS.tools } })
+const mcpPort = ref(DEFAULT_MCP_SETTINGS.port || 61207)
+const mcpStatus = ref<MCPStatus>({ running: false, port: 0 })
+const mcpTokens = ref<string[]>([])
+const newTokenName = ref('')
+const mcpTokenCreated = ref('')
+const mcpClientCommands = computed(() =>
+  mcpTokenCreated.value && mcpStatus.value.running
+    ? mcpClientConfigs(mcpStatus.value.port, mcpTokenCreated.value)
+    : [])
+
+// Mirror persisted settings into the reactive form once loaded.
+watch(() => settingsStore.settings.mcp, (v) => {
+  if (v) {
+    Object.assign(mcp, v)
+    mcp.tools = { ...v.tools }
+    mcpPort.value = v.port || 61207
+  }
+}, { immediate: true })
+
+async function refreshMcpState() {
+  try { mcpStatus.value = await GetMCPStatus() } catch { mcpStatus.value = { running: false, port: 0 } }
+  try { mcpTokens.value = (await ListMCPTokens()) || [] } catch { mcpTokens.value = [] }
+}
+
+async function saveMcp() {
+  settingsStore.settings.mcp = {
+    enabled: mcp.enabled,
+    port: mcpPort.value,
+    policy: mcp.policy,
+    tools: { ...mcp.tools },
+  }
+  await settingsStore.save()
+  refreshMcpState()
+}
+
+async function generateToken() {
+  const name = newTokenName.value.trim()
+  if (!name) { msg.error(t('settings.mcpTokenName')); return }
+  try {
+    const token = await GenerateMCPToken(name)
+    mcpTokenCreated.value = token
+    newTokenName.value = ''
+    refreshMcpState()
+  } catch (e: any) {
+    msg.error(backendErrorText(e))
+  }
+}
+
+async function revokeToken(name: string) {
+  try {
+    await RevokeMCPToken(name)
+    if (mcpTokens.value.length === 1 && mcpTokens.value[0] === name) mcpTokenCreated.value = ''
+    refreshMcpState()
+  } catch (e: any) {
+    msg.error(backendErrorText(e))
+  }
+}
+
+async function copyToken(text: string) {
+  await writeClipboard(text)
+  ElMessage.success(t('common.copySuccess') || 'Copied')
+}
+
+onMounted(refreshMcpState)
 
 onMounted(async () => {
   try {
@@ -2690,6 +2865,64 @@ async function onToggleSystemTitleBar(v: boolean) {
   display: flex;
   gap: 0.25rem;
   flex-shrink: 0;
+}
+
+/* MCP settings */
+.mcp-running {
+  color: var(--el-color-success);
+  font-family: var(--font-mono);
+}
+.mcp-running.mcp-error {
+  color: var(--el-color-danger);
+}
+.mcp-token-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.mcp-token-icon {
+  margin-right: 0.5rem;
+  color: var(--text-muted);
+}
+.mcp-token-once .mcp-token-value {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.mcp-token-once code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--el-fill-color-dark);
+  border-radius: 4px;
+  word-break: break-all;
+  flex: 1;
+}
+.mcp-cmd {
+  margin-top: 0.75rem;
+}
+.mcp-cmd label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+}
+.mcp-cmd-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.mcp-cmd-row code {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.375rem 0.5rem;
+  background: var(--el-fill-color-dark);
+  border-radius: 4px;
+  word-break: break-all;
+  white-space: pre-wrap;
+  flex: 1;
 }
 
 .about-content {

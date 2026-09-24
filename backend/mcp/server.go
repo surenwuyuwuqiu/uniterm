@@ -77,6 +77,11 @@ type Env struct {
 	ToolsEnabled func() ToolGroups
 	// Policy returns the active approval policy.
 	Policy func() Policy
+	// ResolveToken resolves a token hash to its client name, re-reading
+	// persisted tokens when the file changed (so tokens written elsewhere
+	// take effect without a restart). "" = unknown token. When nil, the
+	// in-memory map from SetTokens is authoritative.
+	ResolveToken func(hash string) (name string)
 }
 
 // SessionSummary is one live session row for list_sessions.
@@ -273,21 +278,30 @@ type tokenNameContextKey struct{}
 
 // authMiddleware rejects requests without a valid bearer token. Loopback
 // binding alone is not trust: browser pages and local processes can reach
-// 127.0.0.1 unauthenticated. The resolved token name is stashed in the
-// request context so tool handlers can label approvals/audit entries.
+// 127.0.0.1 unauthenticated. Token resolution prefers Env.ResolveToken
+// (file-backed, hot-reloaded); the in-memory map is the fallback. The
+// resolved token name is stashed in the request context so tool handlers can
+// label approvals/audit entries.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := bearerToken(r)
 		key := HashToken(token)
-		s.mu.Lock()
-		info, ok := s.tokens[key]
-		s.mu.Unlock()
-		if !ok {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="uniterm"`)
-			http.Error(w, "invalid or missing token", http.StatusUnauthorized)
-			return
+		name := ""
+		if s.env.ResolveToken != nil {
+			name = s.env.ResolveToken(key)
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), tokenNameContextKey{}, info.Name)))
+		if name == "" {
+			s.mu.Lock()
+			info, ok := s.tokens[key]
+			s.mu.Unlock()
+			if !ok {
+				w.Header().Set("WWW-Authenticate", `Bearer realm="uniterm"`)
+				http.Error(w, "invalid or missing token", http.StatusUnauthorized)
+				return
+			}
+			name = info.Name
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), tokenNameContextKey{}, name)))
 	})
 }
 

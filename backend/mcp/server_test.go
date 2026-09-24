@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -119,6 +120,11 @@ func (fakeExecutor) MCPInterrupt(id, sig string) error { return nil }
 // URL + token + a dialable MCP client transport.
 func newTestServer(t *testing.T) (url, token string) {
 	t.Helper()
+	return newTestServerWithPolicy(t, PolicyConfirmAll)
+}
+
+func newTestServerWithPolicy(t *testing.T, policy Policy) (url, token string) {
+	t.Helper()
 	env := Env{
 		Sessions: func(id string) (SSHExecutor, bool) { return fakeExecutor{}, id == "s1" },
 		Commands: func(id string) (string, SSHExecutor, bool) { return "", nil, false },
@@ -134,7 +140,7 @@ func newTestServer(t *testing.T) (url, token string) {
 		ToolsEnabled: func() ToolGroups {
 			return ToolGroups{Discovery: true, Exec: true}
 		},
-		Policy: func() Policy { return PolicyConfirmAll },
+		Policy: func() Policy { return policy },
 	}
 	srv := NewServer(env)
 	token, hash := GenerateToken()
@@ -229,5 +235,74 @@ func TestAuthRejected(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", resp.StatusCode)
+	}
+}
+
+// TestDeniedApprovalBlocksExec pins the critical safety property: a denied
+// approval must abort the exec (tool error, no execution), and a read-level
+// command under confirm_dangerous runs without a dialog.
+func TestDeniedApprovalBlocksExec(t *testing.T) {
+	// 1) confirm_all + denied approval → exec is a tool error and the
+	// executor is never invoked.
+	env := Env{
+		Sessions:     func(id string) (SSHExecutor, bool) { return fakeExecutor{}, id == "s1" },
+		ListSessions: func() []SessionSummary { return []SessionSummary{{ID: "s1", Type: "ssh", Status: "connected"}} },
+		Approve:      func(req ApprovalRequest) error { return fmt.Errorf("denied by user: no") },
+		ToolsEnabled: func() ToolGroups { return ToolGroups{Discovery: true, Exec: true} },
+		Policy:       func() Policy { return PolicyConfirmAll },
+	}
+	srv := NewServer(env)
+	token, hash := GenerateToken()
+	srv.SetTokens(map[string]TokenInfo{hash: {Name: "deny-agent"}})
+	if err := srv.Start(0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(srv.Stop)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client := mcp.NewClient(&mcp.Implementation{Name: "deny-probe", Version: "1"}, nil)
+	transport := &mcp.StreamableClientTransport{
+		Endpoint:   "http://127.0.0.1:" + strconv.Itoa(srv.Port()) + "/mcp",
+		HTTPClient: &http.Client{Transport: tokenTransport{rt: http.DefaultTransport, token: token}},
+	}
+	cs, err := client.Connect(ctx, transport, nil)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer cs.Close()
+
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "exec_command",
+		Arguments: map[string]any{"sessionId": "s1", "command": "echo X"},
+	})
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+	if !res.IsError {
+		t.Fatal("denied approval must surface as tool error")
+	}
+
+	// 2) confirm_dangerous + read command → no approval dialog, direct exec.
+	url2, token2 := newTestServerWithPolicy(t, PolicyConfirmDangerous)
+	client2 := mcp.NewClient(&mcp.Implementation{Name: "read-probe", Version: "1"}, nil)
+	transport2 := &mcp.StreamableClientTransport{
+		Endpoint:   url2,
+		HTTPClient: &http.Client{Transport: tokenTransport{rt: http.DefaultTransport, token: token2}},
+	}
+	cs2, err := client2.Connect(ctx, transport2, nil)
+	if err != nil {
+		t.Fatalf("connect2: %v", err)
+	}
+	defer cs2.Close()
+	res2, err := cs2.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "exec_command",
+		Arguments: map[string]any{"sessionId": "s1", "command": "echo X"},
+	})
+	if err != nil {
+		t.Fatalf("call2: %v", err)
+	}
+	if res2.IsError {
+		t.Fatal("read command under confirm_dangerous should execute without dialog")
 	}
 }

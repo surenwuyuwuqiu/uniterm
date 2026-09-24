@@ -57,6 +57,7 @@ func (a *App) ensureMCPServer() *mcp.Server {
 			Audit:           a.mcpAudit,
 			ToolsEnabled:    a.mcpToolsEnabled,
 			Policy:          a.mcpPolicy,
+			ResolveToken:    a.mcpResolveToken,
 		}
 		a.mcpServer = mcp.NewServer(env)
 	})
@@ -203,6 +204,25 @@ func (a *App) mcpLoadTokens() map[string]mcp.TokenInfo {
 		out[t.Hash] = mcp.TokenInfo{Name: t.Name}
 	}
 	return out
+}
+
+// mcpResolveToken backs Env.ResolveToken: resolves a token hash to its name,
+// re-reading mcp.json when its mtime changed (tokens generated/revoked from
+// the UI hot-reload; the file is also authoritative for external writers).
+func (a *App) mcpResolveToken(hash string) string {
+	a.mcpTokenCacheMu.Lock()
+	defer a.mcpTokenCacheMu.Unlock()
+	fi, err := os.Stat(a.mcpTokensPath())
+	if err != nil || fi.ModTime() != a.mcpTokenCacheMtime {
+		// Reload (also resets the mtime on failure so we don't hammer the
+		// disk on every request when the file is unreadable).
+		a.mcpTokenCache = a.mcpLoadTokens()
+		a.mcpTokenCacheMtime = fi.ModTime()
+	}
+	if info, ok := a.mcpTokenCache[hash]; ok {
+		return info.Name
+	}
+	return ""
 }
 
 // ── Env glue ─────────────────────────────────────────────────────

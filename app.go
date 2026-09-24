@@ -100,6 +100,10 @@ type App struct {
 	// mcpApprovals maps pending approval request ids to their answer channels.
 	mcpApprovals   map[string]chan mcpApprovalVerdict
 	mcpApprovalsMu stdsync.Mutex
+	// Token hot-reload cache: mcp.json mtime → parsed token map.
+	mcpTokenCacheMu    stdsync.Mutex
+	mcpTokenCache      map[string]mcp.TokenInfo
+	mcpTokenCacheMtime time.Time
 
 	// session objects and the log file spans all of them. sessionToPanel
 	// tracks the current session→panel binding so emitData can look up

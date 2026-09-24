@@ -1722,5 +1722,7 @@
   "common.done": "Done",
   "mcp.regenerate": "Regenerate",
   "mcp.regenerateHint": "The plaintext of token {name} can no longer be viewed (only a hash is stored). Regenerating invalidates the old token immediately; client configs must be updated.",
-  "mcp.zcodeHint": "Merge into the mcp.servers field of ~/.zcode/cli/config.json (do not replace the whole file):"
+  "mcp.zcodeHint": "Merge into the mcp.servers field of ~/.zcode/cli/config.json (do not replace the whole file):",
+  "mcp.traeHint": "Save as .trae/mcp.json in the project root (or ~/.trae/mcp.json user-level):",
+  "mcp.workbuddyHint": "WorkBuddy connector format. Save as ~/.workbuddy/connectors-marketplace/connectors/uniterm/mcp.json and enable it in the app:"
 }

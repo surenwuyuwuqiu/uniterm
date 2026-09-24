@@ -1722,5 +1722,7 @@
   "common.done": "完成",
   "mcp.regenerate": "重新生成",
   "mcp.regenerateHint": "令牌 {name} 的明文已不可查看(仅存储哈希)。重新生成将使旧令牌立即失效,需在客户端更新配置。",
-  "mcp.zcodeHint": "在 ~/.zcode/cli/config.json 的 mcp.servers 中加入(merges 到现有 JSON,勿整文件替换):"
+  "mcp.zcodeHint": "在 ~/.zcode/cli/config.json 的 mcp.servers 中加入(merges 到现有 JSON,勿整文件替换):",
+  "mcp.traeHint": "保存为项目根 .trae/mcp.json(或用户级 ~/.trae/mcp.json):",
+  "mcp.workbuddyHint": "WorkBuddy 连接器格式。保存为 ~/.workbuddy/connectors-marketplace/connectors/uniterm/mcp.json,并在 App 内完成启用:"
 }

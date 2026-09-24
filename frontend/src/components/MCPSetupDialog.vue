@@ -103,6 +103,33 @@ const clients = computed(() => [
     }, null, 2),
   },
   {
+    id: 'trae',
+    label: 'Trae',
+    hint: t('mcp.traeHint'),
+    config: JSON.stringify({
+      mcpServers: {
+        uniterm: {
+          url: url.value,
+          headers: { Authorization: `Bearer ${props.token}` },
+        },
+      },
+    }, null, 2),
+  },
+  {
+    id: 'workbuddy',
+    label: 'WorkBuddy',
+    hint: t('mcp.workbuddyHint'),
+    config: JSON.stringify({
+      mcpServers: {
+        uniterm: {
+          type: 'streamableHttp',
+          url: url.value,
+          headers: { Authorization: `Bearer ${props.token}` },
+        },
+      },
+    }, null, 2),
+  },
+  {
     id: 'kimi',
     label: 'Kimi',
     hint: t('mcp.kimiHint'),

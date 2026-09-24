@@ -38,6 +38,12 @@ func TestResolveMcpLocalPath(t *testing.T) {
 		{"no roots rejects everything", f, nil, true},
 		{"empty path", "", []string{allowed}, true},
 		{"relative resolves against cwd", "f.txt", []string{allowed}, true}, // cwd is the package dir, not allowed
+		// Download destination: file does not exist yet, but its directory
+		// does — must resolve through the symlinked ancestor (regression for
+		// the macOS /tmp → /private/tmp case where plain EvalSymlinks failed
+		// and every fresh download target was wrongly rejected).
+		{"nonexistent file in allowed dir", filepath.Join(allowed, "download-dest.txt"), []string{allowed}, false},
+		{"nonexistent file outside", filepath.Join(outside, "nope.txt"), []string{allowed}, true},
 	}
 	for _, c := range cases {
 		_, err := ResolveMcpLocalPath(c.path, c.roots)

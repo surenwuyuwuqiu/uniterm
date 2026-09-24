@@ -219,8 +219,12 @@ func (s *SSHSession) MCPRemoteStat(remotePath string) (MCPFileEntry, error) {
 }
 
 // ResolveMcpLocalPath validates a local path against the allowed directory
-// list: the resolved path must live under one of the roots (no symlink
-// escape — filepath.EvalSymlinks resolves it, then containment is re-checked).
+// list: the resolved path must live under one of the roots. Symlinks are
+// resolved (filepath.EvalSymlinks) then containment is re-checked, so
+// symlink escapes are caught. A not-yet-existing path (the normal case for
+// download destinations) resolves its nearest existing ancestor instead —
+// plain EvalSymlinks fails on missing files, which on macOS (/tmp →
+// /private/tmp) would wrongly reject every fresh download target.
 // An empty allowed list rejects everything.
 func ResolveMcpLocalPath(path string, allowedRoots []string) (string, error) {
 	if strings.TrimSpace(path) == "" {
@@ -232,9 +236,26 @@ func ResolveMcpLocalPath(path string, allowedRoots []string) (string, error) {
 	}
 	resolved, err := filepath.EvalSymlinks(abs)
 	if err != nil {
-		// Not-yet-existing upload source (or plain missing): validate the
-		// parent for downloads; for uploads the caller stats the file itself.
-		resolved = abs
+		// Missing leaf (download destination): resolve the deepest existing
+		// ancestor, then re-append the non-existing tail.
+		dir, tail := filepath.Split(abs)
+		var parts []string
+		for tail != "" {
+			if r, derr := filepath.EvalSymlinks(filepath.Clean(dir)); derr == nil {
+				resolved = filepath.Join(r, tail, strings.Join(parts, string(filepath.Separator)))
+				break
+			}
+			d, t := filepath.Split(filepath.Clean(dir))
+			if d == dir {
+				resolved = abs
+				break
+			}
+			parts = append([]string{tail}, parts...)
+			dir, tail = d, t
+		}
+		if resolved == "" {
+			resolved = abs
+		}
 	}
 	for _, root := range allowedRoots {
 		rootAbs, err := filepath.Abs(root)

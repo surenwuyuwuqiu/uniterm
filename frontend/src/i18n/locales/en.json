@@ -1721,5 +1721,6 @@
   "common.copied": "Copied",
   "common.done": "Done",
   "mcp.regenerate": "Regenerate",
-  "mcp.regenerateHint": "The plaintext of token {name} can no longer be viewed (only a hash is stored). Regenerating invalidates the old token immediately; client configs must be updated."
+  "mcp.regenerateHint": "The plaintext of token {name} can no longer be viewed (only a hash is stored). Regenerating invalidates the old token immediately; client configs must be updated.",
+  "mcp.zcodeHint": "Merge into the mcp.servers field of ~/.zcode/cli/config.json (do not replace the whole file):"
 }

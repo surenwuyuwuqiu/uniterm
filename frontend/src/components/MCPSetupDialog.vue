@@ -87,6 +87,22 @@ const clients = computed(() => [
     config: `[mcp_servers.uniterm]\nurl = "${url.value}"\nhttp_headers = { "Authorization" = "Bearer ${props.token}" }`,
   },
   {
+    id: 'zcode',
+    label: 'ZCode',
+    hint: t('mcp.zcodeHint'),
+    config: JSON.stringify({
+      mcp: {
+        servers: {
+          uniterm: {
+            type: 'http',
+            url: url.value,
+            headers: { Authorization: `Bearer ${props.token}` },
+          },
+        },
+      },
+    }, null, 2),
+  },
+  {
     id: 'kimi',
     label: 'Kimi',
     hint: t('mcp.kimiHint'),

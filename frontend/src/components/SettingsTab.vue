@@ -1235,6 +1235,7 @@
             </div>
             <div class="setting-control">
               <el-checkbox v-model="mcp.tools.exec" :label="t('settings.mcpToolExec')" @change="saveMcp()" />
+              <el-checkbox v-model="mcp.tools.files" :label="t('settings.mcpToolFiles')" @change="saveMcp()" />
             </div>
           </div>
 

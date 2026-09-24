@@ -48,16 +48,18 @@ func (a *App) mcpTokensPath() string {
 func (a *App) ensureMCPServer() *mcp.Server {
 	a.mcpOnce.Do(func() {
 		env := mcp.Env{
-			Sessions:        a.mcpSessionExec,
-			Commands:        a.mcpCommandOwner,
-			ListSessions:    a.mcpListSessions,
-			ListConnections: a.mcpListConnections,
-			Connect:         a.mcpConnect,
-			Approve:         a.mcpApprove,
-			Audit:           a.mcpAudit,
-			ToolsEnabled:    a.mcpToolsEnabled,
-			Policy:          a.mcpPolicy,
-			ResolveToken:    a.mcpResolveToken,
+			Sessions:         a.mcpSessionExec,
+			Commands:         a.mcpCommandOwner,
+			ListSessions:     a.mcpListSessions,
+			ListConnections:  a.mcpListConnections,
+			Connect:          a.mcpConnect,
+			Approve:          a.mcpApprove,
+			Audit:            a.mcpAudit,
+			ToolsEnabled:     a.mcpToolsEnabled,
+			Policy:           a.mcpPolicy,
+			ResolveToken:     a.mcpResolveToken,
+			FileSession:      a.mcpFileSession,
+			ResolveLocalPath: a.mcpResolveLocalPath,
 		}
 		a.mcpServer = mcp.NewServer(env)
 	})
@@ -279,6 +281,76 @@ func (a *App) mcpListSessions() []mcp.SessionSummary {
 		out = append(out, sum)
 	}
 	return out
+}
+
+// mcpFileSession adapts a live SSH session to the mcp package's FileExecutor.
+func (a *App) mcpFileSession(sessionID string) (mcp.FileExecutor, bool) {
+	exec, ok := a.mcpSessionExec(sessionID)
+	if !ok {
+		return nil, false
+	}
+	fe, ok := exec.(MCPFileExecutor)
+	if !ok {
+		return nil, false
+	}
+	return fileExecutorAdapter{fe}, true
+}
+
+// MCPFileExecutor is the session-side contract implemented by SSHSession
+// (mcp_file.go); declared here because the mcp package must stay free of
+// session imports. The adapter below maps its types across.
+type MCPFileExecutor interface {
+	MCPListDir(remotePath string) ([]MCPFileEntry, error)
+	MCPReadFile(remotePath string, offset int64, max int) ([]byte, bool, error)
+	MCPWriteFile(localPath, remotePath string) (int64, error)
+	MCPReadRemoteToFile(remotePath, localPath string) (int64, error)
+}
+
+// MCPFileEntry is the session-side listing row (mirrors mcp.FileEntry).
+type MCPFileEntry = session.MCPFileEntry
+
+// fileExecutorAdapter converts between the session and mcp type shapes.
+type fileExecutorAdapter struct{ fe MCPFileExecutor }
+
+func (a fileExecutorAdapter) MCPListDir(remotePath string) ([]mcp.FileEntry, error) {
+	entries, err := a.fe.MCPListDir(remotePath)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]mcp.FileEntry, len(entries))
+	for i, e := range entries {
+		out[i] = mcp.FileEntry{
+			Name:    e.Name,
+			Size:    e.Size,
+			IsDir:   e.IsDir,
+			ModTime: e.ModTime,
+			Mode:    e.Mode,
+		}
+	}
+	return out, nil
+}
+
+func (a fileExecutorAdapter) MCPReadFile(remotePath string, offset int64, max int) ([]byte, bool, error) {
+	return a.fe.MCPReadFile(remotePath, offset, max)
+}
+
+func (a fileExecutorAdapter) MCPWriteFile(localPath, remotePath string) (int64, error) {
+	return a.fe.MCPWriteFile(localPath, remotePath)
+}
+
+func (a fileExecutorAdapter) MCPReadRemoteToFile(remotePath, localPath string) (int64, error) {
+	return a.fe.MCPReadRemoteToFile(remotePath, localPath)
+}
+
+// mcpResolveLocalPath validates an agent-supplied local path against the
+// user's SFTP local bookmarks (settings.sftpBookmarks.localPaths): resolved
+// paths must sit inside one of them; an empty list rejects everything.
+func (a *App) mcpResolveLocalPath(path string) (string, error) {
+	settings, err := a.settingsStore.Load()
+	if err != nil {
+		return "", err
+	}
+	return session.ResolveMcpLocalPath(path, settings.SFTPBookmarks.LocalPaths)
 }
 
 func (a *App) mcpListConnections() []mcp.ConnectionSummary {

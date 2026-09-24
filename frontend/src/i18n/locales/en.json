@@ -1708,5 +1708,6 @@
   "mcp.approve": "Allow",
   "mcp.deny": "Deny",
   "mcp.denyWithReason": "Deny with reason",
-  "mcp.deniedDefaultReason": "The user denied this operation"
+  "mcp.deniedDefaultReason": "The user denied this operation",
+  "settings.mcpToolFiles": "File transfers (upload/download/read)"
 }

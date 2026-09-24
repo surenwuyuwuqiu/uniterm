@@ -50,6 +50,16 @@ const DefaultMaxOutputBytes = 64 * 1024
 // the mcp package stays testable in isolation).
 type SessionFunc func(sessionID string) (SSHExecutor, bool)
 
+// FileEntry is one remote listing row for list_remote_dir (kept free of
+// session types so the mcp package stays isolated).
+type FileEntry struct {
+	Name    string `json:"name"`
+	Size    int64  `json:"size"`
+	IsDir   bool   `json:"isDir"`
+	ModTime int64  `json:"modTime,omitempty"`
+	Mode    string `json:"mode,omitempty"`
+}
+
 // CommandFunc resolves a commandId to its owning session's executor and the
 // session id. Injected by the App layer.
 type CommandFunc func(commandID string) (sessionID string, exec SSHExecutor, ok bool)
@@ -82,6 +92,12 @@ type Env struct {
 	// take effect without a restart). "" = unknown token. When nil, the
 	// in-memory map from SetTokens is authoritative.
 	ResolveToken func(hash string) (name string)
+	// FileSession resolves a live session id to its SFTP-backed file
+	// executor; (nil,false) when the session is gone or not SSH.
+	FileSession func(sessionID string) (FileExecutor, bool)
+	// ResolveLocalPath validates a local path against the user-configured
+	// allowed directories (SFTP bookmarks) and returns the resolved path.
+	ResolveLocalPath func(path string) (resolved string, err error)
 }
 
 // SessionSummary is one live session row for list_sessions.
@@ -116,6 +132,15 @@ type SSHExecutor interface {
 	MCPLatestOutput(commandID string, offset int, max int) (stdout, stderr []byte, exitCode int, state string, err error)
 	// MCPInterrupt kills a command started via MCPExec.
 	MCPInterrupt(commandID string, signal string) error
+}
+
+// FileExecutor carries the SFTP-backed file tools. Split from SSHExecutor so
+// the exec group can be implemented/tested without SFTP.
+type FileExecutor interface {
+	MCPListDir(remotePath string) (entries []FileEntry, err error)
+	MCPReadFile(remotePath string, offset int64, max int) (data []byte, truncated bool, err error)
+	MCPWriteFile(localPath, remotePath string) (bytes int64, err error)
+	MCPReadRemoteToFile(remotePath, localPath string) (bytes int64, err error)
 }
 
 // ToolGroups are the per-group tool toggles.

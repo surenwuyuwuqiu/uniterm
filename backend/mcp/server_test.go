@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/ys-ll/uniterm/backend/session"
 )
 
 func TestClassifyCommand(t *testing.T) {
@@ -304,5 +307,133 @@ func TestDeniedApprovalBlocksExec(t *testing.T) {
 	}
 	if res2.IsError {
 		t.Fatal("read command under confirm_dangerous should execute without dialog")
+	}
+}
+
+// fakeFileExecutor implements FileExecutor for tests.
+type fakeFileExecutor struct{}
+
+func (fakeFileExecutor) MCPListDir(p string) ([]FileEntry, error) {
+	return []FileEntry{{Name: "a.txt", Size: 3}, {Name: "sub", IsDir: true}}, nil
+}
+func (fakeFileExecutor) MCPReadFile(p string, off int64, max int) ([]byte, bool, error) {
+	return []byte("hello"), false, nil
+}
+func (fakeFileExecutor) MCPWriteFile(local, remote string) (int64, error) {
+	return 5, nil
+}
+func (fakeFileExecutor) MCPReadRemoteToFile(remote, local string) (int64, error) {
+	return 5, nil
+}
+
+// TestFileToolsAndLocalPathScope covers the files group end to end:
+// list/read run without approval, upload/download require it, and local
+// paths outside the allowed directories are rejected before any transfer.
+func TestFileToolsAndLocalPathScope(t *testing.T) {
+	dir := t.TempDir()
+	inside := filepath.Join(dir, "allowed")
+	os.MkdirAll(inside, 0755)
+	srcFile := filepath.Join(inside, "f.txt")
+	os.WriteFile(srcFile, []byte("hello"), 0644)
+	outside := filepath.Join(dir, "outside", "f.txt")
+	os.MkdirAll(filepath.Dir(outside), 0755)
+
+	env := Env{
+		Sessions:     func(id string) (SSHExecutor, bool) { return fakeExecutor{}, id == "s1" },
+		FileSession:  func(id string) (FileExecutor, bool) { return fakeFileExecutor{}, id == "s1" },
+		ListSessions: func() []SessionSummary { return []SessionSummary{{ID: "s1", Type: "ssh", Status: "connected"}} },
+		Approve:      func(req ApprovalRequest) error { return nil },
+		Audit:        func(entry AuditEntry) {},
+		ToolsEnabled: func() ToolGroups { return ToolGroups{Discovery: true, Exec: true, Files: true} },
+		Policy:       func() Policy { return PolicyConfirmAll },
+		ResolveLocalPath: func(p string) (string, error) {
+			return session.ResolveMcpLocalPath(p, []string{inside})
+		},
+	}
+	srv := NewServer(env)
+	token, hash := GenerateToken()
+	srv.SetTokens(map[string]TokenInfo{hash: {Name: "file-agent"}})
+	if err := srv.Start(0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(srv.Stop)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	client := mcp.NewClient(&mcp.Implementation{Name: "file-probe", Version: "1"}, nil)
+	transport := &mcp.StreamableClientTransport{
+		Endpoint:   "http://127.0.0.1:" + strconv.Itoa(srv.Port()) + "/mcp",
+		HTTPClient: &http.Client{Transport: tokenTransport{rt: http.DefaultTransport, token: token}},
+	}
+	cs, err := client.Connect(ctx, transport, nil)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer cs.Close()
+
+	// list_remote_dir: no approval needed, entries returned.
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "list_remote_dir",
+		Arguments: map[string]any{"sessionId": "s1", "remotePath": "/tmp"},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("list_remote_dir: err=%v isError=%v", err, res.IsError)
+	}
+	b, _ := json.Marshal(res.StructuredContent)
+	var ld struct {
+		Entries []FileEntry `json:"entries"`
+	}
+	json.Unmarshal(b, &ld)
+	if len(ld.Entries) != 2 || ld.Entries[0].Name != "a.txt" {
+		t.Fatalf("entries = %+v", ld.Entries)
+	}
+
+	// read_remote_file: no approval, content returned.
+	res, err = cs.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "read_remote_file",
+		Arguments: map[string]any{"sessionId": "s1", "remotePath": "/tmp/f.txt"},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("read_remote_file: err=%v isError=%v", err, res.IsError)
+	}
+
+	// upload inside the allowed dir: policy confirm_all → approval called
+	// (auto-approved here), transfer succeeds.
+	res, err = cs.CallTool(ctx, &mcp.CallToolParams{
+		Name: "upload_file",
+		Arguments: map[string]any{
+			"sessionId": "s1", "localPath": srcFile, "remotePath": "/tmp/f.txt",
+		},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("upload_file: err=%v isError=%v", err, res.IsError)
+	}
+
+	// upload OUTSIDE the allowed dir: rejected before the executor runs.
+	res, err = cs.CallTool(ctx, &mcp.CallToolParams{
+		Name: "upload_file",
+		Arguments: map[string]any{
+			"sessionId": "s1", "localPath": outside, "remotePath": "/tmp/evil",
+		},
+	})
+	if err != nil {
+		t.Fatalf("upload_file call: %v", err)
+	}
+	if !res.IsError {
+		t.Fatal("upload outside allowed dir must be a tool error")
+	}
+
+	// download outside: rejected too.
+	res, err = cs.CallTool(ctx, &mcp.CallToolParams{
+		Name: "download_file",
+		Arguments: map[string]any{
+			"sessionId": "s1", "remotePath": "/etc/passwd", "localPath": outside,
+		},
+	})
+	if err != nil {
+		t.Fatalf("download_file call: %v", err)
+	}
+	if !res.IsError {
+		t.Fatal("download outside allowed dir must be a tool error")
 	}
 }

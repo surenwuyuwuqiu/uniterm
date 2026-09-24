@@ -1708,5 +1708,6 @@
   "mcp.approve": "允许",
   "mcp.deny": "拒绝",
   "mcp.denyWithReason": "拒绝并说明",
-  "mcp.deniedDefaultReason": "用户拒绝了此操作"
+  "mcp.deniedDefaultReason": "用户拒绝了此操作",
+  "settings.mcpToolFiles": "文件传输（上传/下载/读文件）"
 }

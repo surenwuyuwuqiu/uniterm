@@ -47,6 +47,9 @@ func (s *Server) registerTools(srv *mcp.Server) {
 		Name:        "interrupt_command",
 		Description: "Send a signal (SIGINT/SIGTERM/SIGKILL) to a still-running command started via exec_command.",
 	}, s.toolInterruptCommand)
+
+	// ── Files group (SFTP over the session's connection) ─────────────
+	s.registerFileTools(srv)
 }
 
 // ── Inputs / outputs ────────────────────────────────────────────

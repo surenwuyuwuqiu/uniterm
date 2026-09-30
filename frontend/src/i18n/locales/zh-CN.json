@@ -1786,5 +1786,6 @@
   "mcp.regenerateHint": "令牌 {name} 的明文已不可查看(仅存储哈希)。重新生成将使旧令牌立即失效,需在客户端更新配置。",
   "mcp.zcodeHint": "在 ~/.zcode/cli/config.json 的 mcp.servers 中加入(merges 到现有 JSON,勿整文件替换):",
   "mcp.traeHint": "保存为项目根 .trae/mcp.json(或用户级 ~/.trae/mcp.json):",
-  "mcp.workbuddyHint": "WorkBuddy 连接器格式。保存为 ~/.workbuddy/connectors-marketplace/connectors/uniterm/mcp.json,并在 App 内完成启用:"
+  "mcp.workbuddyHint": "WorkBuddy 连接器格式。保存为 ~/.workbuddy/connectors-marketplace/connectors/uniterm/mcp.json,并在 App 内完成启用:",
+  "mcp.dshHint": "DeepSeek Harness (dsh) 的 Cordis overlay 片段。保存为 uniterm.cordis.yml,启动时 dsh web --patch <该文件>;令牌建议放环境变量 UNITERM_MCP_TOKEN(先 export,或在 config.env 中配置):"
 }

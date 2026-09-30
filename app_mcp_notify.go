@@ -1,4 +1,4 @@
-//go:build !darwin
+//go:build !darwin && !windows
 
 package main
 
@@ -8,8 +8,8 @@ import (
 
 // notifyMCPApproval surfaces a pending MCP approval to the OS when the app
 // window is not focused. Platform-specific (app_mcp_notify_darwin.go and
-// friends); this non-darwin base is a no-op — Windows/Linux can grow their
-// own toast/flash implementations on demand.
+// friends); this non-darwin/windows base is a no-op — Linux can grow a
+// notify-send implementation on demand.
 func (a *App) notifyMCPApproval(req mcp.ApprovalRequest) {}
 
 // raiseMainWindow brings the main window to the front for the notification

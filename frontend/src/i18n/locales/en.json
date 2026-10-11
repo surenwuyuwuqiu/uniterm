@@ -122,6 +122,8 @@
   "conn.startLocalTerminal": "Local Terminal",
   "conn.shell": "Terminal Type",
   "conn.postLoginScriptPlaceholder": "One command per line, executed sequentially after login",
+  "conn.mcpExecViaPty": "MCP Exec via Terminal",
+  "conn.mcpExecViaPtyDesc": "Runs MCP exec_command on a companion terminal tab (visible, replays this login automation) instead of an exec channel — for menu-driven jump hosts where the exec channel lands on the jump host.",
   "conn.postLoginModeScript": "Script",
   "conn.postLoginModeExpect": "Expect/Send",
   "conn.expectPlaceholder": "e.g. password:",

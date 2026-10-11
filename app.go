@@ -123,6 +123,15 @@ type App struct {
 	mcpFileMu          stdsync.Mutex
 	mcpTransferWaiters map[string]chan mcpTransferOutcome
 	mcpTransferMu      stdsync.Mutex
+	// MCP PTY exec (issue #1108): per-USER-SSH-session companion PTY session
+	// ids for connections that opted into mcpExecViaPty (menu-driven jump
+	// hosts). The companion is a visible channel-clone tab whose login
+	// automation replay lands it on the target host; MCP exec_command rides
+	// its PTY instead of an exec channel (which would land on the jump host).
+	// One companion per user session, created lazily on the first exec, torn
+	// down with the user session.
+	mcpPtySessions map[string]string
+	mcpPtyMu       stdsync.Mutex
 	// customLogDir, when non-empty, overrides defaultSessionLogDir()
 	// as the target for new session logs. Set from settings via
 	// SetDefaultSessionLogDir; ongoing logs are not migrated.
@@ -147,6 +156,7 @@ func NewApp(webviewDataPath string) *App {
 		panelAutoTriggered: make(map[string]bool),
 		mcpFileSessions:    make(map[string]string),
 		mcpTransferWaiters: make(map[string]chan mcpTransferOutcome),
+		mcpPtySessions:     make(map[string]string),
 		k8sManager:         k8s.NewManager(),
 		containerManager:   container.NewManager(),
 		errCh:              make(chan error, 16),

@@ -165,6 +165,32 @@ The agent drives the whole flow itself: discover connections → open a session 
 
 **Typical flow**: find the target with `list_connections` / `list_sessions` → `connect` if no session exists → `exec_command` → poll long commands with `get_command_output` → move files with `upload_file` / `download_file`.
 
+## Menu-driven jump hosts: mcpExecViaPty
+
+Some jump hosts (bastion servers) offer no real SSH tunneling: after login they present an **interactive menu** (pick a host, type the target IP, ...) and only then drop you onto the target machine. The SSH transport of such a connection terminates on the jump host:
+
+- `exec_command`'s exec channel lands on the **jump host** — commands never reach the target (issue #1108)
+- File tools (SFTP/SCP companion sessions) likewise only see the jump host's filesystem
+
+For such connections, turn on **MCP Exec via Terminal** in the connection's advanced settings, and `exec_command` rides a **companion terminal** instead:
+
+1. On the first command, uniTerm opens a visible terminal tab cloned from the connection (no re-authentication; the connection's login automation / expect steps replay to get through the menu onto the target)
+2. Commands run on that companion terminal's PTY — fully visible, and you can take over input at any time
+3. The companion closes with the user session; if the jump host idle-logs it out, the next command recreates it
+
+**Semantic differences** (a PTY is not an exec channel — the agent sees these through the tool description):
+
+- stdout and stderr arrive **merged**; the exit code is parsed from a sentinel echo (best-effort on POSIX shells; non-POSIX shells or a killed session may time out with "exit state unknown")
+- Commands run **serially** on a shared working directory and environment (`cd`, `export` persist between calls)
+- Interactive commands (anything waiting on stdin) hang until the timeout — tell the agent to avoid them
+- Interrupts are Ctrl+C only (SIGTERM/SIGKILL degrade to ^C)
+
+**File tools refuse these connections** (they cannot reach the target behind the menu): to transfer files, use an SSH jump tunnel instead (the connection's SSH tunnel field pointing at the jump-host connection), or move data through `exec_command` (cat/base64).
+
+::: warning Bastion-host considerations
+Menu-driven bastions often **limit concurrent sessions per account** and require auditable sessions. The companion terminal is a real second login (SSH auth is skipped, but it occupies a menu session) — make sure your bastion's policy allows it. The companion tab is fully visible to the user, so auditing matches manual operation.
+:::
+
 ## Approval Policy
 
 | Policy | Behavior |

@@ -88,6 +88,13 @@ export interface ConnectionConfig {
   redisKeySeparator?: string
   postLoginScript?: string
   postLoginExpectSteps?: PostLoginExpectStep[]
+  // MCP exec routing (issue #1108): for menu-driven jump hosts an exec
+  // channel lands on the jump host, not the target behind the menu. When
+  // true, MCP exec_command runs on a companion PTY session (a visible
+  // channel-clone tab whose login automation replays) instead of a plain
+  // exec channel. File tools refuse such connections (they cannot reach
+  // the target either) — use an SSH jump tunnel for those.
+  mcpExecViaPty?: boolean
   // SSH tunnel: reference to an existing SSH connection used as a jump host
   tunnelSSHConnId?: string
   // Initial terminal size reported by the frontend BEFORE the SSH/local PTY

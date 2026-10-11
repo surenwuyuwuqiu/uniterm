@@ -122,6 +122,8 @@
   "conn.startLocalTerminal": "Terminal local",
   "conn.shell": "Type de terminal",
   "conn.postLoginScriptPlaceholder": "Une commande par ligne, exécutées séquentiellement après la connexion",
+  "conn.mcpExecViaPty": "Exécution MCP via terminal",
+  "conn.mcpExecViaPtyDesc": "Exécute MCP exec_command dans un onglet terminal compagnon visible (rejouant cette automatisation de login) au lieu d'un canal exec — pour les rebonds à menu, où le canal exec n'atteint que le serveur de rebond.",
   "conn.postLoginModeScript": "Script",
   "conn.postLoginModeExpect": "Expect/Send",
   "conn.expectPlaceholder": "ex. password:",

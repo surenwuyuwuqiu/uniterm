@@ -547,6 +547,10 @@
                 <el-radio-button value="scp">SCP</el-radio-button>
               </el-radio-group>
             </el-form-item>
+            <el-form-item v-if="form.type === 'ssh' && (form.postLoginScript || (form.postLoginExpectSteps && form.postLoginExpectSteps.length))" :label="t('conn.mcpExecViaPty')">
+              <el-switch v-model="form.mcpExecViaPty" />
+              <span class="field-hint" style="margin-left: 0.75rem;">{{ t('conn.mcpExecViaPtyDesc') }}</span>
+            </el-form-item>
             <el-form-item v-if="form.type === 'ssh' || form.type === 'sftp' || form.type === 'scp'" :label="t('conn.sftpMaxConcurrency')">
               <el-input-number v-model="form.sftpMaxConcurrency" :min="0" :max="20" />
             </el-form-item>
@@ -1063,6 +1067,7 @@ const form = reactive<ConnectionConfig>({
   sentinelPassword: '',
   postLoginScript: '',
   postLoginExpectSteps: [],
+  mcpExecViaPty: false,
   sftpMaxConcurrency: 5,
   fileTransferProto: 'sftp' as 'sftp' | 'scp',
   x11Forwarding: false,
@@ -1305,6 +1310,7 @@ watch(() => props.editConfig, (config) => {
     // Redis key separator defaults to ":" (empty from old connections = ":").
     form.redisKeySeparator = config.redisKeySeparator ?? ':'
     postLoginMode.value = (config.postLoginExpectSteps?.length || 0) > 0 ? 'expect' : 'script'
+    form.mcpExecViaPty = config.mcpExecViaPty ?? false
     selectedGroupId.value = config.groupId || undefined
     // Sync serial refs from config
     if (config.serialBaudRate) serialBaudRateInput.value = String(config.serialBaudRate)
@@ -1449,6 +1455,7 @@ function resetForm() {
   form.sentinelPassword = ''
   form.postLoginScript = ''
   form.postLoginExpectSteps = []
+  form.mcpExecViaPty = false
   postLoginMode.value = 'script'
   form.sftpMaxConcurrency = 5
   form.fileTransferProto = 'sftp'

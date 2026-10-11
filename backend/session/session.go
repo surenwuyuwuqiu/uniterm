@@ -153,6 +153,11 @@ type ConnectionConfig struct {
 	PostLoginScript string `json:"postLoginScript,omitempty"`
 	// Post-login expect/send automation: interactive steps executed after login.
 	PostLoginExpectSteps []PostLoginExpectStep `json:"postLoginExpectSteps,omitempty"`
+	// MCPExecViaPty routes MCP exec_command through a companion PTY channel
+	// (same login automation replay) instead of a plain exec channel. For
+	// menu-driven jump hosts (issue #1108) where the exec channel lands on
+	// the jump host itself. Opt-in per connection, default off.
+	MCPExecViaPty bool `json:"mcpExecViaPty,omitempty"`
 	// SSH tunnel: reference to an existing SSH connection used as a jump host.
 	// When set, the connection goes through local port forwarding:
 	//   127.0.0.1:auto-port → tunnel SSH → target Host:Port
@@ -370,6 +375,11 @@ type baseSession struct {
 	// foreground-keepalive counter) register here so they survive the App
 	// layer re-registering onStatusCallback via SetOnStatusChangeCallback.
 	statusListeners []func(SessionStatus)
+	// tapList holds TapOnData observers (see TapOnData): extra consumers of
+	// the emitted output stream that coexist with onDataCallback. Guarded
+	// by its own RWMutex so tap churn never contends s.mu's read path.
+	tapList   []*tapEntry
+	tapListMu sync.RWMutex
 	mu               sync.RWMutex
 	pendingCols      int
 	pendingRows      int
@@ -447,6 +457,53 @@ func (s *baseSession) SetOnDataCallback(cb func([]byte)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onDataCallback = cb
+}
+
+// tapMu guards the data-tap list: taps register/unregister while the emit
+// path iterates, so a plain slice append under s.mu would race the reader.
+type tapEntry struct {
+	fn func([]byte)
+}
+
+// TapOnData registers an additional output observer alongside the primary
+// onData callback and returns an untap function. Used by the MCP PTY
+// executor (companion session capture) where a second consumer must see the
+// same decoded chunks the terminal renderer sees. Chunks are delivered
+// synchronously on the read-loop goroutine — tap callbacks must not block.
+func (s *baseSession) TapOnData(fn func([]byte)) (untap func()) {
+	s.tapListMu.Lock()
+	s.tapList = append(s.tapList, &tapEntry{fn: fn})
+	entry := s.tapList[len(s.tapList)-1]
+	s.tapListMu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.tapListMu.Lock()
+			for i, t := range s.tapList {
+				if t == entry {
+					s.tapList = append(s.tapList[:i], s.tapList[i+1:]...)
+					break
+				}
+			}
+			s.tapListMu.Unlock()
+		})
+	}
+}
+
+// dispatchTaps runs every registered tap for a chunk. Called from emitData's
+// queue-less synchronous path only — the async emitLoop path replays chunks
+// through emitData once they are drained, so taps fire exactly once per chunk
+// per consumer, same as the primary callback.
+func (s *baseSession) dispatchTaps(data []byte) {
+	s.tapListMu.RLock()
+	taps := make([]*tapEntry, len(s.tapList))
+	copy(taps, s.tapList)
+	s.tapListMu.RUnlock()
+	for _, t := range taps {
+		if t != nil && t.fn != nil {
+			t.fn(data)
+		}
+	}
 }
 
 func (s *baseSession) SetOnStatusChangeCallback(cb func(SessionStatus)) {
@@ -528,6 +585,14 @@ func (s *baseSession) emitData(data []byte) {
 	if w != nil {
 		w(data)
 	}
+	// Taps see every chunk exactly once regardless of the emit path chosen
+	// below — they capture before the primary callback, and are skipped
+	// only when there is nothing to deliver to at all (no callback, no
+	// tap): a queueless path means nobody consumes the chunk.
+	if cb == nil && !s.hasTaps() {
+		return
+	}
+	s.dispatchTaps(data)
 	if cb == nil {
 		return
 	}
@@ -538,6 +603,14 @@ func (s *baseSession) emitData(data []byte) {
 	// tests), already stopped, or a zmodem transfer is in progress — file
 	// transfer bytes must never be dropped or delayed.
 	cb(data)
+}
+
+// hasTaps reports whether any TapOnData observer is registered; cheap
+// enough to gate the tap dispatch on the nothing-to-deliver early return.
+func (s *baseSession) hasTaps() bool {
+	s.tapListMu.RLock()
+	defer s.tapListMu.RUnlock()
+	return len(s.tapList) > 0
 }
 
 // queueEmit hands data to the emit loop. Returns false when the caller must

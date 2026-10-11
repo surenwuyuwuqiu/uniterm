@@ -122,6 +122,8 @@
   "conn.startLocalTerminal": "本地終端",
   "conn.shell": "終端類型",
   "conn.postLoginScriptPlaceholder": "每行一條命令，連線成功後依序執行",
+  "conn.mcpExecViaPty": "MCP 命令經終端機執行",
+  "conn.mcpExecViaPtyDesc": "MCP exec_command 透過一個可見的伴隨終端機分頁執行（重放此登入自動化）而非獨立 exec 通道——適用於選單式跳板機（exec 通道只會落在跳板機上）。",
   "conn.postLoginModeScript": "腳本",
   "conn.postLoginModeExpect": "Expect/Send",
   "conn.expectPlaceholder": "如 password:",

@@ -122,6 +122,8 @@
   "conn.startLocalTerminal": "로컬 터미널",
   "conn.shell": "터미널 유형",
   "conn.postLoginScriptPlaceholder": "한 줄에 하나의 명령어를 입력하면 로그인 후 순차적으로 실행됩니다",
+  "conn.mcpExecViaPty": "MCP 명령 터미널 경유 실행",
+  "conn.mcpExecViaPtyDesc": "MCP exec_command를 독립 exec 채널이 아닌 표시되는 동반 터미널 탭에서 실행(이 로그인 자동화 재생) — exec 채널이 점프 호스트에만 도달하는 메뉴형 점프 호스트용.",
   "conn.postLoginModeScript": "스크립트",
   "conn.postLoginModeExpect": "Expect/Send",
   "conn.expectPlaceholder": "예: password:",

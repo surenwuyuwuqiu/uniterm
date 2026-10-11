@@ -35,6 +35,7 @@ func (s *Server) registerTools(srv *mcp.Server) {
 		Name: "exec_command",
 		Description: "Run a shell command on a remote host over an existing connected uniTerm SSH session (non-interactive; separate stdout/stderr; real exit code). " +
 			"Prefer this over writing into the user's terminal. Long-running commands (longer than ~20s) return a commandId you can poll with get_command_output. " +
+			"Some connections (menu-driven jump hosts, marked mcpExecViaPty) run this on a shared PTY companion tab instead: output is not stdout/stderr-separated, the exit code is parsed from a sentinel (best-effort), commands run serially with a persistent working directory and environment, interactive commands will hang until the timeout, and Ctrl+C is the only interrupt signal. " +
 			"Each command may require user approval in the uniTerm window.",
 	}, s.toolExecCommand)
 

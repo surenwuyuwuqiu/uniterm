@@ -122,6 +122,8 @@
   "conn.startLocalTerminal": "Локальный терминал",
   "conn.shell": "Тип терминала",
   "conn.postLoginScriptPlaceholder": "По одной команде на строку, выполняются последовательно после входа",
+  "conn.mcpExecViaPty": "Выполнение MCP через терминал",
+  "conn.mcpExecViaPtyDesc": "Выполняет MCP exec_command в видимой сопутствующей вкладке терминала (повторяя эту автоматизацию входа) вместо exec-канала — для меню-переходных хостов, где exec-канал попадает только на промежуточный хост.",
   "conn.postLoginModeScript": "Скрипт",
   "conn.postLoginModeExpect": "Expect/Send",
   "conn.expectPlaceholder": "напр. password:",

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 	"github.com/ys-ll/uniterm/backend/log"
 	"github.com/ys-ll/uniterm/backend/mcp"
@@ -230,6 +231,140 @@ func (a *App) mcpResolveToken(hash string) string {
 
 // ── Env glue ─────────────────────────────────────────────────────
 
+// ── MCP PTY exec: companion channel-clone session (issue #1108) ────────
+//
+// Connections through menu-driven jump hosts terminate the SSH transport on
+// the jump host: an exec channel runs commands THERE, not on the target the
+// user's shell reached after navigating the menu. When the connection opts
+// in (mcpExecViaPty), exec_command rides a companion PTY instead — a
+// channel clone of the user's session with the login automation replayed,
+// opened as a visible tab (user can watch and take over), one per user
+// session, lazily created on the first exec and closed with its owner.
+
+// mcpPtyExecutorFor resolves a user session to its MCP exec executor:
+// the companion PTY executor for opt-in connections, the session itself
+// (exec channel) otherwise. It creates the companion on first use; the
+// creation error text reaches the AI caller verbatim. Companion sessions
+// resolve to their own PTY executor (the create-side counterpart of
+// mcpSessionExecReadOnly's companion branch).
+func (a *App) mcpPtyExecutorFor(ssh *session.SSHSession) (mcp.SSHExecutor, error) {
+	// Opt-out connections keep the exec-channel semantics.
+	if !ssh.ConnectionConfig().MCPExecViaPty {
+		return ssh, nil
+	}
+	if ssh.IsMCPCompanion() {
+		return session.GetOrCreateMcpPtyExecutor(ssh), nil
+	}
+	comp, err := a.mcpEnsurePtySession(ssh)
+	if err != nil {
+		return nil, err
+	}
+	return session.GetOrCreateMcpPtyExecutor(comp), nil
+}
+
+// mcpEnsurePtySession returns the cached companion for the user session, or
+// creates and connects one. The companion is a VISIBLE tab (mcp:session-
+// created) so the user can watch the menu replay and take over if a step
+// misfires — the same visibility contract as the connect tool. A cached-but-
+// dead companion is replaced on the next call (jump hosts may idle-logout an
+// unused menu session).
+func (a *App) mcpEnsurePtySession(ssh *session.SSHSession) (*session.SSHSession, error) {
+	userSID := ssh.ID()
+	a.mcpPtyMu.Lock()
+	compSID, cached := a.mcpPtySessions[userSID]
+	a.mcpPtyMu.Unlock()
+	if cached {
+		if s, ok := a.sessionManager.Get(compSID); ok {
+			if comp, ok := s.(*session.SSHSession); ok && comp.Status() == session.StatusConnected {
+				return comp, nil
+			}
+		}
+		// Stale entry: tear the leftover down and recreate below.
+		a.mcpDropPtySession(userSID, compSID)
+	}
+	if ssh.Status() != session.StatusConnected {
+		return nil, fmt.Errorf("ssh session %s is not connected", userSID)
+	}
+
+	comp := session.NewMCPCompanionSession(uuid.New().String(), ssh)
+	config := ssh.ConnectionConfig()
+	// The companion is a channel clone: SessionStart's clone branch skips
+	// identity/proxy/tunnel resolution, so this config is already fully
+	// materialized. Strip the cwd hook: companions follow no directory and
+	// the hook line would pollute the MCP capture window.
+	config.CwdHookMode = session.CwdHookModeFollow
+	comp.SetLogIdentity(config.Name, config.Host)
+	comp.SetOnDataCallback(func(data []byte) {
+		a.emit("session:data", map[string]interface{}{
+			"id":   comp.ID(),
+			"data": string(data),
+		})
+	})
+	comp.SetOnBinaryCallback(func(data []byte) {
+		a.emit("session:binary", map[string]interface{}{
+			"id":   comp.ID(),
+			"data": base64.StdEncoding.EncodeToString(data),
+		})
+	})
+	comp.SetOnStatusChangeCallback(func(status session.SessionStatus) {
+		a.emit("session:status", map[string]interface{}{
+			"id":     comp.ID(),
+			"status": status,
+		})
+	})
+	a.sessionManager.Add(comp)
+	a.mcpPtyMu.Lock()
+	a.mcpPtySessions[userSID] = comp.ID()
+	a.mcpPtyMu.Unlock()
+
+	// Follow the user session down so the companion never outlives its
+	// owner; only the registered generation cleans up.
+	ssh.AddStatusListener(func(st session.SessionStatus) {
+		if st != session.StatusDisconnected && st != session.StatusError {
+			return
+		}
+		a.mcpDropPtySession(userSID, comp.ID())
+	})
+
+	// Visible tab, same as the connect tool's sessions. The tab attaches via
+	// the companion's session id; its xterm mounts at real size and calls
+	// SessionStart, whose clone branch runs the login-automation replay.
+	a.emit("mcp:session-created", map[string]interface{}{
+		"sessionId": comp.ID(),
+		"name":      config.Name,
+		"host":      config.Host,
+	})
+
+	if err := comp.Connect(config); err != nil {
+		a.mcpDropPtySession(userSID, comp.ID())
+		return nil, fmt.Errorf("companion PTY session connect failed: %w", err)
+	}
+	log.Writef("[mcp-pty] opened companion PTY session %s for ssh session %s", comp.ID(), userSID)
+	return comp, nil
+}
+
+// mcpDropPtySession closes the companion (when still live), unregisters it,
+// and clears the mapping — used on user-session teardown, companion death,
+// and connect failure.
+func (a *App) mcpDropPtySession(userSID, compSID string) {
+	a.mcpPtyMu.Lock()
+	cur, ok := a.mcpPtySessions[userSID]
+	if ok && cur == compSID {
+		delete(a.mcpPtySessions, userSID)
+	}
+	a.mcpPtyMu.Unlock()
+	if ok && a.sessionManager != nil {
+		session.RemoveMcpPtyExecutor(compSID)
+		_ = a.sessionManager.Close(compSID)
+	}
+}
+
+// mcpSessionExec resolves a session id to its exec executor for the MCP
+// server: the companion PTY executor for mcpExecViaPty connections, the
+// session's own exec channel otherwise. Creating the companion on demand is
+// a side effect confined to the exec_command path (toolExecCommand); the
+// poll/interrupt path (mcpCommandOwner) must not spin sessions up, so it
+// uses the read-only variant below.
 func (a *App) mcpSessionExec(sessionID string) (mcp.SSHExecutor, bool) {
 	if a.sessionManager == nil {
 		return nil, false
@@ -242,17 +377,66 @@ func (a *App) mcpSessionExec(sessionID string) (mcp.SSHExecutor, bool) {
 	if !ok {
 		return nil, false
 	}
+	exec, err := a.mcpPtyExecutorFor(ssh)
+	if err != nil || exec == nil {
+		return nil, false
+	}
+	return exec, true
+}
+
+// mcpSessionExecReadOnly resolves a session id to its executor without
+// creating anything: cached companions only. Used by command-id resolution
+// where a miss must stay a miss.
+func (a *App) mcpSessionExecReadOnly(sessionID string) (mcp.SSHExecutor, bool) {
+	if a.sessionManager == nil {
+		return nil, false
+	}
+	s, ok := a.sessionManager.Get(sessionID)
+	if !ok {
+		return nil, false
+	}
+	ssh, ok := s.(*session.SSHSession)
+	if !ok {
+		return nil, false
+	}
+	// Read-only: for opt-in connections, only a live cached companion binds.
+	// A companion session itself (also opt-in via inherited config) resolves
+	// to its own PTY executor — that is how mcpCommandOwner attributes
+	// poll/interrupt calls for commands running on it.
+	if ssh.ConnectionConfig().MCPExecViaPty {
+		if ssh.IsMCPCompanion() {
+			return session.GetOrCreateMcpPtyExecutor(ssh), true
+		}
+		a.mcpPtyMu.Lock()
+		compSID, cached := a.mcpPtySessions[sessionID]
+		a.mcpPtyMu.Unlock()
+		if !cached {
+			return nil, false
+		}
+		cs, ok := a.sessionManager.Get(compSID)
+		if !ok {
+			return nil, false
+		}
+		comp, ok := cs.(*session.SSHSession)
+		if !ok {
+			return nil, false
+		}
+		return session.GetOrCreateMcpPtyExecutor(comp), true
+	}
 	return ssh, true
 }
 
 func (a *App) mcpCommandOwner(commandID string) (string, mcp.SSHExecutor, bool) {
 	// Commands are registered globally in the session package; resolve by
-	// scanning live SSH sessions (tens at most).
+	// scanning live SSH sessions (tens at most). PTY companion commands are
+	// attributed to their companion session, whose executor is the same PTY
+	// executor instance (GetOrCreateMcpPtyExecutor). Read-only: polling a
+	// dead command must not spin a new companion up.
 	if a.sessionManager == nil {
 		return "", nil, false
 	}
 	for _, s := range a.sessionManager.List() {
-		if exec, ok := a.mcpSessionExec(s.ID); ok {
+		if exec, ok := a.mcpSessionExecReadOnly(s.ID); ok {
 			if _, _, _, state, _ := exec.MCPLatestOutput(commandID, 0, 1); state != "unknown" {
 				return s.ID, exec, true
 			}
@@ -382,6 +566,13 @@ func (a *App) mcpFileSession(sessionID string) (mcp.FileExecutor, error) {
 	ssh, ok := s.(*session.SSHSession)
 	if !ok {
 		return nil, fmt.Errorf("session %s is not an SSH session", sessionID)
+	}
+	// mcpExecViaPty connections route commands through a menu-driven jump
+	// host (issue #1108): an SFTP/SCP companion would dial the jump host's
+	// transport and list/transfer ITS filesystem, not the target's. Refuse
+	// with the actionable alternative instead.
+	if ssh.ConnectionConfig().MCPExecViaPty {
+		return nil, fmt.Errorf("file tools are unavailable on mcpExecViaPty connections: the file session would land on the jump host, not the target behind the menu — configure an SSH jump tunnel (tunnelSSHConnId) on the connection to make file tools work, or transfer via exec_command (cat/base64)")
 	}
 	fs, err := a.mcpEnsureFileSession(ssh)
 	if err != nil {

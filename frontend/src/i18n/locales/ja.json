@@ -122,6 +122,8 @@
   "conn.startLocalTerminal": "ローカル端末",
   "conn.shell": "端末タイプ",
   "conn.postLoginScriptPlaceholder": "1行に1コマンド、ログイン後に順次実行されます",
+  "conn.mcpExecViaPty": "MCPコマンドを端末経由で実行",
+  "conn.mcpExecViaPtyDesc": "MCP exec_command を独立した exec チャネルではなく、表示されるコンパニオン端末タブで実行する（このログイン自動化を再生）——exec チャネルがジャンプホスト上にしか届かないメニュー式ジャンプホスト向け。",
   "conn.postLoginModeScript": "スクリプト",
   "conn.postLoginModeExpect": "Expect/Send",
   "conn.expectPlaceholder": "例: password:",

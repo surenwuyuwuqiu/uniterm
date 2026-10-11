@@ -128,6 +128,20 @@ type SSHSession struct {
 	// opens a new session channel.
 	channelClone bool
 
+	// mcpCompanion marks an MCP companion clone (mcpExecViaPty connections,
+	// issue #1108): a visible tab whose PTY carries commands for MCP
+	// exec_command. It skips the cwd hook (no OSC-7 aliasing with the source
+	// tab, no hook line in the exec capture window) and exposes the PTY to
+	// the MCP PTY executor after post-login automation finishes.
+	mcpCompanion bool
+
+	// mcpPtyReady is closed once post-login automation finished on an
+	// mcpCompanion session (or immediately when none was configured). The
+	// MCP PTY executor gates its first command on it: commands sent before
+	// the last expect step landed would race the menu, not the shell.
+	mcpPtyReady chan struct{}
+	mcpPtyOnce  sync.Once
+
 	// connConfig is the fully materialized config this session connected
 	// with (identity/proxy resolved by the App layer, tunnel rewrite
 	// applied). MCP file tools reuse it to lazily open the companion
@@ -142,6 +156,15 @@ func (s *SSHSession) ConnectionConfig() ConnectionConfig {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.connConfig
+}
+
+// SetTestConnectionConfig installs a config on a never-connected session.
+// Test-only injection: the App-layer MCP routing reads ConnectionConfig()
+// before any Connect ran.
+func (s *SSHSession) SetTestConnectionConfig(config ConnectionConfig) {
+	s.mu.Lock()
+	s.connConfig = config
+	s.mu.Unlock()
 }
 
 // sshClientRef owns one authenticated SSH transport. The last release closes
@@ -268,10 +291,62 @@ func NewSSHChannelSession(id string, source *SSHSession) *SSHSession {
 	return clone
 }
 
+// NewMCPCompanionSession creates an MCP companion clone on the source
+// session's authenticated client (issue #1108). Post-login automation
+// replays on it (menu-driven jump hosts), so it must NOT be started before
+// the source's own automation is done — callers pass the source's ready
+// state; mcpPtyReady only closes after this session's automation finishes.
+func NewMCPCompanionSession(id string, source *SSHSession) *SSHSession {
+	clone := NewSSHChannelSession(id, source)
+	clone.mcpCompanion = true
+	clone.mcpPtyReady = make(chan struct{})
+	return clone
+}
+
+// MCPPtyWaitReady blocks until post-login automation on this companion
+// session finished (or immediately for non-companion sessions). timeout ≤ 0
+// waits indefinitely.
+func (s *SSHSession) MCPPtyWaitReady(timeout time.Duration) error {
+	s.mu.RLock()
+	ch := s.mcpPtyReady
+	s.mu.RUnlock()
+	if ch == nil {
+		return nil
+	}
+	if timeout <= 0 {
+		<-ch
+		return nil
+	}
+	select {
+	case <-ch:
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("post-login automation still running after %s (check the companion tab — a menu step may be waiting for input)", timeout)
+	}
+}
+
+// mcpPtySignalReady closes the companion's ready gate exactly once; called
+// from runPostLoginAutomation's completion path.
+func (s *SSHSession) mcpPtySignalReady() {
+	if ch := func() chan struct{} {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		return s.mcpPtyReady
+	}(); ch != nil {
+		s.mcpPtyOnce.Do(func() { close(ch) })
+	}
+}
+
 // IsChannelClone reports whether this session shares an authenticated client
 // with another session instead of owning its own connection.
 func (s *SSHSession) IsChannelClone() bool {
 	return s.channelClone
+}
+
+// IsMCPCompanion reports whether this session is the MCP PTY companion of
+// another session (issue #1108) — commands from exec_command ride its PTY.
+func (s *SSHSession) IsMCPCompanion() bool {
+	return s.mcpCompanion
 }
 
 // RemoteOS returns the detected remote operating system. For Microsoft's
@@ -480,8 +555,10 @@ func (s *SSHSession) attach(client *ssh.Client, config ConnectionConfig) error {
 	// CLI-only appliances (Netgear M4300 etc.) tear down the whole transport
 	// on exec, killing the login. CwdHookMode "follow"
 	// skips the startup injection entirely: InjectCwdHook re-detects on
-	// demand.
-	s.cwdHookFollow = config.CwdHookMode == CwdHookModeFollow
+	// demand. MCP companion clones (issue #1108) skip it too: their OSC-7
+	// reports would alias the source tab's directory in the sidebar and the
+	// hook line would pollute the MCP exec capture window.
+	s.cwdHookFollow = config.CwdHookMode == CwdHookModeFollow || s.mcpCompanion
 	injectHook, injectShell := "", ""
 	if s.cwdHookFollow {
 		log.Writef("ssh: cwd hook deferred to directory-follow toggle")
@@ -780,9 +857,11 @@ func (s *SSHSession) runPostLoginAutomation(config ConnectionConfig) {
 	}
 	if len(config.PostLoginExpectSteps) > 0 {
 		s.runPostLoginExpect(config)
+		s.mcpPtySignalReady()
 		return
 	}
 	s.runPostLoginScript(config.PostLoginScript)
+	s.mcpPtySignalReady()
 }
 
 func (s *SSHSession) runPostLoginExpect(config ConnectionConfig) {

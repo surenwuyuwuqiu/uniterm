@@ -2016,5 +2016,10 @@
   "netscan.export.failed": "Xuất thất bại: ",
   "netscan.export.copy": "Sao chép",
   "netscan.export.copied": "Đã sao chép kết quả quét vào clipboard",
-  "netscan.export.copyFailed": "Sao chép thất bại: "
+  "netscan.export.copyFailed": "Sao chép thất bại: ",
+  "backendErrors.sftp_unavailable": "Không thể khởi động SFTP. Máy chủ có thể không cung cấp SFTP hoặc từ chối thực thi. Thử lại bằng SCP hoặc cài đặt/bật sftp-server trên máy chủ. Lỗi subsystem: {0}; lỗi khởi động thay thế: {1}",
+  "sftp.retryScp": "Thử lại bằng SCP",
+  "sftp.usingScp": "Phiên này đang dùng SCP",
+  "sftp.rememberScp": "Ghi nhớ SCP cho kết nối này",
+  "backendErrors.scp_unavailable": "Không thể dùng SCP. Kiểm tra scp đã được cài trên máy chủ và cho phép chạy lệnh shell cũng như liệt kê thư mục. Chi tiết: {0}"
 }

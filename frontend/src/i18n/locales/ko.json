@@ -2016,5 +2016,10 @@
   "netscan.export.failed": "내보내기 실패: ",
   "netscan.export.copy": "복사",
   "netscan.export.copied": "스캔 결과가 클립보드에 복사되었습니다",
-  "netscan.export.copyFailed": "복사 실패: "
+  "netscan.export.copyFailed": "복사 실패: ",
+  "backendErrors.sftp_unavailable": "SFTP를 시작하지 못했습니다. 서버가 SFTP를 제공하지 않거나 실행을 거부했을 수 있습니다. SCP로 재시도하거나 서버에 sftp-server를 설치하고 활성화하세요. 하위 시스템 오류: {0}; 대체 시작 오류: {1}",
+  "sftp.retryScp": "SCP로 재시도",
+  "sftp.usingScp": "현재 세션에서 SCP 사용 중",
+  "sftp.rememberScp": "이 연결에 SCP 사용 기억",
+  "backendErrors.scp_unavailable": "SCP를 사용할 수 없습니다. 서버에 scp가 설치되어 있고 셸 명령 실행 및 디렉터리 목록 조회가 허용되는지 확인하세요. 세부 정보: {0}"
 }

@@ -51,3 +51,10 @@ export function isConnectionLostError(err?: string | null): boolean {
   if (!err) return false
   return /connection lost|not connected|use of closed network connection|broken pipe|connection reset|connection refused|unexpected eof|\beof\b|already closed|ssh: disconnected|i\/o timeout|connection timed out/i.test(err)
 }
+
+// Only a coded SFTP startup failure offers a protocol switch. Authentication,
+// transport and file-operation errors must never trigger it.
+export function canRetryWithScp(config: { type?: string; fileTransferProto?: 'sftp' | 'scp' } | null | undefined, error: string): boolean {
+  return !!config && (config.type === 'sftp' || (config.type === 'ssh' && fileTransferProto(config) === 'sftp')) &&
+    /unitermerr:sftp_unavailable(?:\||$)/.test(error)
+}

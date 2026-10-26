@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { supportsRemoteSymlink, canOpenSshTerminal, asSshTerminalConfig } from './fileTransferUtils'
+import { canRetryWithScp, supportsRemoteSymlink, canOpenSshTerminal, asSshTerminalConfig } from './fileTransferUtils'
 
 // "New link" must appear wherever the backend can create symbolic links. The
 // WSL dual-pane file window carries config type 'wsl-file' (the companion
@@ -54,5 +54,23 @@ describe('asSshTerminalConfig', () => {
   it('returns ssh configs unchanged (same reference)', () => {
     const cfg = { type: 'ssh', host: 'h' }
     expect(asSshTerminalConfig(cfg)).toBe(cfg)
+  })
+})
+
+// A failed protocol handshake can be retried with SCP, but an existing SCP
+// choice, unrelated protocols and transport/auth errors must not offer it.
+describe('canRetryWithScp', () => {
+  const unavailable = 'sftp client: unitermerr:sftp_unavailable|unexpected EOF|fallback failed'
+  it('offers recovery on SSH companion and standalone SFTP startup failures', () => {
+    expect(canRetryWithScp({ type: 'ssh' }, unavailable)).toBe(true)
+    expect(canRetryWithScp({ type: 'sftp' }, unavailable)).toBe(true)
+  })
+  it('does not reinterpret other errors or override SCP', () => {
+    for (const error of ['unexpected EOF', 'ssh dial: timeout', 'unable to authenticate', 'unitermerr:sftp_subsystem_polluted|packet too long', 'unitermerr:sftp_unavailable_other']) {
+      expect(canRetryWithScp({ type: 'ssh' }, error)).toBe(false)
+    }
+    for (const config of [{ type: 'scp' }, { type: 'ssh', fileTransferProto: 'scp' as const }, { type: 'ftp' }, null]) {
+      expect(canRetryWithScp(config, unavailable)).toBe(false)
+    }
   })
 })

@@ -1,5 +1,6 @@
 <template>
   <div class="sftp-tab-content">
+    <FileConnectionRecovery :session-id="panel?.sessionId" :config="panel?.config" :retry-scp="retryWithScp" />
     <div class="panes-area">
       <div
         class="local-pane"
@@ -167,6 +168,8 @@
 </template>
 
 <script setup lang="ts">
+import FileConnectionRecovery from './FileConnectionRecovery.vue'
+import { backendErrorTextOf } from '../utils/backendError'
 import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue'
 
 import { msg } from '../services/message'
@@ -210,6 +213,14 @@ const transferHeight = ref(130)
 const { t } = useI18n()
 bindExtEditUploadedToast()
 const panel = computed(() => panelStore.getPanel(props.panelId))
+async function retryWithScp() {
+  const owner = panel.value
+  if (!owner?.config) return
+  const config = owner.config
+  owner.config = config.type === 'ssh' ? { ...config, fileTransferProto: 'scp' } : { ...config, type: 'scp' }
+  await reconnectFileTransferPanel(props.panelId)
+}
+
 // "New link" exists only for backends with link semantics (SFTP/SCP/WSL).
 const remoteSupportsSymlink = computed(() => supportsRemoteSymlink(panel.value?.config ?? undefined))
 
@@ -420,7 +431,7 @@ onMounted(async () => {
     // Connection failed messages from backend (SFTP/FTP async connect errors)
     const connMatch = payload.data.match(/\[Connection failed: ([^\]]+)\]/)
     if (connMatch) {
-      msg.error(connMatch[1])
+      msg.error(backendErrorTextOf(connMatch[1]))
       return
     }
   })

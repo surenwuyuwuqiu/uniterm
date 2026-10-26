@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ys-ll/uniterm/backend/utils"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -100,6 +101,14 @@ func (s *SCPSession) Connect(config ConnectionConfig) error {
 	s.mu.Unlock()
 	go startFileSessionKeepAlive(client, s.Status)
 
+	// A successful SSH login alone does not establish SCP support. Probe the
+	// remote transfer program and the shell listing used by the file browser.
+	if _, err := s.runCommand(scpCapabilityCommand, 15*time.Second); err != nil {
+		_ = s.Disconnect()
+		s.setStatus(StatusError)
+		return utils.UserErr("scp_unavailable", err.Error())
+	}
+
 	// Resolve the login home directory as the initial remote cwd. Login
 	// banners may print before it, so take the last non-empty line.
 	if out, err := s.runCommand("pwd", 15*time.Second); err == nil {
@@ -131,6 +140,10 @@ func (s *SCPSession) Disconnect() error {
 func (s *SCPSession) IsConnected() bool {
 	return s.Status() == StatusConnected && s.getClient() != nil
 }
+
+// Keep connection tests and real connections aligned. Do not write remote
+// files during capability detection; transfer handshakes run when needed.
+const scpCapabilityCommand = "command -v scp >/dev/null 2>&1 && LC_ALL=C ls -la . >/dev/null"
 
 // --- Connection helpers ---
 

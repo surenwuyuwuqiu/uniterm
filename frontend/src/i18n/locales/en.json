@@ -2047,5 +2047,10 @@
   "netscan.export.failed": "Export failed: ",
   "netscan.export.copy": "Copy",
   "netscan.export.copied": "Scan results copied to clipboard",
-  "netscan.export.copyFailed": "Copy failed: "
+  "netscan.export.copyFailed": "Copy failed: ",
+  "backendErrors.sftp_unavailable": "SFTP could not start. The server may not provide SFTP or may deny its execution. You can retry using SCP, or install/enable sftp-server on the server. Subsystem error: {0}; fallback error: {1}",
+  "sftp.retryScp": "Retry using SCP",
+  "sftp.usingScp": "Using SCP for this session",
+  "sftp.rememberScp": "Remember SCP for this connection",
+  "backendErrors.scp_unavailable": "SCP is unavailable. Check that scp is installed on the server and shell commands and directory listing are permitted. Details: {0}"
 }

@@ -2,6 +2,12 @@
   <div
     class="companion-sidebar file-sidebar"
   >
+    <FileConnectionRecovery
+      :key="companionStore.activeFilesPanelId ?? ''"
+      :session-id="sessionId"
+      :config="panelStore.getPanel(companionStore.activeFilesPanelId ?? '')?.config"
+      :retry-scp="retryWithScp"
+    />
     <div v-if="!sessionId" class="companion-empty">
       <span v-if="connecting">{{ t('companion.connecting') }}</span>
       <span v-else-if="connectError">{{ connectError }}</span>
@@ -164,6 +170,8 @@ import {
   useEditorBridge, useDragOver, useNativeFileDrop, remoteFileOps, resolveRemoteTarget, joinPath,
 } from '../composables/useFilePanel'
 import { bindExtEditUploadedToast } from '../composables/useFilePanel'
+import FileConnectionRecovery from './FileConnectionRecovery.vue'
+import { backendErrorTextOf } from '../utils/backendError'
 import FileList from './FileList.vue'
 import type { FileItem } from './FileList.vue'
 import TransferPanel from './TransferPanel.vue'
@@ -225,6 +233,15 @@ function scheduleRefresh(delay = 250) {
   }, delay)
 }
 
+async function retryWithScp() {
+  const pid = companionStore.activeFilesPanelId
+  const owner = pid ? panelStore.getPanel(pid) : undefined
+  if (!pid || !owner?.config) return
+  owner.config = { ...owner.config, fileTransferProto: 'scp' }
+  connectError.value = ''
+  await companionStore.ensureSftp(pid)
+}
+
 async function ensureConnected() {
   const pid = companionStore.activeFilesPanelId
   if (!pid || !companionStore.filesVisible) return
@@ -233,7 +250,7 @@ async function ensureConnected() {
   try {
     await companionStore.ensureSftp(pid)
   } catch (e: any) {
-    connectError.value = e?.toString?.() || t('companion.listFailed')
+    connectError.value = backendErrorTextOf(e?.toString?.() || t('companion.listFailed'))
   } finally {
     connecting.value = false
   }
@@ -468,7 +485,7 @@ function bindListeners() {
     const connMatch = payload.data.match(/\[Connection failed: ([^\]]+)\]/)
     if (connMatch) {
       connectError.value = connMatch[1]
-      msg.error(connMatch[1])
+      msg.error(backendErrorTextOf(connMatch[1]))
       return
     }
   })

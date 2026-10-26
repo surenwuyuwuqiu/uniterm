@@ -2047,5 +2047,10 @@
   "netscan.export.failed": "匯出失敗：",
   "netscan.export.copy": "複製",
   "netscan.export.copied": "掃描結果已複製到剪貼簿",
-  "netscan.export.copyFailed": "複製失敗："
+  "netscan.export.copyFailed": "複製失敗：",
+  "backendErrors.sftp_unavailable": "SFTP 啟動失敗：伺服器可能未提供 SFTP，或拒絕執行服務端程式。可使用 SCP 重試，或在伺服器上安裝、啟用 sftp-server。子系統錯誤：{0}；備用啟動錯誤：{1}",
+  "sftp.retryScp": "使用 SCP 重試",
+  "sftp.usingScp": "目前工作階段使用 SCP",
+  "sftp.rememberScp": "此連線以後使用 SCP",
+  "backendErrors.scp_unavailable": "SCP 無法使用。請確認伺服器已安裝 scp，並允許執行 shell 命令和讀取目錄。詳細資訊：{0}"
 }

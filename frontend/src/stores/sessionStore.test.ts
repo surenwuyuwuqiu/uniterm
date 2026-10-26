@@ -6,12 +6,14 @@ import { setActivePinia, createPinia } from 'pinia'
 // module-level listener directly.
 const { runtimeState } = vi.hoisted(() => ({
   runtimeState: {
+    statusHandler: null as null | ((ev: any) => void),
     dataHandler: null as null | ((ev: any) => void),
   },
 }))
 vi.mock('@wailsio/runtime', () => ({
   Events: {
     On: vi.fn((name: string, handler: (ev: any) => void) => {
+      if (name === 'session:status') runtimeState.statusHandler = handler
       if (name === 'session:data') runtimeState.dataHandler = handler
       return () => { if (name === 'session:data') runtimeState.dataHandler = null }
     }),
@@ -198,5 +200,24 @@ describe('sessionStore zmodem cancel window', () => {
     emitData('s-expire', 'prompt')
     expect(sessions.getChunkCount('s-expire')).toBe(1)
     expect(sessions.getDataFromChunk('s-expire', 0)).toBe('prompt')
+  })
+})
+
+
+describe('file connection failure replay', () => {
+  it('preserves a fast failure across session binding and cleanup', () => {
+    setActivePinia(createPinia())
+    const store = useSessionStore()
+    const id = 'fast-sftp-failure'
+    const errorMessage = 'unitermerr:sftp_unavailable|unexpected EOF|missing server'
+    runtimeState.statusHandler!({ data: { id, status: 'error', errorMessage } })
+    // The backend removes the failed session after emitting the error.
+    runtimeState.statusHandler!({ data: { id, status: 'disconnected' } })
+    store.initSession(id)
+    expect(store.getStatus(id)).toBe('disconnected')
+    expect(store.sessions.get(id)?.errorMessage).toBe(errorMessage)
+    runtimeState.statusHandler!({ data: { id, status: 'connected' } })
+    expect(store.sessions.get(id)?.errorMessage).toBeUndefined()
+    store.removeSession(id)
   })
 })

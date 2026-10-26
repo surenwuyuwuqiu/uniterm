@@ -2016,5 +2016,10 @@
   "netscan.export.failed": "エクスポート失敗: ",
   "netscan.export.copy": "コピー",
   "netscan.export.copied": "スキャン結果をクリップボードにコピーしました",
-  "netscan.export.copyFailed": "コピー失敗: "
+  "netscan.export.copyFailed": "コピー失敗: ",
+  "backendErrors.sftp_unavailable": "SFTP を起動できません。サーバーが SFTP を提供していないか、実行を拒否している可能性があります。SCP で再試行するか、サーバーに sftp-server をインストールして有効にしてください。サブシステムエラー: {0}、代替起動エラー: {1}",
+  "sftp.retryScp": "SCP で再試行",
+  "sftp.usingScp": "このセッションは SCP を使用中",
+  "sftp.rememberScp": "この接続で今後 SCP を使用",
+  "backendErrors.scp_unavailable": "SCP を利用できません。サーバーに scp がインストールされ、シェルコマンドの実行とディレクトリ一覧の取得が許可されていることを確認してください。詳細: {0}"
 }

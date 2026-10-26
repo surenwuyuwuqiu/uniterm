@@ -83,6 +83,17 @@ export const useConnectionStore = defineStore('connection', () => {
     }
   }
 
+  // Persist the explicit SCP choice only after a successful retry. Unlike
+  // general edits, do not publish an in-memory preference if saving fails.
+  async function rememberScp(id: string) {
+    const saved = connections.value.find(c => c.id === id)
+    if (!saved || !['ssh', 'sftp', 'scp'].includes(saved.type)) return
+    const patch: Partial<ConnectionConfig> = saved.type === 'ssh' ? { fileTransferProto: 'scp' } : { type: 'scp' }
+    const next = connections.value.map(c => c.id === id ? { ...c, ...patch } : c)
+    await SaveConnections({ groups: groups.value, connections: next } as any)
+    connections.value = next
+  }
+
   async function remove(id: string) {
     connections.value = connections.value.filter(c => c.id !== id)
     await save()
@@ -347,6 +358,7 @@ export const useConnectionStore = defineStore('connection', () => {
     save,
     add,
     update,
+    rememberScp,
     remove,
     removeMany,
     addGroup,

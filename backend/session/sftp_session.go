@@ -145,8 +145,19 @@ func isSFTPStreamPolluted(err error) bool {
 	}
 	msg := err.Error()
 	return strings.Contains(msg, "packet too long") ||
-		strings.Contains(msg, "message too long") ||
-		strings.Contains(msg, "version packet")
+		strings.Contains(msg, "message too long")
+}
+
+// isSFTPUnavailable identifies startup failures after SSH authentication. A
+// version-packet EOF can mean an absent server, not necessarily stdout noise.
+// Transport timeouts/resets and authentication failures must not offer SCP.
+func isSFTPUnavailable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "subsystem request failed") ||
+		((strings.Contains(msg, "version packet") || strings.Contains(msg, "init packet")) && strings.Contains(msg, "eof"))
 }
 
 // sftpServerPaths 是各发行版 sftp-server 二进制的常见位置。
@@ -180,11 +191,11 @@ func buildSFTPExecCommand() string {
 	return b.String()
 }
 
-// trySFTPExecFallback 在 subsystem 方式失败(且属于协议流被污染)时，
+// trySFTPExecFallback 在 subsystem 不可用或协议流被污染时，
 // 改为 exec sftp-server，并跳过 stdout 上 marker 之前的全部噪声，
 // 再用管道接管，绕过被登录脚本污染的协议流。
 func trySFTPExecFallback(client *ssh.Client, subsystemErr error) (*sftp.Client, error) {
-	if !isSFTPStreamPolluted(subsystemErr) {
+	if !isSFTPStreamPolluted(subsystemErr) && !isSFTPUnavailable(subsystemErr) {
 		return nil, subsystemErr
 	}
 	sess, err := client.NewSession()
@@ -239,6 +250,13 @@ func skipToMarker(r *bufio.Reader, marker string) error {
 // 污染了 SFTP 协议流。subErr 是 subsystem 方式的原始错误，fbErr 是 exec fallback
 // 的失败原因(便于诊断到底卡在哪一步)。
 func hintSFTPStartupError(subErr, fbErr error) error {
+	if isSFTPUnavailable(subErr) {
+		fallback := ""
+		if fbErr != nil {
+			fallback = fbErr.Error()
+		}
+		return utils.UserErr("sftp_unavailable", subErr.Error(), fallback)
+	}
 	if isSFTPStreamPolluted(subErr) {
 		// Full remediation guidance lives in the i18n template
 		// (backendErrors.sftp_subsystem_polluted); only the raw subsystem /

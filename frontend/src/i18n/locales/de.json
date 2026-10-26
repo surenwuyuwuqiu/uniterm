@@ -2016,5 +2016,10 @@
   "netscan.export.failed": "Export fehlgeschlagen: ",
   "netscan.export.copy": "Kopieren",
   "netscan.export.copied": "Scanergebnisse in die Zwischenablage kopiert",
-  "netscan.export.copyFailed": "Kopieren fehlgeschlagen: "
+  "netscan.export.copyFailed": "Kopieren fehlgeschlagen: ",
+  "backendErrors.sftp_unavailable": "SFTP konnte nicht gestartet werden. Der Server bietet SFTP möglicherweise nicht an oder verweigert die Ausführung. Mit SCP erneut versuchen oder sftp-server auf dem Server installieren/aktivieren. Subsystemfehler: {0}; Fehler beim alternativen Start: {1}",
+  "sftp.retryScp": "Mit SCP erneut versuchen",
+  "sftp.usingScp": "Diese Sitzung verwendet SCP",
+  "sftp.rememberScp": "SCP für diese Verbindung merken",
+  "backendErrors.scp_unavailable": "SCP ist nicht verfügbar. Prüfen Sie, ob scp auf dem Server installiert ist und Shell-Befehle sowie Verzeichnislisten erlaubt sind. Details: {0}"
 }

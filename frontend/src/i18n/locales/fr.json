@@ -2016,5 +2016,10 @@
   "netscan.export.failed": "Échec de l'export : ",
   "netscan.export.copy": "Copier",
   "netscan.export.copied": "Résultats du scan copiés dans le presse-papiers",
-  "netscan.export.copyFailed": "Échec de la copie : "
+  "netscan.export.copyFailed": "Échec de la copie : ",
+  "backendErrors.sftp_unavailable": "Impossible de démarrer SFTP. Le serveur peut ne pas le proposer ou refuser son exécution. Réessayez avec SCP ou installez/activez sftp-server sur le serveur. Erreur du sous-système : {0} ; erreur du démarrage alternatif : {1}",
+  "sftp.retryScp": "Réessayer avec SCP",
+  "sftp.usingScp": "Cette session utilise SCP",
+  "sftp.rememberScp": "Mémoriser SCP pour cette connexion",
+  "backendErrors.scp_unavailable": "SCP est indisponible. Vérifiez que scp est installé sur le serveur et que les commandes shell et les listes de répertoires sont autorisées. Détails : {0}"
 }

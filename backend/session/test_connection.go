@@ -157,7 +157,7 @@ func probeSFTP(config ConnectionConfig) (string, error) {
 }
 
 // probeSCP verifies SSH connectivity AND that the exec channel (which the SCP
-// transfer engine drives) is usable — a plain shell command round-trip.
+// transfer engine drives) can find scp and list the login directory.
 func probeSCP(config ConnectionConfig) (string, error) {
 	kb := func(user, instruction string, questions []string, echos []bool) ([]string, error) {
 		return nil, fmt.Errorf("interactive auth not allowed during connection test")
@@ -192,7 +192,7 @@ func probeSCP(config ConnectionConfig) (string, error) {
 		return "", fmt.Errorf("scp: exec channel: %w", err)
 	}
 	defer sess.Close()
-	if _, err := sess.Output("pwd"); err != nil {
+	if _, err := sess.Output(scpCapabilityCommand); err != nil {
 		return "", fmt.Errorf("scp: exec channel: %w", err)
 	}
 	return fmt.Sprintf("scp: connected as %s@%s:%d", config.User, config.Host, config.Port), nil

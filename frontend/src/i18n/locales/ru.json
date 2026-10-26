@@ -2016,5 +2016,10 @@
   "netscan.export.failed": "Ошибка экспорта: ",
   "netscan.export.copy": "Копировать",
   "netscan.export.copied": "Результаты сканирования скопированы в буфер обмена",
-  "netscan.export.copyFailed": "Ошибка копирования: "
+  "netscan.export.copyFailed": "Ошибка копирования: ",
+  "backendErrors.sftp_unavailable": "Не удалось запустить SFTP. Сервер может не поддерживать SFTP или запрещать его запуск. Повторите с SCP либо установите и включите sftp-server на сервере. Ошибка подсистемы: {0}; ошибка альтернативного запуска: {1}",
+  "sftp.retryScp": "Повторить с SCP",
+  "sftp.usingScp": "Сеанс использует SCP",
+  "sftp.rememberScp": "Запомнить SCP для этого подключения",
+  "backendErrors.scp_unavailable": "SCP недоступен. Убедитесь, что на сервере установлен scp и разрешены команды оболочки и просмотр каталогов. Подробности: {0}"
 }

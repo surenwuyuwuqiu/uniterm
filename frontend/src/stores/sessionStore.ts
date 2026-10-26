@@ -7,6 +7,7 @@ import { useZmodemStore } from './zmodemStore'
 interface SessionData {
   id: string
   status: SessionStatus
+  errorMessage?: string
   // Detected remote OS (e.g. "windows-openssh") reported by the backend on
   // connect. Empty when unknown or not applicable.
   remoteOS?: string
@@ -75,13 +76,15 @@ let unsubSessionStatus: (() => void) | null = null
 let unsubSessionData: (() => void) | null = null
 
 // Register event listeners once at module level
-unsubSessionStatus =Events.On('session:status', (ev) => { const payload: { id: string; status: SessionStatus; remoteOS?: string } = ev.data; 
+unsubSessionStatus =Events.On('session:status', (ev) => { const payload: { id: string; status: SessionStatus; remoteOS?: string; errorMessage?: string } = ev.data;
   let s = sessionState.sessions.get(payload.id)
   if (!s) {
     s = { id: payload.id, status: 'connecting', data: [], seq: 0, bytes: 0 }
     sessionState.sessions.set(payload.id, s)
   }
   s.status = payload.status
+  if (payload.errorMessage) s.errorMessage = payload.errorMessage
+  if (payload.status === 'connected' || payload.status === 'connecting') s.errorMessage = undefined
   if (payload.remoteOS !== undefined) {
     s.remoteOS = payload.remoteOS
   }
@@ -117,11 +120,8 @@ export function disposeSessionStore() {
 export const useSessionStore = defineStore('session', () => {
   function initSession(id: string) {
     const existing = sessionState.sessions.get(id)
-    if (existing) {
-      if (existing.status !== 'connected') {
-        existing.status = 'connecting'
-      }
-    } else {
+    // Events can arrive before CreateSession returns. Preserve their result.
+    if (!existing) {
       sessionState.sessions.set(id, { id, status: 'connecting', data: [], seq: 0, bytes: 0 })
     }
   }

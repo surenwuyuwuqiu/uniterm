@@ -260,7 +260,7 @@ export const useCompanionStore = defineStore('companion', () => {
         ...entries.value,
         [sshPanelId]: { ...entries.value[sshPanelId], creatingSftp: false },
       }
-      return null
+      throw e
     }
   }
 
